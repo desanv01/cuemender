@@ -140,3 +140,9 @@ Ran the final binary as PID 34168 on 127.0.0.1:18788 with `--no-browser --sessio
 - Disconnected the test client, closed its hidden tab, verified/stopped only owned PID 34168 and removed its isolated runtime data/logs. Port 18788 released. The user's OBS process remains running; the authorized test card remains available. No streaming/audio state was changed.
 
 No further local correction packet is outstanding. Live OBS P02-B/V07 and browser P02-H are verified. Live Twitch P02-A/V06 remains unperformed and explicitly deferred by the user. No P03 release or P02 acceptance/merge is implied. Root final verification of Codex-authored changes is self-verification with separately identified peer findings, not an independent external acceptance review.
+
+### Publication
+
+Published verified source checkpoint `1b068843e38bee905ff6ea80c44f612e88ed32d4` on `feature/p02-live-connections`; opened [draft PR #5](https://github.com/desanv01/cuemender/pull/5). Updated issue #4 (comment 6559487505) and issue #2 (comment 6559488395); both remain open with acceptance/merge held. No main-branch change or P03 dispatch.
+
+Staged-content audit found no known OBS credential, credential-shaped literal or forbidden runtime artifact. Tools, data, screenshots and binaries remain ignored. Four agent-authored review documents had their extra terminal blank lines normalized. `.gitattributes` preserves LF for the pinned upstream module and exempts only its unchanged `docs/request-mapping.md` terminal blank line from whitespace checking; upstream source bytes/license remain preserved as verified above. Final staged whitespace check passed. Publication bookkeeping after the source checkpoint changes documentation only and does not require rerunning application tests.
