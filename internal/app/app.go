@@ -16,8 +16,10 @@ import (
 
 	"github.com/desanv01/cuemender/internal/domain"
 	"github.com/desanv01/cuemender/internal/httpui"
+	"github.com/desanv01/cuemender/internal/obs"
 	"github.com/desanv01/cuemender/internal/secrets"
 	"github.com/desanv01/cuemender/internal/store"
+	"github.com/desanv01/cuemender/internal/twitch"
 	"github.com/desanv01/cuemender/web"
 )
 
@@ -31,15 +33,31 @@ type Options struct {
 	Now                func() time.Time
 }
 
+type osSecretStore interface {
+	secrets.Store
+	Available(context.Context) bool
+}
+
+// The private composition seam lets local fixtures exercise startup and the
+// credential boundary. Public New always uses the real stores and endpoints.
+type appDependencies struct {
+	newOSStore      func() osSecretStore
+	configureTwitch func(*twitch.Options)
+}
+
 type App struct {
-	cfg     Config
-	dataDir string
-	now     func() time.Time
+	cfg        Config
+	fileConfig Config
+	configMu   sync.Mutex
+	dataDir    string
+	now        func() time.Time
 
 	listener     net.Listener
 	store        *store.Store
 	secrets      secrets.Store
 	secretsState domain.SecretsStatus
+	twitchMgr    *twitch.Manager
+	obsMgr       *obs.Manager
 
 	ui         *httpui.Server
 	httpServer *http.Server
@@ -50,6 +68,7 @@ type App struct {
 
 	stateMu       sync.RWMutex
 	saveMu        sync.Mutex
+	integrationMu sync.Mutex
 	settings      domain.Settings
 	stateRevision uint64
 	privateHub    *hub
@@ -67,6 +86,10 @@ type App struct {
 }
 
 func New(ctx context.Context, opts Options) (*App, error) {
+	return newWithDependencies(ctx, opts, appDependencies{})
+}
+
+func newWithDependencies(ctx context.Context, opts Options, deps appDependencies) (*App, error) {
 	if opts.Stdout == nil {
 		opts.Stdout = os.Stdout
 	}
@@ -84,6 +107,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	fileConfig := cfg
 	if opts.ListenAddress != "" {
 		if err := ValidateListenAddress(opts.ListenAddress); err != nil {
 			return nil, fmt.Errorf("--listen: %w", err)
@@ -131,13 +155,17 @@ func New(ctx context.Context, opts Options) (*App, error) {
 			Detail:    "Explicit session-only mode: secrets are held in memory for this process only.",
 		}
 	} else {
-		osStore := secrets.NewOS("LiveCheck")
+		newOSStore := deps.newOSStore
+		if newOSStore == nil {
+			newOSStore = func() osSecretStore { return secrets.NewOS("LiveCheck") }
+		}
+		osStore := newOSStore()
 		secretStore = osStore
 		if osStore.Available(ctx) {
 			secretsStatus = domain.SecretsStatus{
 				Mode:      domain.SecretsModeOS,
 				Available: true,
-				Detail:    "OS credential storage is available. P01 stores no credentials.",
+				Detail:    "OS credential storage is available.",
 			}
 		} else {
 			secretsStatus = domain.SecretsStatus{
@@ -151,6 +179,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	baseCtx, baseCancel := context.WithCancel(context.Background())
 	a := &App{
 		cfg:           cfg,
+		fileConfig:    fileConfig,
 		dataDir:       dataDir,
 		now:           opts.Now,
 		listener:      ln,
@@ -170,6 +199,30 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		baseCancel:    baseCancel,
 	}
 	a.baseURL = "http://" + net.JoinHostPort(host, port)
+	twitchOptions := twitch.Options{
+		Context:       baseCtx,
+		OAuth:         twitch.NewOAuth(&http.Client{Timeout: 15 * time.Second}, twitch.DefaultEndpoints(), a.now),
+		Store:         twitch.NewCredentialStore(secretStore),
+		Dialer:        twitch.CoderDialer{HTTP: &http.Client{}},
+		Endpoints:     twitch.DefaultEndpoints(),
+		ClientID:      fileConfig.TwitchClientID,
+		StorageMode:   secretsStatus.Mode,
+		Now:           a.now,
+		OnUpdate:      a.onIntegrationUpdate,
+		RefreshPeriod: time.Hour,
+	}
+	if deps.configureTwitch != nil {
+		deps.configureTwitch(&twitchOptions)
+	}
+	a.twitchMgr = twitch.NewManager(twitchOptions)
+	a.obsMgr = obs.NewManager(obs.Options{
+		Context:  baseCtx,
+		Dialer:   obs.GoobsDialer{},
+		Secrets:  secretStore,
+		Now:      a.now,
+		OnUpdate: a.onIntegrationUpdate,
+	})
+	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
 
 	ui, err := httpui.New(httpui.Options{
 		Backend: a,
@@ -216,8 +269,10 @@ func (a *App) Run(ctx context.Context) error {
 	fmt.Fprintf(a.stdout, "Listening on %s\n", a.baseURL)
 	fmt.Fprintf(a.stdout, "Public overlay: %s/overlay/\n", a.baseURL)
 	fmt.Fprintf(a.stdout, "Private control (single-use link, valid 5 minutes): %s\n", a.controlURL)
-	fmt.Fprintln(a.stdout, "Twitch: not connected. OBS: not connected. Integrations arrive in P02.")
+	fmt.Fprintln(a.stdout, "Twitch: not connected. OBS: not connected. Use the private control page to connect.")
 	a.logger.Info("listening", "address", a.baseURL)
+	a.twitchMgr.StartSaved()
+	a.twitchMgr.StartRefreshLoop()
 
 	if !a.noBrowser {
 		if err := openBrowser(a.controlURL); err != nil {
@@ -262,6 +317,12 @@ func (a *App) Close() {
 		a.baseCancel()
 		if a.ui != nil {
 			a.ui.Close()
+		}
+		if a.twitchMgr != nil {
+			a.twitchMgr.Close()
+		}
+		if a.obsMgr != nil {
+			a.obsMgr.Close()
 		}
 		if a.listener != nil {
 			_ = a.listener.Close()
@@ -333,6 +394,7 @@ func (a *App) SaveSettings(ctx context.Context, expectedRevision int64, exp doma
 	if err != nil {
 		return domain.Settings{}, err
 	}
+	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
 
 	// stateMu is the publication ordering lock: cache update, revision
 	// increment, both projections and both hub publications happen while a
@@ -374,6 +436,8 @@ func (a *App) SubscribePublic() httpui.Subscription {
 }
 
 func (a *App) privateLocked() domain.PrivateState {
+	twitchState := a.twitchMgr.Snapshot()
+	obsState, discovery, observation, resolutionReady := a.obsMgr.SnapshotBundle(a.settings)
 	return domain.PrivateState{
 		Mode:             domain.ModeLive,
 		StateRevision:    a.stateRevision,
@@ -383,17 +447,16 @@ func (a *App) privateLocked() domain.PrivateState {
 			MicrophoneConfigured:   a.settings.Microphone != nil,
 			StreamTrackConfigured:  a.settings.StreamTrack != nil,
 			VisualConfigured:       a.settings.Visual != nil,
-			LiveOBSResolutionReady: false,
+			TwitchAuthorized:       twitchState.Status == domain.ConnectionConnected,
+			OBSConnected:           obsState.Status == domain.ConnectionConnected,
+			OBSDiscoveryReady:      discovery != nil,
+			LiveOBSResolutionReady: obsState.Status == domain.ConnectionConnected && !obsState.Stale && resolutionReady,
 		},
-		Secrets: a.secretsStatus(),
-		Twitch: domain.IntegrationStatus{
-			Status: domain.IntegrationNotConnected,
-			Detail: "Twitch connection is not implemented in P01; it arrives in P02.",
-		},
-		OBS: domain.IntegrationStatus{
-			Status: domain.IntegrationNotConnected,
-			Detail: "OBS connection is not implemented in P01; it arrives in P02.",
-		},
+		Secrets:        a.secretsStatus(),
+		Twitch:         twitchState,
+		OBS:            obsState,
+		OBSDiscovery:   discovery,
+		OBSObservation: observation,
 		Startup: domain.StartupInfo{
 			ListenAddress:            a.cfg.ListenAddress,
 			OBSAddress:               a.cfg.OBSAddress,

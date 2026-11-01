@@ -28,6 +28,13 @@ Revision: 1.3
 
 ## Change record procedure
 
+### P02 closure decisions — 2026-11-01
+
+- D26 (Codex, user-authorized takeover): Codex completes remaining P02 implementation and verification with GPT-6.1 Sol high subagents. DeepSeek remains stopped. One implementation writer at a time; other agents may inspect independently. P03 stays held. Codex-authored fixes receive self-verification and separately identified peer review, not a claim of independent DeepSeek acceptance.
+- D27 (Codex): permit a minimal local patched copy of pinned goobs v1.11.1 under third_party/goobs, retaining its license and provenance with a local go.mod replacement. Inspection found constructor/authentication, raw EOF and request-wait ownership defects that public adapter hooks cannot fully repair while meeting prompt cancellation and joined cleanup. Limit upstream production edits to client.go and api/client.go and record the exact patch; no SDK substitution or version upgrade. Reverify real-protocol cancel/failure/shutdown and race behavior. Storage and supported OBS write scope do not change.
+- D28 (user constraint): all computer access stays in the background, including OBS. Do not activate windows or take mouse/keyboard control. Guide the user through necessary foreground authentication/OBS settings steps.
+- D29 (Codex): use existing WSL Ubuntu/GCC with an official checksum-verified workspace-local Linux Go toolchain for race validation; production Windows artifacts remain CGO_ENABLED=0. No administrator/system-wide installation.
+
 New entry: date, author/approver, affected contracts/packets, decision, reason, migration or retest effect. Workers propose changes in their reports rather than editing this file.
 
 Reasonable local function naming, CSS choices within a released design brief and small test helpers are not architectural decisions. Dependency substitution, state/API semantics, platform scope and automatic side effects are.
@@ -36,3 +43,4 @@ Reasonable local function naming, CSS choices within a released design brief and
 - D22 (Codex): preserve LiveCheck data/keyring namespace, livecheck.db and livecheck_session for compatibility. Visible branding and module/imports use CueMender. No storage migration. Rename gets full build/test self-verification.
 - D23 (Codex): C08 and P02 v1.1 define connect/disconnect bodies, atomic config ownership and asynchronous status against actual P01 interfaces. P02 may develop with fixtures while Public client registration is pending, but real Twitch/OBS acceptance gates remain required.
 - D24 (Codex): P02 diagnostic receipt counts can be shown privately while idle as a setup aid. They never create incidents or claim monitoring; C04 monitoring-gated report processing starts in P03.
+- D25 (Codex, 2026-11-01): approve explicit private OBS Connect after process restart for the MVP. A default endpoint alone is not intent to connect. Keep exact-endpoint saved-password reuse and established-loss automatic recovery; no new startup flag/config field. This resolves the worker's reported choice under C08's optional startup resume, without waiving cancellation/readiness gates.

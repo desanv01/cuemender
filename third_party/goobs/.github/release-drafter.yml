@@ -1,0 +1,70 @@
+---
+name-template: v$RESOLVED_VERSION
+tag-template: v$RESOLVED_VERSION
+tag-prefix: v
+
+autolabeler:
+- label: chore
+  branch: [/^chore\/.+/]
+- label: ci
+  branch: [/^ci\/.+/]
+- label: docs
+  branch: [/^docs\/.+/]
+- label: fix
+  branch: [/^fix\/.+/]
+- label: feature
+  branch: [/^feature\/.+/]
+- label: major
+  branch: [/^major\/.+/]
+- label: minor
+  branch: [/^minor\/.+/]
+- label: patch
+  branch: [/^patch\/.+/]
+
+categories:
+- title: 🚨 Breaking Changes
+  labels:
+  - breaking
+- title: 💻 Protocol Updates
+  labels:
+  - protocol
+- title: 🚀 Features
+  labels:
+  - enhancement
+  - feature
+- title: 🐛 Bug Fixes
+  labels:
+  - bug
+  - fix
+- title: 🔧 Maintenance
+  labels:
+  - chore
+  - ci
+  - docs
+- title: 🤖 Dependencies
+  labels:
+  - dependencies
+
+version-resolver:
+  major:
+    labels:
+    - breaking
+    - major
+  minor:
+    labels:
+    - enhancement
+    - feature
+    - minor
+  patch:
+    labels:
+    - bug
+    - chore
+    - ci
+    - dependencies
+    - docs
+    - fix
+    - patch
+  default: patch
+
+template: |
+  $CHANGES

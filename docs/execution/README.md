@@ -1,12 +1,12 @@
 # CueMender execution pack
 
-Revision: 1.3 • Updated 2026-11-01 • P01 accepted; P02 v1.1 released.
+Revision: 1.8 • Updated 2026-11-01 • P01 accepted; P02 local closure/live OBS verified; live Twitch deferred.
 
 ## Immediate next action
 
-P01-R01 is accepted in [the final review](handoffs/P01-R01-review.md). Dispatch **P02 v1.1** from [PROMPTS.md](PROMPTS.md), using [the live-connection packet](packages/P02-live-connections.md). The portable Go toolchain is present. The public repository is [desanv01/cuemender](https://github.com/desanv01/cuemender). Twitch Public client registration is still needed for live validation; fixture development can start.
+Codex completed the remaining P02 boundary fixes, local/full race tests and actual hidden-browser/live OBS verification. See [the closure review](handoffs/P02-codex-closure-review.md) and [exact evidence](../implementation/P02-codex-closure.md). **Only live Twitch P02-A/V06 remains unmet**, explicitly deferred by the user because of 2FA/phone setup. All writers and test processes stopped. Do not redispatch old corrections or start P03; follow [STATUS](STATUS.md).
 
-This revision replaces the earlier Codex-only-plans/reviews arrangement. DeepSeek remains the main implementer for P01/P02/P03/P05/P06. Codex directly implements P04 and its tests, plus needed integration fixes when it owns edits. Use the current P02 v1.1 prompt, not an earlier copied P01 prompt. This division provides substantive planned Codex work but is not an organizer guarantee of eligibility.
+DeepSeek remains the planned implementer for P03/P05/P06 after their release. Codex owns the current P02 closure and directly implements P04 and its tests. This division provides substantive Codex work but is not an organizer guarantee of eligibility.
 
 ## Reading order
 
@@ -25,7 +25,7 @@ Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [init
 | Packet | Outcome | Dispatch state |
 |---|---|---|
 | [P01 — Foundation](packages/P01-foundation.md) | Runnable local shell, persistent settings, credential boundary, private/public HTTP boundaries | Accepted after P01-R01 |
-| [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Released v1.1; live prerequisites pending |
+| [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Local/live OBS verified; Twitch deferred; P03 held |
 | [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Planned |
 | [P04 — Approved repair](packages/P04-approved-repair.md) | Codex implements approval, correction, reconciliation and tests | Planned; reserved for Codex |
 | [P05 — User experience](packages/P05-user-experience.md) | Finished setup, controls, overlay, confirmation, rehearsal | Planned |

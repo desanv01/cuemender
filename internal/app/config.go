@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 const (
@@ -79,6 +81,65 @@ func ensureJSONEOF(dec *json.Decoder) error {
 		return errors.New("multiple JSON values")
 	}
 	return err
+}
+
+var saveConfigMu sync.Mutex
+
+// replaceConfigFile is an injectable boundary for deterministic filesystem
+// failure tests; production uses same-directory rename.
+var replaceConfigFile = os.Rename
+
+// SaveConfig validates and atomically replaces dataDir/config.json. The
+// temporary file is written, synced and closed in the same directory before
+// replacement, so a failure leaves the previous valid file intact.
+func SaveConfig(dataDir string, cfg Config) error {
+	saveConfigMu.Lock()
+	defer saveConfigMu.Unlock()
+	if err := ValidateConfig(cfg); err != nil {
+		return fmt.Errorf("validate config: %w", err)
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode config: %w", err)
+	}
+	data = append(data, '\n')
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return fmt.Errorf("create data directory: %w", err)
+	}
+	tmp, err := os.CreateTemp(dataDir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temporary config: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("set config permissions: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write temporary config: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("sync temporary config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temporary config: %w", err)
+	}
+	path := filepath.Join(dataDir, configFileName)
+	var renameErr error
+	for attempt := 0; attempt < 20; attempt++ {
+		renameErr = replaceConfigFile(tmpPath, path)
+		if renameErr == nil {
+			return nil
+		}
+		// Windows can transiently deny replacement while a reader/AV scanner
+		// still has the prior file open. Retry briefly without weakening the
+		// atomic same-directory replacement.
+		time.Sleep(time.Duration(attempt+1) * 5 * time.Millisecond)
+	}
+	return fmt.Errorf("replace config: %w", renameErr)
 }
 
 func ValidateConfig(cfg Config) error {

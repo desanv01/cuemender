@@ -1,13 +1,15 @@
 # CueMender — development and foundation testing
 
-CueMender is a local Windows stream-diagnostics application. This repository
-currently contains the accepted P01 foundation only: a small Go executable that serves
-embedded private-control and public-overlay pages, protects private state with a
-one-time local session, stores validated expectations in SQLite, and shuts down
-cleanly.
+CueMender is a local Windows stream-diagnostics application. The repository
+contains the accepted P01 foundation plus P02 Twitch/OBS connection setup:
+embedded private-control and public-overlay pages, a one-time local session,
+validated SQLite expectations, public-client Twitch authorization, EventSub chat
+intake, and read-only local OBS discovery/observations.
 
-It does **not** connect to Twitch or OBS yet. Diagnostics, approvals and the
-supported track correction are later packets.
+Live Twitch and OBS behavior has **not** been validated in this workspace: no
+Twitch Public client is registered and OBS's WebSocket server is disabled.
+Fixture tests are not live evidence. Diagnostics, approvals and the supported
+track correction remain later packets.
 
 ## Requirements
 
@@ -90,7 +92,7 @@ Only explicit loopback IPs are accepted for `listen_address` and `obs_address`.
 URL credentials, remote addresses, unknown fields and unsupported schema versions
 are rejected. A malformed file is reported and left untouched.
 
-## Private HTTP boundary (P01)
+## Private HTTP boundary
 
 - `GET /healthz` — minimal process status.
 - `GET /control/` — static private-control shell (no private data).
@@ -98,6 +100,11 @@ are rejected. A malformed file is reported and left untouched.
 - `GET /api/v1/state` — authenticated private snapshot with CSRF token.
 - `POST /api/v1/settings` — revision-checked expectations update.
 - `GET /api/v1/events` — authenticated private SSE.
+- `POST /api/v1/twitch/connect` — persist client ID and begin device flow.
+- `POST /api/v1/twitch/disconnect` — cancel and clear Twitch credentials.
+- `POST /api/v1/obs/connect` — connect read-only to local OBS WebSocket.
+- `POST /api/v1/obs/disconnect` — cancel reads and invalidate observations.
+- `GET /api/v1/obs/discovery` — authorized discovery snapshot.
 - `GET /overlay/` — static public overlay.
 - `GET /public/v1/state` — sanitized public snapshot.
 - `GET /public/v1/events` — sanitized public SSE.
@@ -129,9 +136,10 @@ return HTTP 409 and never overwrite newer data.
 
 - SQLite: `<data-dir>\livecheck.db`; schema version 1 creates
   `schema_migrations` and `app_settings` only.
-- Credentials: P01 stores none. Without `--session-only-secrets`, the OS keyring
-  is probed; if unavailable, the UI reports it and credential-dependent work is
-  disabled. There is no plaintext fallback.
+- Credentials: P02 stores the Twitch token pair and endpoint-scoped OBS password
+  in the OS keyring. With `--session-only-secrets`, credentials remain in memory
+  for that process only. If the keyring is unavailable, the UI reports it and
+  credential-dependent work is disabled. There is no plaintext fallback.
 - The server is loopback-only. Loopback HTTP is not a defense against malware or
   another privileged process on the same computer.
 - Private pages use a self-only CSP and anti-framing; the public overlay remains
@@ -140,20 +148,25 @@ return HTTP 409 and never overwrite newer data.
 
 ## Current limitations
 
-- No Twitch authorization, EventSub or chat.
-- No OBS connection or live source/track resolution.
-- No incident, approval or repair engine; P04 belongs to Codex.
+- Live Twitch authorization/chat is deferred by the user due to 2FA/phone
+  setup; live OBS reads are verified on OBS 32.1.1 / obs-websocket 5.7.3.
+  See [P02 setup](implementation/P02-setup.md) for the remaining gate.
+- P02 has no incident, approval or repair engine; P04 belongs to Codex.
 - No final UI, rehearsal mode, release ZIP or license decision.
-- Browser rendering has not been exercised in a real browser; HTTP and embedded
-  asset tests pass, but visual review remains for Codex.
+- The final closure build passed hidden-browser bootstrap, live discovery,
+  save/reload/save and disconnect/reconnect. Full Windows tests, vet/build and
+  Linux race checks passed; see [the closure record](implementation/P02-codex-closure.md).
+- OBS reads are intentionally read-only in P02; no mutation route exists.
 
 ## Next packet
 
-P02 adds real own-channel Twitch chat and OBS discovery/read evidence. It is not
-part of P01. See [execution status](execution/STATUS.md) for its current dispatch state.
+P03 adds evidence-based diagnostics and the persistent incident lifecycle. It is
+not part of P02 and remains held until Codex accepts the live-connection gates.
+See [execution status](execution/STATUS.md) for its current dispatch state.
 
 ## License
 
 No license has been selected. Dependency notices are recorded in
-[P01 environment](implementation/P01-environment.md); final repository licensing is a
-release decision.
+[P02 compatibility](implementation/P02-compatibility.md) and
+[P01 environment](implementation/P01-environment.md); final repository
+licensing is a release decision.

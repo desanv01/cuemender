@@ -10,9 +10,9 @@
   <header class="masthead">
     <div>
       <h1>CueMender</h1>
-      <p class="subtitle">Community-assisted stream diagnostics · foundation</p>
+      <p class="subtitle">Community-assisted stream diagnostics · connection setup</p>
     </div>
-    <span class="badge">P01</span>
+    <span class="badge">P02</span>
   </header>
 
   <main>
@@ -36,12 +36,70 @@
           <div><dt>Twitch</dt><dd id="twitch">not connected</dd></div>
           <div><dt>OBS</dt><dd id="obs">not connected</dd></div>
         </dl>
-        <p class="note">Twitch and OBS connection arrive in P02. Live OBS resolution is not implemented in P01.</p>
+        <p class="note">Twitch and OBS setup is live. Monitoring, incidents and repairs are not implemented in P02.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="twitch-heading">
+        <h2 id="twitch-heading">Twitch connection</h2>
+        <p class="muted">Authorize the broadcaster's own channel with a Twitch Public client. No client secret is used.</p>
+        <label for="twitch-client-id">Public client ID</label>
+        <input id="twitch-client-id" type="text" maxlength="64" autocomplete="off" spellcheck="false">
+        <div class="actions">
+          <button id="twitch-connect" type="button">Connect Twitch</button>
+          <button id="twitch-disconnect" type="button" class="secondary">Disconnect</button>
+        </div>
+        <p id="twitch-status" class="connection-status">not connected</p>
+        <div id="twitch-device" class="device-box" hidden>
+          <p>Open the verification page and enter this code:</p>
+          <p id="twitch-user-code" class="device-code"></p>
+          <p id="twitch-verification-uri" class="muted"></p>
+          <p id="twitch-device-expiry" class="muted"></p>
+        </div>
+        <p id="twitch-receipt" class="muted">No commands received.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="obs-heading">
+        <h2 id="obs-heading">OBS connection</h2>
+        <p class="muted">Read-only local discovery. CueMender never changes OBS scenes, sources or tracks in P02.</p>
+        <label for="obs-address">WebSocket address</label>
+        <input id="obs-address" type="text" maxlength="256" autocomplete="off" spellcheck="false">
+        <label for="obs-password">WebSocket password <span class="optional">(leave blank if none)</span></label>
+        <input id="obs-password" type="password" maxlength="256" autocomplete="new-password">
+        <label class="check">
+          <input id="obs-reuse" type="checkbox" checked>
+          Reuse saved password for this endpoint
+        </label>
+        <div class="actions">
+          <button id="obs-connect" type="button">Connect OBS</button>
+          <button id="obs-disconnect" type="button" class="secondary">Disconnect</button>
+          <button id="obs-refresh" type="button" class="secondary">Refresh discovery</button>
+        </div>
+        <p id="obs-status" class="connection-status">not connected</p>
+        <p id="obs-broadcast" class="muted">Broadcasting state unknown.</p>
+        <p id="obs-stale" class="muted"></p>
+        <p id="obs-readiness" class="muted"></p>
+        <p id="obs-observed" class="muted"></p>
+        <div id="obs-observation" class="device-box" hidden>
+          <p class="connection-status">Live read-only observation</p>
+          <p id="obs-mute" class="muted">Microphone mute: unknown</p>
+          <p id="obs-tracks" class="muted">Tracks: unknown</p>
+          <p id="obs-scene" class="muted">Program scene: unknown</p>
+          <p id="obs-visual" class="muted">Visual item: unknown</p>
+          <p id="obs-streaming" class="muted">Streaming: unknown</p>
+        </div>
+        <div id="obs-discovery" hidden>
+          <label for="discovery-mic">Discovered microphone</label>
+          <select id="discovery-mic"><option value="">Select an input</option></select>
+          <label for="discovery-scene">Discovered scene</label>
+          <select id="discovery-scene"><option value="">Select a scene</option></select>
+          <label for="discovery-item">Direct scene item</label>
+          <select id="discovery-item"><option value="">Select a scene item</option></select>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="setup-heading">
         <h2 id="setup-heading">Declared expectations</h2>
-        <p class="muted">Structural validation only. These names are not resolved against OBS yet.</p>
+        <p class="muted">Select from OBS discovery when connected, or enter identities manually. Live resolution is shown separately.</p>
         <form id="settings-form" novalidate>
           <fieldset>
             <legend>Microphone</legend>
@@ -49,6 +107,8 @@
             <input id="mic-name" name="mic-name" type="text" maxlength="256" autocomplete="off" placeholder="e.g. Mic/Aux">
             <label for="mic-uuid">Stable input UUID <span class="optional">(optional)</span></label>
             <input id="mic-uuid" name="mic-uuid" type="text" maxlength="256" autocomplete="off">
+            <label for="mic-context">Context <span class="optional">(optional)</span></label>
+            <input id="mic-context" name="mic-context" type="text" maxlength="256" autocomplete="off">
           </fieldset>
 
           <fieldset>
@@ -75,10 +135,16 @@
             <fieldset id="visual-fields" class="nested" disabled>
               <label for="visual-scene">Scene name</label>
               <input id="visual-scene" type="text" maxlength="256" autocomplete="off">
+              <label for="visual-scene-uuid">Stable scene UUID <span class="optional">(optional)</span></label>
+              <input id="visual-scene-uuid" type="text" maxlength="256" autocomplete="off">
               <label for="visual-item">Scene item ID</label>
               <input id="visual-item" type="text" maxlength="256" autocomplete="off">
               <label for="visual-source">Source name</label>
               <input id="visual-source" type="text" maxlength="256" autocomplete="off">
+              <label for="visual-source-uuid">Stable source UUID <span class="optional">(optional)</span></label>
+              <input id="visual-source-uuid" type="text" maxlength="256" autocomplete="off">
+              <label for="visual-context">Context <span class="optional">(optional)</span></label>
+              <input id="visual-context" type="text" maxlength="256" autocomplete="off">
             </fieldset>
           </fieldset>
 
@@ -92,7 +158,7 @@
   </main>
 
   <footer>
-    <p>Local only · loopback HTTP · no Twitch or OBS connection in this foundation</p>
+    <p>Local only · loopback HTTP · P02 setup only; no monitoring or repair actions</p>
   </footer>
   <noscript>JavaScript is required for the private control surface.</noscript>
   <script src="app.js"></script>

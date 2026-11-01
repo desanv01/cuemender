@@ -36,6 +36,11 @@ type Backend interface {
 	PrivateSnapshot(context.Context) (domain.PrivateState, error)
 	PublicSnapshot(context.Context) (domain.PublicState, error)
 	SaveSettings(context.Context, int64, domain.Expectations) (domain.Settings, error)
+	TwitchConnect(context.Context, string) error
+	TwitchDisconnect(context.Context) error
+	OBSConnect(context.Context, string, *string) error
+	OBSDisconnect(context.Context) error
+	OBSDiscovery(context.Context) (domain.OBSDiscovery, error)
 	SubscribePrivate() Subscription
 	SubscribePublic() Subscription
 }
@@ -177,6 +182,11 @@ func (s *Server) buildHandler() http.Handler {
 	mux.HandleFunc("/api/v1/state", onlyMethod(http.MethodGet, s.requireSession(http.HandlerFunc(s.handleState))).ServeHTTP)
 	mux.HandleFunc("/api/v1/settings", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleSettings)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/events", onlyMethod(http.MethodGet, s.requireSession(http.HandlerFunc(s.handlePrivateEvents))).ServeHTTP)
+	mux.HandleFunc("/api/v1/twitch/connect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleTwitchConnect)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/twitch/disconnect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleTwitchDisconnect)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/obs/connect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleOBSConnect)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/obs/disconnect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleOBSDisconnect)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/obs/discovery", onlyMethod(http.MethodGet, s.requireSession(http.HandlerFunc(s.handleOBSDiscovery))).ServeHTTP)
 
 	mux.HandleFunc("/public/v1/state", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicState)).ServeHTTP)
 	mux.HandleFunc("/public/v1/events", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicEvents)).ServeHTTP)
@@ -391,6 +401,111 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, r, settings)
+}
+
+func (s *Server) handleTwitchConnect(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		ClientID string `json:"client_id"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if strings.TrimSpace(body.ClientID) == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid_client_id", "A Twitch Public client ID is required.")
+		return
+	}
+	if err := s.backend.TwitchConnect(r.Context(), body.ClientID); err != nil {
+		writeIntegrationError(w, r, err)
+		return
+	}
+	writeDataStatus(w, r, http.StatusAccepted, map[string]string{"status": "authorizing"})
+}
+
+func (s *Server) handleTwitchDisconnect(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct{}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if err := s.backend.TwitchDisconnect(r.Context()); err != nil {
+		writeIntegrationError(w, r, err)
+		return
+	}
+	writeData(w, r, map[string]string{"status": "disconnected"})
+}
+
+func (s *Server) handleOBSConnect(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		Address  string  `json:"address"`
+		Password *string `json:"password"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if strings.TrimSpace(body.Address) == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid_obs_address", "An OBS WebSocket address is required.")
+		return
+	}
+	if err := s.backend.OBSConnect(r.Context(), body.Address, body.Password); err != nil {
+		writeIntegrationError(w, r, err)
+		return
+	}
+	writeDataStatus(w, r, http.StatusAccepted, map[string]string{"status": "connecting"})
+}
+
+func (s *Server) handleOBSDisconnect(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct{}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if err := s.backend.OBSDisconnect(r.Context()); err != nil {
+		writeIntegrationError(w, r, err)
+		return
+	}
+	writeData(w, r, map[string]string{"status": "disconnected"})
+}
+
+func (s *Server) handleOBSDiscovery(w http.ResponseWriter, r *http.Request) {
+	discovery, err := s.backend.OBSDiscovery(r.Context())
+	if err != nil {
+		writeIntegrationError(w, r, err)
+		return
+	}
+	writeData(w, r, discovery)
+}
+
+func writeIntegrationError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, domain.ErrBusy):
+		writeError(w, r, http.StatusConflict, "integration_busy", "That integration is already busy.")
+	case errors.Is(err, domain.ErrInvalidInput):
+		writeError(w, r, http.StatusBadRequest, "invalid_integration_input", "The integration settings are invalid.")
+	case errors.Is(err, domain.ErrCredentialStorage):
+		writeError(w, r, http.StatusServiceUnavailable, "credential_storage_unavailable", "Credential storage is unavailable. Restart with --session-only-secrets if appropriate.")
+	case errors.Is(err, domain.ErrUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "integration_unavailable", "That integration is unavailable.")
+	default:
+		writeError(w, r, http.StatusInternalServerError, "internal", "The integration operation failed.")
+	}
 }
 
 func (s *Server) handlePublicState(w http.ResponseWriter, r *http.Request) {

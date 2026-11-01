@@ -1,12 +1,87 @@
 # Copy-paste prompts
 
-Revision: 1.3
+Revision: 1.6
 
-Current dispatch: P02 v1.1 below. P01-R01 is accepted; older P01 prompts are historical. Only the packet currently released in STATUS may be run.
+Current dispatch: P02-R03 v1.0 below. P02 has changes required; earlier launch/correction prompts are historical. Only the correction currently released in STATUS may be run.
 
 This replaces the v1.0 launch instructions: Codex is also a production implementer. P04 is assigned to Codex in the main chat; its prompt below must not be sent to DeepSeek.
 
-## Current: P02 v1.1 — paste into DeepSeek
+## Current: P02-R03 v1.0 — paste into DeepSeek
+
+~~~text
+Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P02-R03 v1.0.
+
+Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md and CONTRACTS.md; the P02 v1.1 packet; docs/execution/handoffs/P02-R02-review.md; and docs/execution/corrections/P02-R03.md. Consult P02-R02.md and the existing worker report for the requirements/history being completed.
+
+Confirm STATUS releases P02-R03, no writer is active and the branch is feature/p02-live-connections; then claim ownership. Preserve the fourteen passing regressions and working setup UI. Complete all four groups in P02-R03: OBS transport ownership/cancellation; OBS context/revision/freshness; Twitch lifecycle/handover/credentials; remaining app/UI failure evidence. These finish existing requirements, not new features.
+
+Six review tests in internal/obs/p02_r02_review_test.go and internal/twitch/p02_r02_review_test.go fail on the handed-back implementation. Keep their behavioral assertions, fix production behavior and promote equivalent ordinary coverage. Also finish the packet's required boundary cases: passing only those six is insufficient. Local stalled-provider, delayed handover and filesystem faults do not require live accounts.
+
+No P03/P04, OBS mutations, UI redesign, new workers, specification edits, dependency substitutions or Git/GitHub actions. D25 manual OBS Connect after restart remains approved. If the pinned SDK prevents a correct bounded solution, report the precise constraint and smallest proposal instead of hiding it behind abandoned goroutines.
+
+Run the required meaningful checks, append an accurate P02-R03 evidence matrix to docs/execution/handoffs/P02-worker-report.md, and update compatibility/setup facts. Separate implemented behavior, executed fixtures, missing evidence and live gates. Never place credentials in reports. Stop owned processes, transfer STATUS to Codex with no active writer, and stop editing.
+
+Return:
+"P02-R03 corrections are ready for review. Read the appended evidence and inspect actual changes against docs/execution/corrections/P02-R03.md and P02-R02-review.md. Rerun the complete review set and required boundary checks. DeepSeek has stopped editing. Record acceptance or remaining corrections with live gates explicit. P03 remains held."
+~~~
+
+## Historical: P02-R02 v1.0 — partial completion; use R03
+
+~~~text
+Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek worker for P02-R02 v1.0.
+
+Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md and CONTRACTS.md; the P02 v1.1 packet; docs/execution/handoffs/P02-worker-report.md and P02-R01-review.md; and docs/execution/corrections/P02-R01.md and P02-R02.md.
+
+Confirm P02-R02 is released, no writer is active and the branch is feature/p02-live-connections, then claim ownership. Preserve the existing implementation and the seven already-passing promoted regressions.
+
+Complete all five P02-R02 groups: A token duration/identity/rotation; B actual OBS cancellation and transport ownership; C revision/context-safe observations; D Twitch lifecycle/handover/reply ownership; E stable setup controls and failure-path evidence. These finish existing requirements, not new features.
+
+The new review-only tests in internal/obs/p02_r01_review_test.go and internal/twitch/p02_r01_review_test.go reproduce seven remaining defects. Preserve their assertions, fix the production behavior and promote equivalent coverage into ordinary tests. Complete the packet's additional boundary tests as well; passing only the supplied regressions is insufficient.
+
+Codex approved manual OBS Connect after process restart (D25). Do not add an auto-start preference. Established-loss reconnect still remains required.
+
+No production fixes were made by Codex during this review. Do not redo working R01 fixes. No P03/P04, OBS mutations, new workers, specification edits, dependency substitutions or Git/GitHub operations.
+
+Live Twitch/OBS gates remain separate. Local cancellation, slow-read, handover and filesystem failure tests need no real credentials; complete them now. Never place secrets in chat, logs, source or reports.
+
+Append P02-R02 evidence with an A–E completion matrix, exact commands/results and remaining gates to the existing worker report. Update compatibility/setup facts honestly. Run the required Go, actual-script and focused boundary checks, stop processes, transfer STATUS to Codex and stop editing.
+
+Return:
+"P02-R02 corrections are ready for review. Read the appended P02-R02 evidence and inspect actual changes against docs/execution/corrections/P02-R02.md. Rerun the complete review regression set and the required lifecycle/protocol/UI failure paths. DeepSeek has stopped editing. Record remaining corrections or acceptance with live gates explicit. P03 remains held."
+~~~
+
+## Historical: P02-R01 — partial completion; use R02
+
+~~~text
+Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P02-R01 v1.0.
+
+Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md and CONTRACTS.md; docs/execution/packages/P02-live-connections.md; docs/execution/handoffs/P02-worker-report.md and P02-review.md; docs/execution/corrections/P02-R01.md; and both internal/obs/p02_review_regression_test.go and internal/twitch/p02_review_regression_test.go.
+
+Confirm STATUS assigns P02-R01, no writer is active and the checkout is feature/p02-live-connections. Claim ownership. Preserve the existing implementation and evidence; do not restart from a scaffold.
+
+Implement all eight correction groups in the packet:
+R01 actual OBS wire-track normalization and protocol tests;
+R02 OBS loss/reconnect, cancellation and saved-password recovery;
+R03 current identity/configuration provenance and coherent snapshots;
+R04 Twitch validation/revocation and explicit storage policy;
+R05 serialized lifecycle, credential deletion and config persistence;
+R06 EventSub handover socket ownership and generations;
+R07 provider rate limits and normalized command seam;
+R08 private setup observation display and identity-preserving save/reload.
+
+Codex's seven review regressions currently fail. Keep their behavioral assertions, make them pass and bring equivalent coverage into ordinary tests; do not weaken them or treat the untagged suite passing as sufficient. Add the packet's missing boundary tests and run its required checks. Correct the compatibility/setup documentation and append a P02-R01 evidence section to the existing worker report.
+
+Twitch registration, own-channel/separate-viewer authorization and live OBS remain separate unmet gates unless actually completed. Fixture servers are not live evidence. Missing live credentials do not block these code corrections. Never request a client secret or place tokens/passwords in chat, source, logs or reports.
+
+No P03/P04 features, OBS mutations, scope expansion, new workers, specification edits or Git/GitHub operations. P04 remains Codex-owned with its recording checkpoint.
+
+When finished, record each R01–R08 result and P02 acceptance gate honestly, update operational STATUS fields, transfer ownership to Codex, stop processes you started and stop editing.
+
+Return:
+"P02-R01 corrections are ready for review. Read the appended correction evidence in docs/execution/handoffs/P02-worker-report.md, inspect actual changes against docs/execution/corrections/P02-R01.md, and rerun the review regressions plus focused lifecycle/protocol/UI checks. DeepSeek has stopped editing. Record remaining corrections or acceptance, keeping live Twitch/OBS gates explicit. P03 remains held until accepted."
+~~~
+
+## Historical: P02 v1.1 initial implementation — do not restart
 
 ~~~text
 Work in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for CueMender P02 v1.1.
@@ -122,7 +197,7 @@ P01 worker handoff is ready. Read docs/execution/handoffs/P01-worker-report.md a
 
 ### P02
 
-Use the current P02 v1.1 prompt at the top of this document; the earlier generic prompt is superseded.
+Use the current P02-R02 correction prompt at the top of this document; earlier dispatches are historical.
 
 ### P03
 
