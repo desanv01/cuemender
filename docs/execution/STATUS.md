@@ -26,6 +26,9 @@ P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
 P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
 P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
 P03 tracking: https://github.com/desanv01/cuemender/issues/7
+P03 draft PR: https://github.com/desanv01/cuemender/pull/9 (unaccepted, unmerged; corrections required)
+P03 worker checkpoint: 9fa1652
+P03 review checkpoint: a09caaa (review fixtures/documents, no Codex production fixes)
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
 Next report: docs/execution/handoffs/P03-worker-report.md

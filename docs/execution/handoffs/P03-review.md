@@ -54,4 +54,6 @@ Review-only Go files are internal/diagnostics/p03_review_test.go, internal/incid
 
 ## Decision and next step
 
+Publication: worker handoff checkpoint `9fa1652`, independent review fixtures/docs checkpoint `a09caaa`, [draft PR #9](https://github.com/desanv01/cuemender/pull/9). These are unaccepted review checkpoints; nothing merged to main. Issues #7/#8 remain open and live gate #6 remains deferred.
+
 Release only P03-R01 v1.0 to DeepSeek on the current feature/p03-diagnostics branch. Complete all six groups and the required missing local boundaries in one correction handoff. No production fixes made by Codex this cycle. No P04 release or recording now. P02-A/V06 and P03-D live remain deferred/unmet under D30/[issue #6](https://github.com/desanv01/cuemender/issues/6).
