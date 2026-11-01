@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"livecheck/internal/store"
+	"github.com/desanv01/cuemender/internal/store"
 )
 
 func freePort(t *testing.T) int {

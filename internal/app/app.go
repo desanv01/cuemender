@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"livecheck/internal/domain"
-	"livecheck/internal/httpui"
-	"livecheck/internal/secrets"
-	"livecheck/internal/store"
-	"livecheck/web"
+	"github.com/desanv01/cuemender/internal/domain"
+	"github.com/desanv01/cuemender/internal/httpui"
+	"github.com/desanv01/cuemender/internal/secrets"
+	"github.com/desanv01/cuemender/internal/store"
+	"github.com/desanv01/cuemender/web"
 )
 
 type Options struct {
@@ -212,7 +212,7 @@ func (a *App) Run(ctx context.Context) error {
 		errCh <- a.httpServer.Serve(a.listener)
 	}()
 
-	fmt.Fprintf(a.stdout, "LiveCheck %s\n", VersionString())
+	fmt.Fprintf(a.stdout, "CueMender %s\n", VersionString())
 	fmt.Fprintf(a.stdout, "Listening on %s\n", a.baseURL)
 	fmt.Fprintf(a.stdout, "Public overlay: %s/overlay/\n", a.baseURL)
 	fmt.Fprintf(a.stdout, "Private control (single-use link, valid 5 minutes): %s\n", a.controlURL)

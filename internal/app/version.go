@@ -13,5 +13,5 @@ var (
 )
 
 func VersionString() string {
-	return fmt.Sprintf("livecheck %s (commit %s, built %s, %s)", Version, Commit, BuildDate, runtime.Version())
+	return fmt.Sprintf("cuemender %s (commit %s, built %s, %s)", Version, Commit, BuildDate, runtime.Version())
 }

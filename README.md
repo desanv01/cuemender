@@ -1,159 +1,164 @@
-# LiveCheck — P01 foundation
+<h1 align="center">CueMender</h1>
 
-LiveCheck is a local Windows stream-diagnostics application. This repository
-currently contains the P01 foundation only: a small Go executable that serves
-embedded private-control and public-overlay pages, protects private state with a
-one-time local session, stores validated expectations in SQLite, and shuts down
-cleanly.
+<p align="center">
+  <strong>Hear the report. Check the evidence. Approve the fix.</strong><br />
+  A local Go application for community-assisted Twitch and OBS diagnostics.
+</p>
 
-It does **not** connect to Twitch or OBS yet. Diagnostics, approvals and the
-supported track correction are later packets.
+<p align="center">
+  Built for the <a href="https://twitchcon-codex.devpost.com/">Codex x TwitchCon Hackathon</a><br />
+  By Desan Vasu
+</p>
 
-## Requirements
+<p align="center">
+  <img src="https://img.shields.io/badge/status-foundation_accepted-9146FF" alt="Foundation accepted; integrations under development" />
+  <img src="https://img.shields.io/badge/Go-1.27.3-00ADD8?logo=go&logoColor=white" alt="Go 1.27.3" />
+  <img src="https://img.shields.io/badge/platform-Windows_x64-65d2f4" alt="Windows x64" />
+</p>
 
-- Windows 11 x64 to run.
-- Go 1.27.3 to build. End users do not need Go or Node.
-- A modern browser for the private control page.
+<p align="center">
+  <a href="#features">Features</a> ·
+  <a href="#demo">Demo</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#built-with-codex">Built with Codex</a> ·
+  <a href="docs/DEVELOPMENT.md">Testing guide</a>
+</p>
 
-This workspace includes a portable, checksum-verified Go toolchain under
-`.tools/go1.27.3/`; `.tools/` and `dist/` are intentionally ignored by Git.
+> **Development milestone:** the local foundation is implemented and reviewed. Twitch/OBS connections, diagnostics and approved repairs are the next implementation stages. This is not yet the complete hackathon demo.
 
-## Build from this workspace
+## Why CueMender
 
-Run PowerShell from the repository root:
+A viewer notices missing audio. The streamer needs to find the cause without disrupting the broadcast or accidentally revealing something private.
 
-```powershell
-$env:GOROOT = "$PWD\.tools\go1.27.3\go"
-$env:GOPATH = "$PWD\.tools\gopath"
-$env:GOMODCACHE = "$env:GOPATH\pkg\mod"
-$env:GOCACHE = "$PWD\.tools\gocache"
-$env:GOTMPDIR = "$PWD\.tools\gotmp"
-$env:PATH = "$env:GOROOT\bin;$env:PATH"
+CueMender is being built around that interaction: receive a report through Twitch, compare OBS configuration with the streamer's declared expectations, explain the evidence, and request approval for a narrowly supported correction. Local configuration verification and viewer feedback remain separate.
 
+## Features
+
+The following foundation features are available now.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Private local controls
+
+Open a single-use launch link to establish a private session. Settings changes require the session and a CSRF token; the server listens on loopback.
+
+</td>
+<td width="50%" valign="top">
+
+### Persisted expectations
+
+Save microphone, stream-track and direct scene-item expectations in SQLite. Revision checks prevent stale updates from silently replacing newer settings.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### A separate public overlay
+
+Embedded control and overlay pages receive separate state projections. Public state excludes private source names, settings and credentials.
+
+</td>
+<td width="50%" valign="top">
+
+### Explicit credential storage
+
+The foundation supports OS credential storage or an explicitly selected memory-only mode. Backend errors are redacted; there is no plaintext fallback.
+
+</td>
+</tr>
+</table>
+
+**Next:** own-channel Twitch chat, OBS discovery, three diagnostic checks, one approved microphone-track correction, and viewer confirmation. See [current scope](#current-scope).
+
+## Demo
+
+The current development preview lets you open private controls, save expectations, reload the page and inspect the separate idle overlay. It does not connect to Twitch or OBS yet.
+
+1. Build and run the application below.
+2. Open the one-time private control link printed in the console.
+3. Save a sample microphone name and confirmed track.
+4. Reload the control page and verify the saved settings.
+5. Open the printed overlay URL to see its public disconnected state.
+
+Real product screenshots, a gallery and the Twitch demonstration video will be added after capture and verification. No simulated screenshot is presented as live integration evidence.
+
+## Get started
+
+### Build the Windows development preview
+
+Install [Go 1.27.3](https://go.dev/dl/) and Git, then run in PowerShell:
+
+~~~powershell
+git clone https://github.com/desanv01/cuemender.git
+cd cuemender
 go version
-go mod tidy
-gofmt -w ./cmd ./internal ./web
-go test ./...
-go vet ./...
-$env:CGO_ENABLED = "0"
-go build -trimpath -o .\dist\livecheck.exe .\cmd\app
-Remove-Item Env:CGO_ENABLED
-```
+go mod download
+$env:CGO_ENABLED = '0'
+go build -trimpath -o .\dist\cuemender.exe .\cmd\app
+.\dist\cuemender.exe --no-browser
+~~~
 
-The production build is CGo-free. A race run needs a supported C toolchain and
-is not required for the standard P01 build.
+The production build is verified with CGo disabled. Go and Node are not needed to run a compiled executable; Node is used only for the optional developer-side JavaScript regression fixture.
 
-## Run
+A release ZIP has not been published yet. The portable toolchain in the original developer's workspace is ignored by Git and is not part of a fresh clone.
 
-```powershell
-.\dist\livecheck.exe --no-browser
-```
+### Open the controls
 
-The executable:
+Open the private link within five minutes. Its launch capability is exchanged once and removed from the browser URL. Reloading keeps the authenticated session; restarting the process requires a new link.
 
-1. Creates the data directory (default: `%AppData%\LiveCheck`, or `--data-dir`).
-2. Loads `config.json` from that directory, or uses loopback defaults.
-3. Serves the private control page at `/control/` and the public overlay at
-   `/overlay/`.
-4. Prints a single-use private control link to the interactive console.
+Use Ctrl+C to stop the application. To isolate a trial:
 
-Open the printed link within five minutes. The token is in the URL fragment; the
-browser clears it before exchanging it for a local session cookie. Restart the
-application if the link expires or has already been used.
+~~~powershell
+.\dist\cuemender.exe --no-browser --session-only-secrets --data-dir ".\local-data\trial"
+~~~
 
-### Flags
+The default listener is **http://127.0.0.1:8787/**. The overlay is **http://127.0.0.1:8787/overlay/**.
 
-| Flag | Behavior |
-|---|---|
-| `--data-dir PATH` | Isolate configuration and SQLite data. Supports spaces and Unicode. |
-| `--listen ADDRESS` | Override the loopback listen address, e.g. `127.0.0.1:8788`. |
-| `--no-browser` | Do not open a browser; print the link for manual use. |
-| `--session-only-secrets` | Explicit memory-only credential mode for this process. |
-| `--version` | Print version/build metadata and exit without touching data. |
+For compatibility with the initial foundation, the default data directory remains **%AppData%\LiveCheck**, the SQLite filename remains **livecheck.db**, and the credential-store namespace remains **LiveCheck**. The CueMender name does not silently move or delete that data.
 
-`--mode` and future integration flags are intentionally not accepted in P01.
+[Flags, configuration, HTTP behavior and detailed testing →](docs/DEVELOPMENT.md)
 
-## Configuration
+## Built with Codex
 
-`config.json` is optional. Missing configuration uses:
+Codex defined the architecture and execution contracts, identified foundation defects, independently verified DeepSeek's corrections, and prepared the repository identity and integration handoff.
 
-```json
-{
-  "schema_version": 1,
-  "listen_address": "127.0.0.1:8787",
-  "twitch_client_id": "",
-  "obs_address": "ws://127.0.0.1:4455"
-}
-```
+DeepSeek implemented the foundation and its corrections. Codex is assigned the upcoming approval-and-repair engine and its tests; that implementation is not claimed as completed yet.
 
-Only explicit loopback IPs are accepted for `listen_address` and `obs_address`.
-URL credentials, remote addresses, unknown fields and unsupported schema versions
-are rejected. A malformed file is reported and left untouched.
+[Actual contribution record →](docs/execution/CONTRIBUTIONS.md) · [Foundation acceptance →](docs/execution/handoffs/P01-R01-review.md)
 
-## Private HTTP boundary (P01)
+The required application workflow has no runtime AI dependency or paid-model requirement.
 
-- `GET /healthz` — minimal process status.
-- `GET /control/` — static private-control shell (no private data).
-- `POST /api/v1/session/bootstrap` — one-time token exchange.
-- `GET /api/v1/state` — authenticated private snapshot with CSRF token.
-- `POST /api/v1/settings` — revision-checked expectations update.
-- `GET /api/v1/events` — authenticated private SSE.
-- `GET /overlay/` — static public overlay.
-- `GET /public/v1/state` — sanitized public snapshot.
-- `GET /public/v1/events` — sanitized public SSE.
+## Built with
 
-Private mutations require the session cookie, a same-origin `Origin`, JSON
-content and the `X-CSRF-Token` header. Request bodies are limited to 64 KiB.
-Public responses never include settings, source names, endpoints or credentials.
+| Runtime | Interface | Persistence | Planned integrations |
+| --- | --- | --- | --- |
+| Go 1.27.3 · Windows x64 | Embedded HTML/CSS/vanilla JS · SSE | SQLite via modernc · OS keyring | Twitch EventSub/Helix · OBS WebSocket |
 
-The settings update is a full replacement of the expectations record:
+One local process, with no separate frontend server or cloud database.
 
-```json
-{
-  "expected_revision": 0,
-  "microphone": { "name": "Mic/Aux", "uuid": "" },
-  "stream_track": 1,
-  "visual": {
-    "scene": "Main",
-    "scene_item_id": "42",
-    "source": { "name": "Camera" }
-  }
-}
-```
+## Current scope
 
-Use `null` for an unconfigured microphone, track or visual expectation. The
-server records `track_confirmed_at` when a track is supplied. Revision conflicts
-return HTTP 409 and never overwrite newer data.
+- **Accepted:** application lifecycle, validated persistence, local private sessions, CSRF protection, separate public/private state, embedded pages, and the corrected reload/concurrency/shutdown/error-redaction paths.
+- **Next implementation:** Twitch/OBS connections, microphone-muted and track-missing checks, direct scene-item visibility check, streamer-approved track assignment, viewer feedback and isolated rehearsal.
+- **Outside the MVP:** automatic unmute or source reveal, raw audio analysis, computer vision, OS-device repair, multiple channels and autonomous control.
+- **Verification limits:** browser-script behavior is tested in a Node VM, not a rendered-browser visual test. Race instrumentation remains pending a configured C toolchain. Worker-reported real Ctrl+C evidence and independently repeated in-process lifecycle tests are distinguished in the acceptance record.
 
-## Data and security notes
+## Documentation
 
-- SQLite: `<data-dir>\livecheck.db`; schema version 1 creates
-  `schema_migrations` and `app_settings` only.
-- Credentials: P01 stores none. Without `--session-only-secrets`, the OS keyring
-  is probed; if unavailable, the UI reports it and credential-dependent work is
-  disabled. There is no plaintext fallback.
-- The server is loopback-only. Loopback HTTP is not a defense against malware or
-  another privileged process on the same computer.
-- Private pages use a self-only CSP and anti-framing; the public overlay remains
-  embeddable for OBS.
-- `--version` exits before creating a database.
+- [Development and testing](docs/DEVELOPMENT.md)
+- [Product behavior and limitations](docs/execution/PROJECT_SPEC.md)
+- [Architecture](docs/execution/ARCHITECTURE.md)
+- [Execution status](docs/execution/STATUS.md)
+- [Foundation acceptance](docs/execution/handoffs/P01-R01-review.md)
+- [Demo capture and submission preparation](docs/execution/SUBMISSION.md)
 
-## Current limitations
+## Feedback
 
-- No Twitch authorization, EventSub or chat.
-- No OBS connection or live source/track resolution.
-- No incident, approval or repair engine; P04 belongs to Codex.
-- No final branded UI, rehearsal mode, package or license decision.
-- Browser rendering has not been exercised in a real browser; HTTP and embedded
-  asset tests pass, but visual review remains for Codex.
-
-## Next packet
-
-P02 adds real own-channel Twitch chat and OBS discovery/read evidence. It is not
-part of P01 and is not released until P01 is accepted.
+[Open an issue](https://github.com/desanv01/cuemender/issues) with the expected result and reproducible steps. Use fictional test data and keep credentials, private launch links and personal chat logs out of public reports.
 
 ## License
 
-No license has been selected. Dependency notices are recorded in
-`docs/implementation/P01-environment.md`; final repository licensing is a
-release decision.
+A project license has not been selected yet. Dependency license notes are recorded in [the environment report](docs/implementation/P01-environment.md).
