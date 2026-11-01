@@ -22,14 +22,20 @@ type Result struct {
 	Sufficient bool
 }
 
-// Evaluate performs only the three supported read-only comparisons. It never
-// converts an unavailable value into a healthy value.
-func Evaluate(ev Evidence) Result {
+// Evaluate evaluates all three checks. EvaluateFor limits checks and
+// sufficiency to one incident category.
+func Evaluate(ev Evidence) Result { return EvaluateFor(ev, "") }
+
+func EvaluateFor(ev Evidence, category string) Result {
 	result := Result{}
 	if ev.Observation == nil {
-		for _, category := range []string{"audio", "video"} {
+		cats := []string{"audio", "video"}
+		if category != "" {
+			cats = []string{category}
+		}
+		for _, cat := range cats {
 			result.Checks = append(result.Checks, domain.DiagnosticCheck{
-				Name: category + "_evidence", Category: category, Status: "unknown",
+				Name: cat + "_evidence", Category: cat, Status: "unknown",
 				Explanation: "observation_unavailable", Unavailable: "OBS observation is unavailable.",
 			})
 		}
@@ -43,21 +49,63 @@ func Evaluate(ev Evidence) Result {
 		(ev.Discovery.SceneCollection != "" && ev.Observation.SceneCollection != ev.Discovery.SceneCollection) {
 		stale = true
 	}
-
-	micCheck := evaluateMute(ev, stale)
-	result.Checks = append(result.Checks, micCheck)
-	trackCheck := evaluateTrack(ev, stale)
-	result.Checks = append(result.Checks, trackCheck)
-	visualCheck := evaluateVisual(ev, stale)
-	result.Checks = append(result.Checks, visualCheck)
-
+	if category == "" || category == "audio" {
+		result.Checks = append(result.Checks, evaluateMute(ev, stale), evaluateTrack(ev, stale))
+	}
+	if category == "" || category == "video" {
+		result.Checks = append(result.Checks, evaluateVisual(ev, stale))
+	}
 	for _, check := range result.Checks {
 		if check.Status == "conflict" {
 			result.Findings = append(result.Findings, findingFor(check, ev))
 		}
 	}
-	result.Sufficient = allRelevantSufficient(result.Checks)
+	result.Sufficient = hasConfigured(result.Checks) && allRelevantSufficient(result.Checks)
 	return result
+}
+
+func hasConfigured(checks []domain.DiagnosticCheck) bool {
+	for _, check := range checks {
+		if check.Status != "not_configured" {
+			return true
+		}
+	}
+	return false
+}
+
+func micIdentityKnown(ev Evidence, ref domain.InputRef) bool {
+	if ev.Discovery == nil || !ev.Discovery.CollectionKnown || ev.Observation.Microphone == nil {
+		return false
+	}
+	if ref.Context != "" && ev.Discovery.SceneCollection != ref.Context {
+		return false
+	}
+	found := false
+	for _, input := range ev.Discovery.Inputs {
+		if input.Name == ref.Name && (ref.UUID == "" || input.UUID == ref.UUID) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	observed := ev.Observation.Microphone
+	if observed.Name != ref.Name {
+		return false
+	}
+	if ref.UUID != "" && observed.UUID != ref.UUID {
+		return false
+	}
+	return true
+}
+
+func unknownCheck(check domain.DiagnosticCheck, reason string) domain.DiagnosticCheck {
+	check.Status = "unknown"
+	check.Explanation = reason
+	check.Unavailable = reason
+	check.Observed = nil
+	return check
 }
 
 func evaluateMute(ev Evidence, stale bool) domain.DiagnosticCheck {
@@ -69,6 +117,9 @@ func evaluateMute(ev Evidence, stale bool) domain.DiagnosticCheck {
 	if stale {
 		check.Status, check.Explanation = "unknown", "evidence_stale"
 		return check
+	}
+	if !micIdentityKnown(ev, *ev.Settings.Microphone) {
+		return unknownCheck(check, "microphone_identity_unresolved")
 	}
 	if ev.Observation.Mute == nil {
 		check.Status, check.Explanation = "unknown", "mute_unknown"
@@ -92,6 +143,12 @@ func evaluateTrack(ev Evidence, stale bool) domain.DiagnosticCheck {
 	if stale {
 		check.Status, check.Explanation = "unknown", "evidence_stale"
 		return check
+	}
+	if ev.Settings.TrackConfirmedAt == nil {
+		return unknownCheck(check, "track_confirmation_missing")
+	}
+	if !micIdentityKnown(ev, *ev.Settings.Microphone) {
+		return unknownCheck(check, "microphone_identity_unresolved")
 	}
 	if !CompleteTracks(ev.Observation.Tracks) {
 		check.Status, check.Explanation = "unknown", "tracks_incomplete"
@@ -123,17 +180,19 @@ func evaluateVisual(ev Evidence, stale bool) domain.DiagnosticCheck {
 		check.Status, check.Explanation = "unknown", "evidence_stale"
 		return check
 	}
+	if ev.Discovery == nil || !ev.Discovery.CollectionKnown {
+		return unknownCheck(check, "visual_context_unknown")
+	}
+	if visual.Source.Context != "" && visual.Source.Context != ev.Discovery.SceneCollection {
+		return unknownCheck(check, "visual_context_changed")
+	}
 	if ev.Observation.ProgramScene == "" {
 		check.Status, check.Explanation = "unknown", "program_scene_unknown"
 		return check
 	}
-	if visual.SceneUUID != "" && ev.Observation.ProgramSceneUUID != "" && visual.SceneUUID != ev.Observation.ProgramSceneUUID {
-		check.Status, check.Explanation = "ok", "configured_item_not_in_program_scene"
-		return check
-	}
-	if visual.Scene != "" && visual.Scene != ev.Observation.ProgramScene {
-		check.Status, check.Explanation = "ok", "configured_item_not_in_program_scene"
-		return check
+	if (visual.SceneUUID != "" && ev.Observation.ProgramSceneUUID != "" && visual.SceneUUID != ev.Observation.ProgramSceneUUID) ||
+		(visual.Scene != "" && visual.Scene != ev.Observation.ProgramScene) {
+		return unknownCheck(check, "configured_item_outside_program_scene")
 	}
 	item, _ := findItem(ev.Discovery, *visual)
 	if item == nil {

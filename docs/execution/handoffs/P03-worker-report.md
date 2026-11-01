@@ -92,3 +92,44 @@ No owned processes remain. Bootstrap URLs/credentials are not included.
 DeepSeek implemented P03 diagnostics, migration, coordinator, routes, projections, controls and tests against Codex's P03/C09 contracts, building on Codex's P02 closure. P03 is not accepted by this report. P04 remains held for Codex and must not be started by DeepSeek.
 
 P03 worker handoff is ready. Read docs/execution/handoffs/P03-worker-report.md and docs/implementation/P03-diagnostics.md; inspect actual changes against P03 v1.2 and CONTRACTS v1.3/C09; reproduce focused diagnostics, persistence, session/lifecycle, route and UI boundary checks. DeepSeek has stopped editing. Record acceptance, consolidated corrections or specific blockers. Keep P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; do not count fixtures as live evidence. P04 remains held for Codex's explicit release and recording checkpoint.
+
+## P03-R01 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-01T17:24Z / 2026-11-01T17:34Z. Parent P03 v1.2/C09. Codex review fixtures/documents were preserved; no production fixes from Codex. All 13 review Go regressions and the 3 actual-script failures were reproduced first, then fixed; review Go files were promoted by removing the opt-in tag. Existing worker tests contrary to C09 were corrected (wrong-scene sufficiency and feedback eligibility).
+
+### R01–R06 matrix
+
+| Group | Implemented evidence | Result |
+|---|---|---|
+| R01 identity/context/category | Microphone requires discovered+observed identity, known/matching collection, revision/generation, age; track diagnosis requires explicit confirmation; mute survives missing confirmation. Wrong scene/unknown context is limitation. `EvaluateFor` filters by incident category; unconfigured category is insufficient. Mode is live with viewer/manual origin. Tests: `TestReviewP03RejectUnresolvedMicrophone` (5 subcases), `WrongSceneIsLimitation`, `CategoryIsolation`, diagnostics worker tests. | pass local |
+| R02 coordinator ownership | Operation gate serializes start/stop/check/report/dismiss/result commit. Provider status/settings outside state lock. Jobs reserved before scheduling; repeat/concurrent start one session and revision checked; closed coordinator rejects. Manual active joins session; stopped manual separate scope. Dismiss cancels only target job; joining reports don't re-read completed diagnosis. Late commit revalidates job/session/revision/generation; stop persists before memory change and retries errors. Tests: `ActiveStartChecksRevision`, `ActiveManualJoinsSession`, `DismissDoesNotCancelOtherIncident`, `ReportsCoalesceCompletedDiagnosis`, `ProviderStatusOutsideCoordinatorLock`, `FailedStopDoesNotSilentlyDiverge`, concurrency/manual-stop tests, existing late-read barrier. | pass local |
+| R03 persistence/bounds | AddFeedback single transaction (vote/count/transition); SaveIncident merges live report/feedback counters instead of overwriting; durable dedup expires at the retained instant, prunes to 10,000 after insertion, and survives reopen. Retained duplicates inert. Tests: `DedupExpiresAt24Hours`, `DedupBoundAfterInsertion`, `FeedbackFailureIsAtomic`, migration/reopen/retention tests. | pass local |
+| R04 Twitch intake/replies | Bounded app intake queue owns command work and is canceled/joined on close; generation/receipt-time validated before durable report/feedback; reply uses existing queue with generation check; feedback only awaiting_feedback/unresolved; ack distinguishes new diagnosis vs joined incident; P02 static ack suppressed only in coordinator wiring. | implemented; actual EventSub protocol→reply fixture remains a gap (below) |
+| R05 truthful controls | Cards render per-finding guidance, limitations and stage-sensitive wording; unknown is not “no supported conflict”; category/origin/evidence time/revision/feedback visible; recheck hidden for terminal/history; public service status derived from monitoring/job state. `p03_review_evidence.js` and p03 actual-script pass. | pass actual-script; no rendered browser |
+| R06 integration/evidence | 13 review tests promoted ordinary and passing; original P02/P03 suites preserved; Node fixtures; WSL race; repeated lifecycle. App composition test exercises coordinator/store/fresh OBS/command/reply/private/public/restart, but still injects readiness and invokes the normalized callback rather than a full EventSub socket chain. | partial; explicit gap below |
+
+### Exact checks
+
+| Command/action | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=180s` | exit 0; all packages |
+| `go test -tags reviewrepro ./internal/diagnostics ./internal/incidents ./internal/store -run TestReviewP03 -count=1 -timeout=45s` | exit 0; 13/13 review tests (now also ordinary) |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| `CGO_ENABLED=0 go build -trimpath -o dist/cuemender.exe ./cmd/app` | exit 0; 19,981,824 bytes; SHA256 `D1086C4FB59BEB42FE809BC3716CB3233ADA31AA244ADD7BFC914FAAB8C5E1E5`; `0.3.0-p03` |
+| Active-SSE + blocked-provider lifecycle ×5 | 5/5 passed |
+| `node control_csrf_reload.js`, `p02_setup_render.js`, `p03_incidents.js`, `p03_review_evidence.js` | all exit 0; review `failures=[]`; p03 `problems=[]` |
+| WSL Linux `go test -race ./... -count=1 -timeout=240s` | exit 0; all packages race-clean. Earlier full-race active-SSE timing failure retained: focused race 5/5 and full rerun passed. |
+
+### Changed in this correction
+
+`internal/diagnostics/diagnostics.go` + tests; `internal/incidents/coordinator.go` + tests; `internal/store/incidents.go` + tests; `internal/app/{app,diagnostics}.go` + P03 test; `internal/twitch/manager.go`; `internal/httpui/server.go`/tests; `web/control/{app.js,index.html}`; `testdata/browser/p03*.js`; P03/docs. Review fixtures promoted. No dependency, SDK, spec or OBS-mutation changes; no Git mutation.
+
+### Remaining gates / explicit gaps
+
+- P03-D live Twitch chat-to-finding and P02-A/V06 remain deferred/unmet under D30/issue #6. No Twitch login/authorization/real chat.
+- The local app test injects monitoring readiness and invokes the normalized callback; it is composition evidence, not actual application readiness/EventSub-socket→reply evidence. This is still a required local boundary and is not claimed complete.
+- No rendered-browser check; Node actual-script only. No fresh live OBS comparison.
+- True concurrent reporter transactions and exact 10,000 reporter/feedback bounds are covered by implementation and store review cases but not a high-volume stress fixture.
+- Migration 2 is forward-only; no downgrade/reset.
+
+P03-R01 corrections are ready for review. Read the appended P03-R01 evidence and inspect actual changes against docs/execution/corrections/P03-R01.md and docs/execution/handoffs/P03-review.md. Rerun the preserved review regressions and required app/protocol/persistence/lifecycle/UI failure paths. DeepSeek has stopped editing. Record acceptance or consolidated remaining corrections, keeping live Twitch deferred under D30/issue #6. P04 remains held for Codex release and recording.

@@ -72,11 +72,26 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 | P03-F | `TestVersionOneSettingsMigrateToCurrent` preserves version-1 settings/revision; migration repeat/schema-newer tests. |
 | Routes/UI | `TestP03MonitoringAndIncidentRoutes`, `TestP03RouteErrorBoundaries`, `TestP03PublicStateRedaction`; actual-script `testdata/browser/p03_incidents.js` start/stop/manual/recheck/dismiss/reload/CSRF, plus existing two fixtures. |
 
+## P03-R01 corrections
+
+- Microphone checks now require current discovered identity, observed identity, known/matching scene-collection context, matching settings revision/generation and evidence age. Track diagnosis additionally requires explicit `TrackConfirmedAt`; an independently supported mute result survives missing track confirmation. Missing/renamed/changed identity is unknown, not conflict or healthy.
+- The visual check treats wrong program scene, missing context, unresolved source, unsupported nested item and failed reads as limitations; it never marks another active scene `ok`.
+- `EvaluateFor(category)` filters checks/findings and sufficiency to the incident category. Unconfigured category evidence is insufficient, and video incidents cannot acquire audio findings.
+- Incidents use C01 mode `live` with origin `viewer`/`manual` (no monitoring/manual mode values). Findings retain observation/generation/revision/context provenance.
+- Coordinator mutations serialize through an operation gate; provider status/settings callbacks run outside the state mutex. Job capacity is reserved before durable scheduling; one session per concurrent start; repeat start still checks revision.
+- Active manual checks join/create in the current monitoring session; stopped manual checks use a separate manual scope. Dismiss cancels only the matching incident job. Completed diagnoses coalesce joining reports until explicit recheck.
+- Stop persists before changing live state; durable failure remains visible/retryable. Stop cancels offline manual jobs and joins intake/Close work. Late results require current job identity, session, settings revision, OBS generation and connection state inside the commit gate.
+- Report dedup uses the actual 24-hour retained instant and prunes to exactly 10,000 keys after insertion. Feedback vote, totals and incident transition are one transaction; stale finding saves merge current report/feedback counters. Report/feedback bounds and retention/restart behavior are documented.
+- Twitch intake uses a bounded queue owned by the app; EventSub callback does not wait on SQLite. Command generation and receipt time are validated against the active session/current Twitch generation before durable acceptance; replies use the existing queue with a generation check. Issue acknowledgments distinguish new diagnosis from joining an existing incident.
+- Feedback is accepted only for current-session `awaiting_feedback`/`unresolved` incidents. `finding_available`, insufficient/reported/investigating, terminal/history/manual-offline feedback is ignored.
+- Public service status derives from monitoring/job state (`disconnected`/`ready`/`checking`). Private cards show per-finding guidance, limitations, category/origin, evidence time, expectation revision, feedback and repair-not-available copy; recheck is hidden for terminal/history and valid rechecks remain enabled for current-session nonterminal incidents.
+
 ## Limits
 
 - **P03-D live Twitch chat-to-finding is deferred/unmet under D30/issue #6**: no real Twitch Public client/authorization/chat was attempted. Local normalized command callback and fixtures are not live evidence.
 - **P02-A/V06 remains deferred/unmet.** P02-B/V07 live OBS was previously verified by Codex; P03 did not repeat a live OBS comparison or alter the user's OBS.
+- The local app composition test still injects monitoring readiness because no live Twitch account exists; it exercises coordinator/store/OBS/command/reply wiring but is not proof of the production Twitch readiness path or actual EventSub socket intake. This remains an explicit local integration gap.
 - No rendered-browser check was possible; actual-script Node VM fixtures are distinct. No OBS mutations.
-- Race suite passed under workspace WSL/Linux Go+CGO.
+- The final WSL Linux race suite passed. One earlier full-race active-SSE timing failure was followed by focused 5/5 and a clean full rerun; retained in the worker report.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.
 - Feedback transition UI is minimal; P05 owns final incident experience. P04 repair/approval code is absent.

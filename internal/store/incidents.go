@@ -144,10 +144,7 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 		return domain.Incident{}, false, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE retained_until < ?`, formatTime(now.Add(-24*time.Hour))); err != nil {
-		return domain.Incident{}, false, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE key NOT IN (SELECT key FROM report_dedup ORDER BY retained_until DESC LIMIT 10000)`); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE retained_until <= ?`, formatTime(now)); err != nil {
 		return domain.Incident{}, false, err
 	}
 	for _, key := range []string{"d:" + deliveryID, "m:" + messageID} {
@@ -162,6 +159,9 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 			return domain.Incident{}, false, nil
 		}
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE key NOT IN (SELECT key FROM report_dedup ORDER BY retained_until DESC, key ASC LIMIT 10000)`); err != nil {
+		return domain.Incident{}, false, err
+	}
 
 	var existingID string
 	err = tx.QueryRowContext(ctx, `SELECT id FROM incidents WHERE session_id = ? AND category = ? AND stage NOT IN (?,?,?,?) ORDER BY updated_at DESC LIMIT 1`,
@@ -169,7 +169,7 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 	var inc domain.Incident
 	if errors.Is(err, sql.ErrNoRows) {
 		inc = domain.Incident{
-			ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: domain.ModeMonitoring,
+			ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: domain.ModeLive,
 			Origin: domain.OriginViewer, Category: category, Stage: domain.StageReported,
 			OpenedAt: now, UpdatedAt: now, LocalVerification: domain.LocalNotAttempted,
 			Findings: []domain.Finding{}, Checks: []domain.DiagnosticCheck{},
@@ -232,7 +232,7 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 
 func (s *Store) CreateManualIncident(ctx context.Context, sessionID, category, incidentID, publicID string, now time.Time) (domain.Incident, error) {
 	inc := domain.Incident{
-		ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: "manual",
+		ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: domain.ModeLive,
 		Origin: domain.OriginManual, Category: category, Stage: domain.StageReported,
 		OpenedAt: now, UpdatedAt: now, LocalVerification: domain.LocalNotAttempted,
 		Findings: []domain.Finding{}, Checks: []domain.DiagnosticCheck{},
@@ -249,6 +249,14 @@ func (s *Store) SaveIncident(ctx context.Context, inc domain.Incident) error {
 		return err
 	}
 	defer tx.Rollback()
+	// Report joins and feedback can advance indexed counters independently of a
+	// stale in-memory finding snapshot. Merge them before replacing JSON.
+	var reportCount, distinct, positive, negative int
+	if err := tx.QueryRowContext(ctx, `SELECT report_count, distinct_reporters, feedback_positive, feedback_negative FROM incidents WHERE id = ?`, inc.ID).Scan(&reportCount, &distinct, &positive, &negative); err != nil {
+		return err
+	}
+	inc.ReportCount, inc.DistinctReporters = reportCount, distinct
+	inc.Feedback.Positive, inc.Feedback.Negative = positive, negative
 	raw, _ := json.Marshal(inc)
 	if _, err := tx.ExecContext(ctx, `UPDATE incidents SET stage = ?, updated_at = ?, local_verification = ?, feedback_positive = ?, feedback_negative = ?, closed_at = ?, evidence_at = ?, incident_json = ? WHERE id = ?`,
 		inc.Stage, formatTime(inc.UpdatedAt), inc.LocalVerification, inc.Feedback.Positive, inc.Feedback.Negative,
@@ -293,18 +301,20 @@ func (s *Store) DismissIncident(ctx context.Context, incidentID string, now time
 }
 
 func (s *Store) AddFeedback(ctx context.Context, incidentID, actorID, vote string, now time.Time) (domain.Incident, error) {
-	inc, err := s.GetIncident(ctx, incidentID)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Incident{}, err
+	}
+	defer tx.Rollback()
+	inc, err := incidentFromRow(func(dest ...any) error {
+		return tx.QueryRowContext(ctx, incidentSelect+` WHERE id = ?`, incidentID).Scan(dest...)
+	})
 	if err != nil {
 		return domain.Incident{}, err
 	}
 	if domain.StageTerminal(inc.Stage) {
 		return inc, nil
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return domain.Incident{}, err
-	}
-	defer tx.Rollback()
 	var actorCount int
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM feedback WHERE incident_id = ?`, incidentID).Scan(&actorCount); err != nil {
 		return domain.Incident{}, err
@@ -324,15 +334,17 @@ func (s *Store) AddFeedback(ctx context.Context, incidentID, actorID, vote strin
 	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(CASE WHEN vote = 'positive' THEN 1 ELSE 0 END),0), COALESCE(SUM(CASE WHEN vote = 'negative' THEN 1 ELSE 0 END),0) FROM feedback WHERE incident_id = ?`, incidentID).Scan(&positive, &negative); err != nil {
 		return domain.Incident{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return domain.Incident{}, err
-	}
 	inc.Feedback.Positive, inc.Feedback.Negative = positive, negative
 	inc.UpdatedAt = now
-	if negative > 0 && !domain.StageTerminal(inc.Stage) {
+	if negative > 0 {
 		inc.Stage = domain.StageUnresolved
 	}
-	if err := s.SaveIncident(ctx, inc); err != nil {
+	raw, _ := json.Marshal(inc)
+	if _, err := tx.ExecContext(ctx, `UPDATE incidents SET stage = ?, updated_at = ?, feedback_positive = ?, feedback_negative = ?, incident_json = ? WHERE id = ?`,
+		inc.Stage, formatTime(inc.UpdatedAt), inc.Feedback.Positive, inc.Feedback.Negative, string(raw), inc.ID); err != nil {
+		return domain.Incident{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return domain.Incident{}, err
 	}
 	return inc, nil

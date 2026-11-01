@@ -841,6 +841,15 @@ func (m *Manager) EnqueueReply(text string) bool {
 	return m.reply.Enqueue(text)
 }
 
+func (m *Manager) EnqueueReplyFor(generation uint64, text string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.reply == nil || m.closed || m.conn.ConnectionGeneration != generation {
+		return false
+	}
+	return m.reply.Enqueue(text)
+}
+
 func (m *Manager) startReplyQueue(gen uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

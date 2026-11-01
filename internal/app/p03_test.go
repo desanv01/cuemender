@@ -36,6 +36,7 @@ func (p03Backend) InputAudioTracks(context.Context, domain.InputRef) (map[string
 func (p03Backend) ProgramScene(context.Context) (string, string, error) {
 	return "Main", "scene-uuid", nil
 }
+func (p03Backend) SceneCollection(context.Context) (string, error) { return "Collection", nil }
 func (p03Backend) Scenes(context.Context) ([]domain.OBSScene, error) {
 	return []domain.OBSScene{{Name: "Main", UUID: "scene-uuid"}}, nil
 }
@@ -93,7 +94,7 @@ func TestP03ApplicationWiringPersistsIncidentAndRestart(t *testing.T) {
 	ctx := context.Background()
 	track := 2
 	settings, err := a.SaveSettings(ctx, 0, domain.Expectations{
-		Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid"}, StreamTrack: &track,
+		Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid", Context: "Collection"}, StreamTrack: &track,
 	})
 	if err != nil {
 		t.Fatal(err)

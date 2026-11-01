@@ -74,8 +74,8 @@ func TestWrongSceneAndStaleEvidence(t *testing.T) {
 	ev.Observation.ProgramScene = "Other"
 	ev.Observation.ProgramSceneUUID = "other"
 	result := Evaluate(ev)
-	if len(result.Findings) != 0 || !result.Sufficient {
-		t.Fatalf("configured item outside current scene should not be a hidden finding: %+v", result)
+	if len(result.Findings) != 0 || result.Sufficient {
+		t.Fatalf("configured item outside current scene must remain a limitation: %+v", result)
 	}
 	ev = baseEvidence(now)
 	ev.Now = now.Add(6 * time.Second)

@@ -26,10 +26,11 @@ func (a *App) monitoringReadiness() incidents.Readiness {
 	tw := a.twitchMgr.Snapshot()
 	obs, _, _, resolution := a.obsMgr.SnapshotBundle(settings)
 	return incidents.Readiness{
-		TwitchConnected: tw.Status == domain.ConnectionConnected,
-		OBSConnected:    obs.Status == domain.ConnectionConnected && !obs.Stale,
-		ResolutionReady: resolution,
-		OBSGeneration:   obs.Generation,
+		TwitchConnected:  tw.Status == domain.ConnectionConnected,
+		OBSConnected:     obs.Status == domain.ConnectionConnected && !obs.Stale,
+		ResolutionReady:  resolution,
+		OBSGeneration:    obs.Generation,
+		TwitchGeneration: tw.ConnectionGeneration,
 	}
 }
 
@@ -48,13 +49,21 @@ func (a *App) onIncidentUpdate() {
 }
 
 func (a *App) onTwitchCommand(event twitch.CommandEvent) {
+	select {
+	case a.intakeCh <- event:
+	default:
+		// Bounded intake: obsolete work is dropped rather than blocking EventSub.
+	}
+}
+
+func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 	reply := ""
 	switch event.Command.Kind {
 	case twitch.CommandStreamHelp:
 		reply = p03Help
 	case twitch.CommandIssueAudio, twitch.CommandIssueVideo:
 		if a.coordinator != nil {
-			reply = a.coordinator.HandleIssue(context.Background(), event.Command.Category, event.DeliveryID, event.MessageID, event.ActorID, event.ConnectionGeneration)
+			reply = a.coordinator.HandleIssueAt(context.Background(), event.Command.Category, event.DeliveryID, event.MessageID, event.ActorID, event.ConnectionGeneration, event.ReceivedAt)
 		} else {
 			reply = p03Help
 		}
@@ -64,7 +73,7 @@ func (a *App) onTwitchCommand(event twitch.CommandEvent) {
 		}
 	}
 	if strings.TrimSpace(reply) != "" {
-		_ = a.twitchMgr.EnqueueReply(reply)
+		_ = a.twitchMgr.EnqueueReplyFor(event.ConnectionGeneration, reply)
 	}
 }
 

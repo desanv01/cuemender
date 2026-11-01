@@ -21,7 +21,7 @@ func coordinatorFixture(t *testing.T) (*Coordinator, *domain.Settings, *store.St
 	track := 2
 	confirmed := now
 	settings := &domain.Settings{Revision: 1, Expectations: domain.Expectations{
-		Microphone:  &domain.InputRef{Name: "Mic", UUID: "mic"},
+		Microphone:  &domain.InputRef{Name: "Mic", UUID: "mic", Context: "Collection"},
 		StreamTrack: &track, TrackConfirmedAt: &confirmed,
 	}}
 	c := New(Options{
@@ -30,8 +30,8 @@ func coordinatorFixture(t *testing.T) (*Coordinator, *domain.Settings, *store.St
 			mute := true
 			tracks := map[string]bool{"track1": false, "track2": false, "track3": false, "track4": false, "track5": false, "track6": false}
 			scene := "Main"
-			return &domain.OBSDiscovery{Generation: 1, ConfigRevision: 1, Inputs: []domain.OBSInput{{Name: "Mic", UUID: "mic"}}, Scenes: []domain.OBSScene{{Name: "Main", UUID: "scene"}}},
-				&domain.OBSObservation{Generation: 1, ConfigRevision: 1, ObservedAt: now, Mute: &mute, Tracks: tracks, ProgramScene: scene}, nil
+			return &domain.OBSDiscovery{Generation: 1, ConfigRevision: 1, SceneCollection: "Collection", CollectionKnown: true, Inputs: []domain.OBSInput{{Name: "Mic", UUID: "mic"}}, Scenes: []domain.OBSScene{{Name: "Main", UUID: "scene"}}},
+				&domain.OBSObservation{Generation: 1, ConfigRevision: 1, SceneCollection: "Collection", ObservedAt: now, Microphone: &domain.InputRef{Name: "Mic", UUID: "mic"}, Mute: &mute, Tracks: tracks, ProgramScene: scene}, nil
 		},
 		Settings: func() domain.Settings { return *settings },
 		Status:   func() Readiness { return Readiness{TwitchConnected: true, OBSConnected: true, ResolutionReady: true} },
@@ -179,7 +179,7 @@ func TestCoordinatorStopRejectsLateBlockedRead(t *testing.T) {
 }
 
 func TestCoordinatorFeedbackLatestVoteAndTerminalRejection(t *testing.T) {
-	c, _, _ := coordinatorFixture(t)
+	c, _, st := coordinatorFixture(t)
 	ctx := context.Background()
 	if _, err := c.Start(ctx, 1); err != nil {
 		t.Fatal(err)
@@ -190,6 +190,11 @@ func TestCoordinatorFeedbackLatestVoteAndTerminalRejection(t *testing.T) {
 	_, list := c.Snapshot()
 	id := list[len(list)-1].ID
 	inc := waitIncident(t, c, id, domain.StageFindingAvailable)
+	inc.Stage = domain.StageAwaitingFeedback
+	if err := st.SaveIncident(ctx, inc); err != nil {
+		t.Fatal(err)
+	}
+	c.setIncident(inc)
 	if reply := c.HandleFeedback(ctx, "still_broken", inc.PublicID, "actor-1"); reply == "" {
 		t.Fatal("negative feedback rejected")
 	}
@@ -217,5 +222,73 @@ func TestCoordinatorStartRequiresTrackConfirmation(t *testing.T) {
 	_, err := c.Start(context.Background(), 1)
 	if err == nil {
 		t.Fatal("monitoring started without explicit track confirmation")
+	}
+}
+
+func TestCoordinatorConcurrentStartReturnsOneSession(t *testing.T) {
+	c, _, _ := coordinatorFixture(t)
+	const workers = 8
+	results := make(chan string, workers)
+	errs := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			session, err := c.Start(context.Background(), 1)
+			results <- session.ID
+			errs <- err
+		}()
+	}
+	ids := map[string]bool{}
+	for i := 0; i < workers; i++ {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+		ids[<-results] = true
+	}
+	if len(ids) != 1 {
+		t.Fatalf("concurrent starts created %d sessions", len(ids))
+	}
+}
+
+func TestCoordinatorStopCancelsManualJobWithoutSession(t *testing.T) {
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "manual-stop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Now().UTC()
+	track := 2
+	confirmed := now
+	settings := domain.Settings{Revision: 1, Expectations: domain.Expectations{
+		Microphone: &domain.InputRef{Name: "Mic", UUID: "mic"}, StreamTrack: &track, TrackConfirmedAt: &confirmed,
+	}}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	c := New(Options{Store: st,
+		Read: func(ctx context.Context, _ domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+			close(entered)
+			select {
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			case <-release:
+			}
+			return nil, nil, context.Canceled
+		},
+		Settings: func() domain.Settings { return settings },
+		Status:   func() Readiness { return Readiness{TwitchConnected: true, OBSConnected: true, ResolutionReady: true} },
+	})
+	defer c.Close()
+	if _, err := c.Check(context.Background(), "audio", 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	<-entered
+	if err := c.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	c.mu.Lock()
+	jobs := len(c.jobs)
+	c.mu.Unlock()
+	if jobs != 0 {
+		t.Fatal("manual job survived stop")
 	}
 }

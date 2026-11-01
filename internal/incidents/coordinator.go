@@ -18,10 +18,11 @@ const (
 )
 
 type Readiness struct {
-	TwitchConnected bool
-	OBSConnected    bool
-	ResolutionReady bool
-	OBSGeneration   uint64
+	TwitchConnected  bool
+	OBSConnected     bool
+	ResolutionReady  bool
+	OBSGeneration    uint64
+	TwitchGeneration uint64
 }
 
 type Options struct {
@@ -53,6 +54,7 @@ type Coordinator struct {
 	now      func() time.Time
 
 	mu        sync.Mutex
+	opMu      sync.Mutex
 	session   *domain.MonitoringSessionInfo
 	jobs      map[string]*job
 	incidents map[string]domain.Incident
@@ -103,21 +105,25 @@ func (c *Coordinator) mustList(ctx context.Context) []domain.Incident {
 }
 
 func (c *Coordinator) Start(ctx context.Context, expectedRevision int64) (domain.MonitoringSessionInfo, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return domain.MonitoringSessionInfo{}, domain.ErrUnavailable
-	}
-	if c.session != nil && c.session.Active {
-		s := *c.session
-		c.mu.Unlock()
-		return s, nil
 	}
 	c.mu.Unlock()
 	settings := c.settings()
 	if settings.Revision != expectedRevision {
 		return domain.MonitoringSessionInfo{}, domain.ErrRevisionConflict
 	}
+	c.mu.Lock()
+	if c.session != nil && c.session.Active {
+		s := *c.session
+		c.mu.Unlock()
+		return s, nil
+	}
+	c.mu.Unlock()
 	ready := c.status()
 	if !ready.TwitchConnected || !ready.OBSConnected {
 		return domain.MonitoringSessionInfo{}, domain.ErrUnavailable
@@ -145,19 +151,27 @@ func (c *Coordinator) Start(ctx context.Context, expectedRevision int64) (domain
 }
 
 func (c *Coordinator) Stop(ctx context.Context) error {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	c.mu.Lock()
 	if c.session == nil || !c.session.Active {
+		jobs := make([]*job, 0, len(c.jobs))
+		for _, job := range c.jobs {
+			jobs = append(jobs, job)
+		}
+		c.jobs = map[string]*job{}
 		c.mu.Unlock()
+		for _, job := range jobs {
+			job.cancel()
+		}
 		return nil
 	}
 	id := c.session.ID
 	now := c.now().UTC()
-	c.session.Active = false
-	c.session.StoppedAt = &now
+	jobs := make([]*job, 0, len(c.jobs))
 	for _, job := range c.jobs {
-		job.cancel()
+		jobs = append(jobs, job)
 	}
-	c.jobs = map[string]*job{}
 	c.mu.Unlock()
 	if err := c.store.StopMonitoringSession(ctx, id, now); err != nil {
 		return err
@@ -165,15 +179,28 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 	if err := c.store.InterruptOpenIncidents(ctx, now); err != nil {
 		return err
 	}
+	_ = c.store.PurgeCompletedIncidents(ctx, now)
+	c.mu.Lock()
+	if c.session != nil && c.session.ID == id {
+		c.session.Active = false
+		c.session.StoppedAt = &now
+	}
+	for _, job := range jobs {
+		job.cancel()
+	}
+	c.jobs = map[string]*job{}
+	c.mu.Unlock()
 	c.reload()
 	c.publish()
 	return nil
 }
 
 func (c *Coordinator) Close() {
+	c.opMu.Lock()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
+		c.opMu.Unlock()
 		return
 	}
 	c.closed = true
@@ -182,6 +209,7 @@ func (c *Coordinator) Close() {
 	}
 	c.jobs = map[string]*job{}
 	c.mu.Unlock()
+	c.opMu.Unlock()
 	c.wg.Wait()
 }
 
@@ -259,6 +287,8 @@ func (c *Coordinator) setIncident(inc domain.Incident) {
 // Check schedules one manual or join/recheck diagnostic job. It returns after
 // the incident is durably in investigating state, not after the OBS read.
 func (c *Coordinator) Check(ctx context.Context, category string, expectedRevision int64, incidentID string) (domain.Incident, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	if category != "audio" && category != "video" {
 		return domain.Incident{}, domain.ErrInvalidInput
 	}
@@ -335,6 +365,9 @@ func (c *Coordinator) Check(ctx context.Context, category string, expectedRevisi
 		return existing.incident, nil
 	}
 	manualSession := "manual-" + store.NewSessionID()
+	if session != nil && session.Active {
+		manualSession = session.ID
+	}
 	c.mu.Unlock()
 	id, publicID := store.NewIncidentIDs()
 	inc, err := c.store.CreateManualIncident(ctx, manualSession, category, id, publicID, c.now().UTC())
@@ -365,6 +398,12 @@ func (c *Coordinator) incidentsByCategoryLocked(sessionID, category string) (dom
 // HandleIssue accepts one viewer report after durable dedup/grouping. It returns
 // the fixed acknowledgment only after the commit.
 func (c *Coordinator) HandleIssue(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64) string {
+	return c.HandleIssueAt(ctx, category, deliveryID, messageID, actorID, generation, time.Time{})
+}
+
+func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time) string {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	settings := c.settings()
 	c.mu.Lock()
 	session := c.session
@@ -372,11 +411,19 @@ func (c *Coordinator) HandleIssue(ctx context.Context, category, deliveryID, mes
 		c.mu.Unlock()
 		return "CueMender monitoring is not active. Help: !streamhelp"
 	}
+	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
+		c.mu.Unlock()
+		return ""
+	}
 	if len(c.jobs) >= maxJobs && c.jobs[category] == nil {
 		c.mu.Unlock()
 		return "CueMender diagnostics are busy. Please retry shortly."
 	}
 	c.mu.Unlock()
+	ready := c.status()
+	if ready.TwitchGeneration != 0 && generation != 0 && generation != ready.TwitchGeneration {
+		return ""
+	}
 	incidentID, publicID := store.NewIncidentIDs()
 	inc, accepted, err := c.store.AcceptReport(ctx, session.ID, category, deliveryID, messageID, actorID, incidentID, publicID, c.now().UTC())
 	if err != nil {
@@ -390,11 +437,17 @@ func (c *Coordinator) HandleIssue(ctx context.Context, category, deliveryID, mes
 	}
 	c.setIncident(inc)
 	c.publish()
-	c.schedule(inc, settings)
-	return fmt.Sprintf("CueMender received your %s report for %s. Diagnostics are running.", category, inc.PublicID)
+	scheduled := inc.Stage == domain.StageReported || inc.Stage == domain.StageInvestigating
+	if scheduled {
+		c.schedule(inc, settings)
+		return fmt.Sprintf("CueMender received your %s report for %s. Diagnostics are running.", category, inc.PublicID)
+	}
+	return fmt.Sprintf("CueMender added your %s report to existing incident %s.", category, inc.PublicID)
 }
 
 func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID string) string {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	c.mu.Lock()
 	session := c.session
 	if session == nil || !session.Active {
@@ -414,6 +467,9 @@ func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID
 	if !found || target.SessionID != session.ID || domain.StageTerminal(target.Stage) {
 		return "CueMender ignored unknown or stale feedback."
 	}
+	if target.Stage != domain.StageAwaitingFeedback && target.Stage != domain.StageUnresolved {
+		return "CueMender ignored feedback before an eligible finding."
+	}
 	vote := "positive"
 	if command == "still_broken" {
 		vote = "negative"
@@ -428,6 +484,8 @@ func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID
 }
 
 func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.Incident, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	c.mu.Lock()
 	inc, ok := c.incidents[incidentID]
 	if !ok {
@@ -441,8 +499,8 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 		}
 		return domain.Incident{}, domain.ErrTerminalIncident
 	}
-	if c.jobs[inc.Category] != nil {
-		c.jobs[inc.Category].cancel()
+	if job := c.jobs[inc.Category]; job != nil && job.incident.ID == incidentID {
+		job.cancel()
 		delete(c.jobs, inc.Category)
 	}
 	c.mu.Unlock()
@@ -451,6 +509,7 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 		return domain.Incident{}, err
 	}
 	c.setIncident(out)
+	_ = c.store.PurgeCompletedIncidents(ctx, c.now().UTC())
 	c.publish()
 	return out, nil
 }
@@ -463,8 +522,10 @@ func (c *Coordinator) sessionIDLocked() string {
 }
 
 func (c *Coordinator) schedule(inc domain.Incident, settings domain.Settings) {
+	ready := c.status()
 	c.mu.Lock()
-	if c.closed || domain.StageTerminal(inc.Stage) {
+	if c.closed || domain.StageTerminal(inc.Stage) ||
+		(inc.Stage != domain.StageReported && inc.Stage != domain.StageInvestigating) {
 		c.mu.Unlock()
 		return
 	}
@@ -473,7 +534,7 @@ func (c *Coordinator) schedule(inc domain.Incident, settings domain.Settings) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), jobTimeout)
-	request := &job{ctx: ctx, cancel: cancel, incident: inc, settings: settings, requestID: store.NewSessionID(), generation: c.status().OBSGeneration}
+	request := &job{ctx: ctx, cancel: cancel, incident: inc, settings: settings, requestID: store.NewSessionID(), generation: ready.OBSGeneration}
 	c.jobs[inc.Category] = request
 	c.wg.Add(1)
 	c.mu.Unlock()
@@ -486,12 +547,14 @@ func (c *Coordinator) run(request *job) {
 	discovery, observation, readErr := c.read(request.ctx, request.settings)
 	result := diagnostics.Result{}
 	if readErr == nil {
-		result = diagnostics.Evaluate(diagnostics.Evidence{
+		result = diagnostics.EvaluateFor(diagnostics.Evidence{
 			Settings: request.settings, Discovery: discovery, Observation: observation, Now: c.now(),
-		})
+		}, request.incident.Category)
 	}
 	currentRevision := c.settings().Revision
 	ready := c.status()
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
 	c.mu.Lock()
 	if c.closed || c.jobs[request.incident.Category] != request {
 		c.mu.Unlock()
@@ -559,6 +622,12 @@ func (c *Coordinator) run(request *job) {
 	}
 	c.setIncident(current)
 	c.publish()
+}
+
+func (c *Coordinator) ActiveJobs() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.jobs)
 }
 
 // PublicIncidents returns only current-session incidents with fixed messages.

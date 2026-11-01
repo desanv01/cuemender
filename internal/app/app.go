@@ -82,9 +82,12 @@ type App struct {
 	connMu sync.Mutex
 	conns  map[net.Conn]http.ConnState
 
-	baseCtx    context.Context
-	baseCancel context.CancelFunc
-	closeOnce  sync.Once
+	baseCtx      context.Context
+	baseCancel   context.CancelFunc
+	closeOnce    sync.Once
+	intakeCh     chan twitch.CommandEvent
+	intakeCancel context.CancelFunc
+	intakeWG     sync.WaitGroup
 
 	baseURL    string
 	controlURL string
@@ -203,6 +206,21 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		baseCtx:       baseCtx,
 		baseCancel:    baseCancel,
 	}
+	intakeCtx, intakeCancel := context.WithCancel(baseCtx)
+	a.intakeCancel = intakeCancel
+	a.intakeCh = make(chan twitch.CommandEvent, 32)
+	a.intakeWG.Add(1)
+	go func() {
+		defer a.intakeWG.Done()
+		for {
+			select {
+			case <-intakeCtx.Done():
+				return
+			case event := <-a.intakeCh:
+				a.processTwitchCommand(event)
+			}
+		}
+	}()
 	a.baseURL = "http://" + net.JoinHostPort(host, port)
 	twitchOptions := twitch.Options{
 		Context:               baseCtx,
@@ -338,6 +356,10 @@ func (a *App) Run(ctx context.Context) error {
 func (a *App) Close() {
 	a.closeOnce.Do(func() {
 		a.baseCancel()
+		if a.intakeCancel != nil {
+			a.intakeCancel()
+		}
+		a.intakeWG.Wait()
 		if a.ui != nil {
 			a.ui.Close()
 		}
@@ -507,11 +529,18 @@ func (a *App) publicLocked() domain.PublicState {
 		publicIncidents = a.coordinator.PublicIncidents()
 	}
 	active := session != nil && session.Active
+	status := domain.ServiceDisconnected
+	if active {
+		status = "ready"
+		if a.coordinator != nil && a.coordinator.ActiveJobs() > 0 {
+			status = "checking"
+		}
+	}
 	return domain.PublicState{
 		Mode:             domain.ModeLive,
 		StateRevision:    a.stateRevision,
 		MonitoringActive: active,
-		ServiceStatus:    domain.ServiceDisconnected,
+		ServiceStatus:    status,
 		Incidents:        publicIncidents,
 	}
 }

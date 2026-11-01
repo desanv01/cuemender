@@ -34,6 +34,7 @@ const snapshot = {
   obs_discovery: { generation: 1, scene_collection: 'Main', captured_at: '2026-11-01T16:00:00Z', inputs: [], scenes: [] },
   incidents: [{
     id: 'inc-fixture', public_id: 'CM-ABC123', category: 'audio', stage: 'awaiting_approval',
+    session_id: 'sess-fixture', origin: 'viewer', evidence_at: '2026-11-01T16:00:01Z',
     report_count: 2, distinct_reporters: 2, local_verification: 'not_attempted',
     feedback: { positive: 0, negative: 0 },
     findings: [{ code: 'MIC_MUTED', manual_guidance: 'Unmute manually.' }, { code: 'MIC_TRACK_MISSING' }]

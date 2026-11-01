@@ -2,7 +2,7 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { csrf: '', revision: 0, currentRevision: 0, connected: false, discovery: null, discoverySignature: '' };
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '' };
   let events = null;
 
   class ApiError extends Error {
@@ -249,6 +249,7 @@
   function renderMonitoring(privateState) {
     const active = Boolean(privateState.monitoring_active);
     const session = privateState.monitoring_session;
+    state.monitoringSessionId = active && session ? session.id : '';
     state.incidents = Array.isArray(privateState.incidents) ? privateState.incidents : [];
     setText('monitor-status', active ? 'Monitoring active' + (session && session.id ? ' (session ' + session.id.slice(0, 8) + '…)' : '') : 'Monitoring is stopped.');
     renderIncidents(state.incidents);
@@ -274,14 +275,31 @@
       card.appendChild(title);
       const meta = document.createElement('p');
       meta.className = 'muted';
-      meta.textContent = 'Reports: ' + incident.report_count + ' · distinct reporters: ' + incident.distinct_reporters +
-        ' · feedback: ' + incident.feedback.positive + ' positive / ' + incident.feedback.negative + ' negative';
+      const evidenceTime = incident.evidence_at ? new Date(incident.evidence_at).toISOString() : 'unknown';
+      const revision = (incident.findings || []).length ? incident.findings[0].expectation_revision : 'unknown';
+      meta.textContent = incident.category + ' · origin: ' + incident.origin + ' · reports: ' + incident.report_count +
+        ' · distinct: ' + incident.distinct_reporters + ' · evidence: ' + evidenceTime + ' · expectation revision: ' + revision +
+        ' · local streaming: unknown · feedback: ' + incident.feedback.positive + ' positive / ' + incident.feedback.negative + ' negative';
       card.appendChild(meta);
       const evidence = document.createElement('p');
       evidence.className = 'muted';
       const findings = (incident.findings || []).map((finding) => finding.code).join(', ');
-      evidence.textContent = 'Evidence: ' + (findings || 'no supported conflict') + ' · local verification: ' + incident.local_verification +
-        ' · repair not yet available';
+      const guidance = (incident.findings || []).map((finding) => finding.manual_guidance).filter(Boolean).join(' ');
+      const limitations = (incident.checks || []).map((check) => check.unavailable_reason).filter(Boolean).join(' ');
+      let evidenceText;
+      if (findings) {
+        evidenceText = 'Findings: ' + findings + (guidance ? '. ' + guidance : '');
+      } else if (incident.stage === 'no_supported_finding') {
+        evidenceText = 'No supported conflict was found in a completed sufficient check.';
+      } else if (incident.stage === 'insufficient_information' || incident.stage === 'interrupted') {
+        evidenceText = 'No completed diagnosis. ';
+      } else {
+        evidenceText = 'Diagnosis is not complete. ';
+      }
+      if (limitations) {
+        evidenceText += ' Limitations: ' + limitations;
+      }
+      evidence.textContent = evidenceText + ' Local verification: ' + incident.local_verification + '. Repair is not yet available.';
       card.appendChild(evidence);
       if (incident.manual_guidance) {
         const guidance = document.createElement('p');
@@ -291,18 +309,24 @@
       }
       const actions = document.createElement('div');
       actions.className = 'actions';
-      const recheck = document.createElement('button');
-      recheck.type = 'button';
-      recheck.className = 'secondary';
-      recheck.textContent = 'Recheck';
-      recheck.addEventListener('click', () => recheckIncident(incident.id));
-      actions.appendChild(recheck);
-      const dismiss = document.createElement('button');
-      dismiss.type = 'button';
-      dismiss.className = 'secondary';
-      dismiss.textContent = 'Dismiss';
-      dismiss.addEventListener('click', () => dismissIncident(incident.id));
-      actions.appendChild(dismiss);
+      const terminal = ['dismissed', 'closed', 'expired', 'invalidated'].includes(incident.stage);
+      const currentSession = state.monitoringSessionId && incident.session_id === state.monitoringSessionId;
+      if (!terminal && currentSession) {
+        const recheck = document.createElement('button');
+        recheck.type = 'button';
+        recheck.className = 'secondary';
+        recheck.textContent = 'Recheck';
+        recheck.addEventListener('click', () => recheckIncident(incident.id));
+        actions.appendChild(recheck);
+      }
+      if (!terminal) {
+        const dismiss = document.createElement('button');
+        dismiss.type = 'button';
+        dismiss.className = 'secondary';
+        dismiss.textContent = 'Dismiss';
+        dismiss.addEventListener('click', () => dismissIncident(incident.id));
+        actions.appendChild(dismiss);
+      }
       card.appendChild(actions);
       list.appendChild(card);
     }
