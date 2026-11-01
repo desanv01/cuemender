@@ -20,9 +20,10 @@ Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
 P02 tracking: https://github.com/desanv01/cuemender/issues/2
-Worker branch: feature/p03-diagnostics (Codex prepares before handoff; worker verifies actual branch, no Git mutation)
+Worker branch: feature/p03-diagnostics (checked out and published; worker verifies actual branch, no Git mutation)
 P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
-P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (conditional development baseline under D30; see GitHub for merge evidence)
+P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
+P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0 (P02 merge; subsequent dispatch-only documentation commits may follow)
 P03 tracking: https://github.com/desanv01/cuemender/issues/7
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
