@@ -1,10 +1,33 @@
 # Copy-paste prompts
 
-Revision: 1.9
+Revision: 2.0
 
-Current dispatch: P03-R02 v1.0. R01 fixed the original regressions but did not complete its required boundaries. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
+Current dispatch: P03-R03 v1.0. Earlier regressions and the actual protocol success path pass; four reproduced failures and remaining required local boundaries prevent acceptance. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
 
-## Current: P03-R02 v1.0 — paste into DeepSeek
+## Current: P03-R03 v1.0 — paste into DeepSeek
+
+~~~text
+Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R03 v1.0.
+
+Read AGENTS.md; docs/execution/README.md, STATUS.md, WORKFLOW.md, CONTRACTS.md v1.3/C04/C06/C09 and DECISIONS.md D30; packages/P03-diagnostics.md; corrections/P03-R02.md and P03-R03.md; handoffs/P03-R02-review.md; and the appended P03 worker report. Paths after docs/execution refer to that directory.
+
+Confirm STATUS releases P03-R03, branch feature/p03-diagnostics, and no active writer. Read Git status/diff and actual HEAD, preserve all existing work, then claim operational ownership. Codex added review tests/docs only, no production fixes. Do not restart P03.
+
+Complete all four groups in P03-R03: A honest startup recovery/manual-stop persistence and retained-history access; B cancellable admission, connected-generation and originating-session-bound intake/replies while preserving idle !streamhelp; C actual App.SaveSettings/provider/result-commit boundaries, timeout outcomes, settled projections and whole-app shutdown; D owned/joined local protocol fixture cleanup and durable/read-only assertions.
+
+Four tests currently fail in internal/app/p03_r02_review_test.go and internal/incidents/p03_r02_review_test.go under -tags reviewrepro. Preserve their behavioral assertions and promote them to ordinary coverage after fixing. If replacing opMu, adapt only the gate-holding mechanism and document it. Preserve all previous regressions, exact 10,000 reporter/feedback coverage and the real production-app protocol success path. Complete the packet's required boundaries, not only the supplied failures; do not silently defer local error handling again.
+
+Keep Go-only backend, current dependencies and read-only OBS scope. No specification changes, P04 implementation, OBS writes, UI redesign, new agents or Git/GitHub mutations. Background computer access only. Do not change the user's OBS configuration. Live Twitch P02-A/V06 and P03-D remain deferred/unmet under D30/issue #6: no login, registration, authorization or real chat. Fixtures are not live evidence.
+
+Run focused regressions while fixing, then full Go tests, vet, gofmt, CGo-free build, all four Node fixtures, affected repeated lifecycle/protocol checks and configured WSL race checks. Record actual failures/resolutions and exact remaining limits. Browser verification may be handed to Codex if unavailable; do not claim a rendered check from Node fixtures.
+
+Append a P03-R03 A-D evidence matrix to docs/execution/handoffs/P03-worker-report.md and update docs/implementation/P03-diagnostics.md. Map every required boundary to test name, command and result. Report an exact technical blocker if needed instead of treating missing local coverage as an approved deferral. Stop owned processes, transfer STATUS to Codex with ready_for_review or a specific blocker and no active writer, then stop editing. P04 remains held for explicit Codex release and recording.
+
+Return:
+"P03-R03 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R03.md and docs/execution/handoffs/P03-R02-review.md. Inspect actual changes and rerun preserved regressions plus the required recovery, cancellation, session, settings/provider, protocol-cleanup and projection boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch stays deferred under D30/issue #6; P04 remains held for Codex release and recording."
+~~~
+
+## Historical: P03-R02 v1.0 — partial completion; use R03
 
 ~~~text
 Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R02 v1.0.

@@ -6,6 +6,8 @@ Maintain this from real work and reports. Codex updates the central record; Deep
 
 ## Current evidence
 
+P03-R02 re-review (2026-11-02 Malaysia): Codex independently ran the ordinary Go suite, preserved regression selection, new actual-app local protocol success path, vet/format/CGo-free build and four Node fixtures: passed. Added four failing reviewrepro tests in internal/app/p03_r02_review_test.go and internal/incidents/p03_r02_review_test.go. They cover actual App.New recovery failure, canceled operation-gate admission, disconnected-generation report persistence and manual-stop persistence failure. Codex authored tests/docs only in this review; DeepSeek authored R02 production changes. See handoffs/P03-R02-review.md and corrections/P03-R03.md. No new browser/live OBS evidence; live Twitch deferred in issue #6; P04 held with recording checkpoint.
+
 P03-R01 re-review, 2026-11-02 (Malaysia): DeepSeek corrected the original 13 Go regressions and three UI evidence failures. Codex independently verified them, full ordinary Go/vet/build and four Node fixtures; added six failing remaining-boundary regressions and one passing exact 10k reporter/feedback SQLite-bound test. P03-R02 finishes previously requested work; no Codex production edits. P04 held; Twitch deferred.
 
 P03 review, 2026-11-02 (Malaysia): DeepSeek implemented P03 v1.2. Codex independently inspected production changes and ran existing Go/Node/build/vet/race/lifecycle checks; added 13 failing Go review tests and an actual-script fixture exposing three evidence-rendering failures. P03-R01/issue #8 records corrections. Codex authored review fixtures/docs only this cycle, no P03 production fixes. P03 remains unaccepted; P04 remains reserved and unstarted; live Twitch remains deferred under D30.
