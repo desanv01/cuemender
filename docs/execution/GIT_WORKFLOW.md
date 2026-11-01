@@ -7,9 +7,9 @@ User authorization recorded 2026-11-01.
 - Public product name: CueMender.
 - Repository name: cuemender.
 - Visibility: public.
-- Intended owner: user's GitHub account; previously supplied profile is desanv01. Verify the authenticated account/target before creating or connecting a repository.
+- Verified owner: desanv01; public repository https://github.com/desanv01/cuemender.
 - Existing workspace location remains C:\Users\Dv\Desktop\Twitch Hackathon.
-- Existing livecheck module/executable/data names are temporary implementation identifiers. Codex coordinates a consistent rename without overwriting existing runtime data.
+- Module github.com/desanv01/cuemender and executable cuemender.exe use the product name. LiveCheck data/keyring namespace, livecheck.db and livecheck_session remain stable; no incidental migration.
 - README, About and repository presentation must follow the user's ErrataScope reference, adapted to CueMender. See [REPOSITORY_PRESENTATION.md](REPOSITORY_PRESENTATION.md) for the inspected patterns and publication checkpoints.
 
 ## Authorized responsibility
@@ -31,6 +31,6 @@ DeepSeek remains a code/test worker and must not mutate repository state. No for
 
 ## Current state
 
-P01 has changes required. No accepted baseline or remote repository has been created by Codex yet. Prepare/correct/review P01 first. GitHub actions will follow the accepted checkpoint sequence above.
+P01-R01 is accepted; baseline a07b3df3c33f0284c1da450a323fbba3e9ed1771 is published. Presentation/P02 preparation is tracked in issue #1 through chore/cuemender-presentation-p02. P02 implementation is tracked in issue #2 on feature/p02-live-connections; Codex prepares that branch before dispatch. Subsequent accepted work uses the PR lifecycle. Verify actual remote state for final PR/merge hashes rather than treating this planning note as merge evidence.
 
 This authorization covers Git/GitHub work. It does not itself authorize unrelated email, YouTube publication or Devpost submission.

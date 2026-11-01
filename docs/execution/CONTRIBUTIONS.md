@@ -30,3 +30,6 @@ Maintain this from real work and reports. Codex updates the central record; Deep
 - Actual session reference and footage location when available.
 
 No quotas or claims about a required percentage of Codex code. Preserve each tool's contribution accurately. Organizers determine eligibility; documentation must not claim approval that has not been received.
+## CueMender publication / P02 dispatch
+
+Codex established and published accepted baseline a07b3df, adapted the ErrataScope-style README and development guide, changed the Go module/import paths and visible product name, and refined P02 v1.1/C08 against the accepted source. Legacy storage identifiers remain unchanged. This mechanical naming work does not substitute for the planned substantive P04 implementation. Publication validation is self-verification; see docs/implementation/P01-publication.md. Public tracking: issues #1 and #2 in desanv01/cuemender.

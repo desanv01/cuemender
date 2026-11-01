@@ -1,6 +1,6 @@
 # Decisions and assumptions
 
-Revision: 1.2
+Revision: 1.3
 
 | ID | Decision | Rationale / status |
 |---|---|---|
@@ -13,7 +13,7 @@ Revision: 1.2
 | D07 | No required runtime AI or mixed worker services | Preserve a dependable baseline |
 | D08 | Codex specifies, implements P04, verifies and handles integration fixes; DeepSeek implements/tests P01/P02/P03/P05/P06 | Revised shared-folder workflow; supersedes planning/review-only restriction |
 | D09 | One writer, six packages, explicit handoff | Avoid shared-file conflicts and excessive relays |
-| D10 | CueMender public name; public cuemender repository | User finalized name/visibility; existing livecheck identifiers remain temporarily until Codex coordinates the rename |
+| D10 | CueMender public name; public cuemender repository | User finalized name/visibility; Go module github.com/desanv01/cuemender, executable cuemender.exe; legacy storage identifiers retained |
 | D11 | Later packet release follows previous acceptance | Instructions may be refined using real integration findings |
 | D12 | Direct scene-item visibility only in MVP | Bounded implementation interpretation; nested groups need future work |
 | D13 | Device grant with Twitch public client | Official flow for a distributed desktop client; verify real registration in P02 |
@@ -31,3 +31,8 @@ Revision: 1.2
 New entry: date, author/approver, affected contracts/packets, decision, reason, migration or retest effect. Workers propose changes in their reports rather than editing this file.
 
 Reasonable local function naming, CSS choices within a released design brief and small test helpers are not architectural decisions. Dependency substitution, state/API semantics, platform scope and automatic side effects are.
+## 2026-11-01 — P02 release and publication decisions
+
+- D22 (Codex): preserve LiveCheck data/keyring namespace, livecheck.db and livecheck_session for compatibility. Visible branding and module/imports use CueMender. No storage migration. Rename gets full build/test self-verification.
+- D23 (Codex): C08 and P02 v1.1 define connect/disconnect bodies, atomic config ownership and asynchronous status against actual P01 interfaces. P02 may develop with fixtures while Public client registration is pending, but real Twitch/OBS acceptance gates remain required.
+- D24 (Codex): P02 diagnostic receipt counts can be shown privately while idle as a setup aid. They never create incidents or claim monitoring; C04 monitoring-gated report processing starts in P03.

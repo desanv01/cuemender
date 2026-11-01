@@ -1,8 +1,8 @@
-# LiveCheck — shared agent instructions
+# CueMender — shared agent instructions
 
 Workspace: C:\Users\Dv\Desktop\Twitch Hackathon
 
-This is a new, local Windows application. Go is the only backend language. HTML, CSS and vanilla JavaScript provide small embedded browser surfaces. The user selected CueMender and public repository cuemender. Existing livecheck implementation identifiers remain temporarily; do not mix branding changes into a correction packet.
+This is a new, local Windows application. Go is the only backend language. HTML, CSS and vanilla JavaScript provide small embedded browser surfaces. Product: CueMender; public repository: desanv01/cuemender; Go module: github.com/desanv01/cuemender; binary: dist/cuemender.exe. Legacy LiveCheck data/keyring names, livecheck.db and livecheck_session remain for storage compatibility; do not rename them incidentally.
 
 ## Start here
 
@@ -14,7 +14,7 @@ Read [execution index](docs/execution/README.md), [status](docs/execution/STATUS
 - DeepSeek implements the dispatched P01/P02/P03/P05/P06 packet, tests and debugs its work, then writes a report and stops. P04 is reserved for Codex, not a DeepSeek dispatch.
 - Codex review of DeepSeek work is separate from worker self-testing. Codex verification of its own code is self-verification, not independent review; record that distinction honestly.
 - Exactly one implementation writer at a time. STATUS.md is an advisory ownership record, not a filesystem lock.
-- Only P01 is released initially. Never start the next packet because its file exists.
+- Only the packet explicitly released in STATUS may be started. Never start the next packet because its file exists.
 - Workers may change STATUS.md only for their assigned packet: claim, progress, blocked, ready_for_review, and owner transfer. Only Codex sets accepted or releases a new packet.
 - Workers may read Git status/diffs. They must not initialize Git, commit, push, switch branches, stash, reset, clean, rebase, publish or submit.
 - Preserve existing user files. No unrelated cleanup. No new agents/chats or parallel writers unless the user explicitly directs them.

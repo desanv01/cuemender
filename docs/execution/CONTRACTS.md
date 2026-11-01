@@ -1,6 +1,6 @@
 # Shared contracts
 
-Revision: 1.1 • Changes require Codex decision and affected-packet review.
+Revision: 1.2 • Changes require Codex decision and affected-packet review.
 
 This specifies observable behavior and data semantics, not mandatory function names. Introduce structures as consumed; P01 does not implement the full future state machine.
 
@@ -198,3 +198,27 @@ P04 action statuses: proposed/reserved, intent_recorded, write_sent, verified, f
 - OS keyring unavailable: show needs_attention and require an explicit choice of memory-only mode. Foundation may run with credential features disabled.
 - Remove application-owned test keys on completion. Never enumerate unrelated user credentials.
 - Shutdown flushes state and closes transports/DB. Browser sessions expire; secrets persist only if keyring mode was selected.
+
+## C08 — P02 integration setup details
+
+Codex clarification at P02 v1.1 release. Existing C01–C07 invariants remain; these define the new route bodies and ownership against the actual P01 code.
+
+| Route | Strict JSON body / result |
+|---|---|
+| POST /api/v1/twitch/connect | {"client_id":"PUBLIC_CLIENT_ID"}; nonempty validated ID, persist non-secret config then begin async device flow; 202 with sanitized status |
+| POST /api/v1/twitch/disconnect | {}; cancel and clear this app's Twitch credentials; 200 when completed, safe error if clearing fails |
+| POST /api/v1/obs/connect | {"address":"ws://127.0.0.1:4455","password":"..."}; password optional (reuse for same endpoint), explicit empty string means no password; 202 sanitized status |
+| POST /api/v1/obs/disconnect | {}; cancel and invalidate reads, retain saved OBS credential for explicit reconnect or next startup; 200 sanitized status |
+| GET /api/v1/obs/discovery | Private typed inputs/direct scenes/items, generation/context and observed_at; 503 if unavailable; no raw SDK payload |
+
+All mutations use existing same-origin session/CSRF checks and reject unknown fields. Connect is asynchronous: 202 means accepted work, not connected. A connect while the same lifecycle is busy returns 409; changing the client/endpoint requires invalidating the old lifecycle. Provider authentication failure is a private needs_attention state. No supplied arbitrary channel ID, OAuth endpoint, OBS request name or token-import route.
+
+Config JSON remains the owner of client ID and OBS endpoint. Atomic validated writes serialize updates and preserve the configured listen address independently of an ephemeral CLI override. SQLite owns expectations only. Credential persistence and JSON config are not a cross-store atomic transaction: fail safely, expose degraded setup, never report a usable saved connection if a required step failed.
+
+Private state additions may contain typed connection status/generation, setup resolution, sanitized cached observations, transient device instructions, and diagnostic command receipt count/last type/time. Pending user_code and verification_uri are private authorization instructions, not logs or public data. Keep device_code, password, access/refresh token and secret-store values out of all projections.
+
+P02 monitoring_active is always false, incidents empty and public service_status idle or disconnected. A successfully connected adapter does not mean monitoring or repair is implemented. Private diagnostic command receipt while idle is a P02 verification aid, not incident processing; C04's monitoring gate remains for P03.
+
+OBS observations and discovery use typed domain structures, not SDK structs. Each field may be unknown independently. The adapter interface is read-only; SDK methods stay behind it. Same-name recreation/context loss must not silently inherit ready status. Partial/offline settings remain structurally saveable, with live resolution explicitly false until verified.
+
+Production startup may resume stored, validated integrations; explicit disconnect stops retries for the current run. Twitch disconnect clears credentials; OBS disconnect retains them as stated above. Persisted credentials are scoped to provider/client or endpoint, and old asynchronous results cannot restore a disconnected/replaced lifecycle. Tests must cover refresh/disconnect and config update races.

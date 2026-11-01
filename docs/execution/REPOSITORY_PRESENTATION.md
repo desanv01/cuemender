@@ -78,3 +78,6 @@ Follow ErrataScope's readable separation of source, docs, assets, fixtures and d
 4. Before submission, inspect rendered GitHub Markdown, image paths/alt text, jump links, About, topics and badge destinations against this reference.
 
 This preference does not expand P01-R01's correction scope or change its current ownership. Codex owns repository presentation; DeepSeek follows this brief when a released packet explicitly includes documentation/presentation work.
+## Foundation publication
+
+Codex applied the centered title/tagline, truthful badges, jump navigation, feature grid, build/run instructions, contribution explanation and documentation navigation. Actual screenshots, video and release links remain deferred until captured/published. No borrowed ErrataScope assets, false CI badge or unselected license badge were added. Public repository: https://github.com/desanv01/cuemender.

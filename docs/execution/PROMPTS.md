@@ -1,12 +1,44 @@
 # Copy-paste prompts
 
-Revision: 1.2
+Revision: 1.3
 
-Current dispatch: P01-R01 correction below. P01 is implemented but not accepted. Do not use the original fresh-start prompt or begin P02. Each later packet is conditional on Codex acceptance/release in STATUS.
+Current dispatch: P02 v1.1 below. P01-R01 is accepted; older P01 prompts are historical. Only the packet currently released in STATUS may be run.
 
 This replaces the v1.0 launch instructions: Codex is also a production implementer. P04 is assigned to Codex in the main chat; its prompt below must not be sent to DeepSeek.
 
-## Current: P01-R01 correction — paste into DeepSeek
+## Current: P02 v1.1 — paste into DeepSeek
+
+~~~text
+Work in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for CueMender P02 v1.1.
+
+Read before editing:
+1. AGENTS.md
+2. docs/execution/README.md, STATUS.md and WORKFLOW.md
+3. docs/execution/PROJECT_SPEC.md, ARCHITECTURE.md and CONTRACTS.md (v1.2, including C08)
+4. docs/execution/packages/P02-live-connections.md
+5. docs/execution/handoffs/P01-R01-review.md
+6. docs/implementation/P01-environment.md and docs/DEVELOPMENT.md
+7. docs/execution/templates/WORKER_REPORT.md
+
+Confirm STATUS releases P02 v1.1, P01 is accepted, no writer is active, and the checkout is feature/p02-live-connections. Then claim P02 ownership in STATUS. If the branch differs, report it to Codex; do not switch it yourself.
+
+Implement P02 end to end: public-client Twitch Device Code authorization and validated/rotated credential storage; EventSub own-channel chat intake and bounded replies; local read-only OBS discovery/observations; minimal private setup controls; and the packet's meaningful tests. Preserve the accepted foundation and CueMender module/name changes. Keep legacy data/keyring/database/cookie identifiers unchanged.
+
+User has NOT registered a Twitch Public client yet, and OBS WebSocket was reported disabled. Complete fixture-based implementation without waiting for these prerequisites. Write the exact operator setup instructions, and perform real checks only when setup is available. Do not invent a client ID, request a client secret, paste tokens into chat, or label fixtures as live. Missing live gates must be explicit in your report; Codex decides acceptance.
+
+Use the existing portable Go toolchain. Pin and compile-verify goobs and coder/websocket; document actual SDK methods and versions before relying on them. Keep credentials out of config, SQLite, logs, public state, source and reports. Protect every new private route with the existing auth/CSRF/Host/Origin/body boundary. Test disconnect/refresh races, old generations, public redaction, config persistence and shutdown with active workers.
+
+No incident engine, monitoring behavior, OBS mutations, proposals or repair code. P04 is reserved for Codex, with its recording checkpoint. No new workers, framework/service dependencies, specification edits, Git mutations, commits, pushes, PRs or publishing. Normal implementation choices inside this packet are yours; report any needed contract/dependency-strategy change to Codex.
+
+Run the packet's required checks and fix failures. Write docs/implementation/P02-compatibility.md, docs/implementation/P02-setup.md and docs/execution/handoffs/P02-worker-report.md, mapping P02-A through P02-I to actual evidence. Distinguish executed, failed, skipped, fixture and live checks. Include changed files, dependency pins, commands/results, environment changes and exact unmet prerequisites.
+
+When done or blocked, update only operational STATUS fields, transfer ownership to Codex, stop processes you started and stop editing. Do not begin P03.
+
+Return this handoff:
+"P02 worker handoff is ready. Read docs/execution/handoffs/P02-worker-report.md, docs/implementation/P02-compatibility.md and docs/implementation/P02-setup.md; inspect actual changes against P02 v1.1 and CONTRACTS v1.2; reproduce the focused regressions and check live Twitch/OBS evidence separately from fixtures. DeepSeek has stopped editing. Record acceptance, consolidated corrections or specific unmet gates. P03 remains held until accepted."
+~~~
+
+## Historical: P01-R01 correction — completed, do not redispatch
 
 ~~~text
 Work in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P01-R01.
@@ -90,15 +122,7 @@ P01 worker handoff is ready. Read docs/execution/handoffs/P01-worker-report.md a
 
 ### P02
 
-~~~text
-In C:\Users\Dv\Desktop\Twitch Hackathon, act as the sole DeepSeek implementation worker for P02 only.
-
-Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md, PROJECT_SPEC.md, ARCHITECTURE.md, CONTRACTS.md; docs/execution/packages/P02-live-connections.md; and docs/execution/handoffs/P01-review.md. Use the current packet revision. Proceed only if Codex accepted P01 and explicitly released P02 and no other writer is active.
-
-Implement the released live-connection packet, test/debug it, and report actual Twitch/OBS evidence separately from fixtures. Don't change specifications, add new scope or perform Git/GitHub/publishing operations. No real credentials in chat, source, logs or reports. Missing live prerequisites must be reported, not simulated as success.
-
-Write docs/execution/handoffs/P02-worker-report.md using the worker template and docs/implementation/P02-compatibility.md. Update operational STATUS fields, stop editing/processes, and give me a short Codex review prompt pointing to those files. Do not begin P03.
-~~~
+Use the current P02 v1.1 prompt at the top of this document; the earlier generic prompt is superseded.
 
 ### P03
 
@@ -118,6 +142,8 @@ Write docs/execution/handoffs/P03-worker-report.md using the worker template. Up
 In C:\Users\Dv\Desktop\Twitch Hackathon, take sole Codex implementation ownership of P04. DeepSeek is stopped. Do not create another worker chat or delegate this implementation.
 
 Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md, PROJECT_SPEC.md, ARCHITECTURE.md, CONTRACTS.md, CONTRIBUTIONS.md; docs/execution/packages/P04-approved-repair.md; and docs/execution/handoffs/P03-review.md. Proceed only if P03 is accepted, P04 explicitly released and no other writer is active.
+
+First complete P04.0: test the recorder, start capture of genuine Codex implementation/test moments, and keep secrets off-screen. At completion stop and verify saved footage before recording its path. Do not silently skip the recording checkpoint.
 
 Directly implement the production proposal/approval logic, durable action intent, fresh preconditions, single OBS track update, read-back and timeout/restart reconciliation. Add and run the specified meaningful tests and debug the actual integration. No generalized OBS control endpoint or optional expansion. Live trial uses only the dedicated configured test setup. Publishing remains a separate authorized step.
 
