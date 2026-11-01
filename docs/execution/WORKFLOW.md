@@ -1,6 +1,8 @@
 # Worker and reviewer protocol
 
-Revision: 1.1
+Revision: 1.2
+
+Current exception: D30 explicitly permits P03 development on the conditionally accepted P02 baseline while live Twitch gates remain deferred/unmet in issue #6. This changes phase sequencing only, not live-evidence requirements or final readiness. Earlier P02/P03 hold wording in historical reports is superseded by this recorded decision; consult STATUS for the current release. No automatic P04 release follows.
 
 ## Ownership sequence
 

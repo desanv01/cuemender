@@ -1,12 +1,55 @@
 # Copy-paste prompts
 
-Revision: 1.6
+Revision: 1.7
 
-Current dispatch: P02-R03 v1.0 below. P02 has changes required; earlier launch/correction prompts are historical. Only the correction currently released in STATUS may be run.
+Current dispatch: P03 v1.2 under D30 and CONTRACTS v1.3. P02 local/live OBS closure is complete; live Twitch remains deferred in issue #6. Earlier P02 prompts are historical and must not be dispatched.
+
+## Current: P03 v1.2 — paste into DeepSeek
+
+~~~text
+You are the sole DeepSeek implementation worker for CueMender in:
+C:\Users\Dv\Desktop\Twitch Hackathon
+
+Implement P03 v1.2 only. Codex owns planning, contracts, acceptance and all Git/GitHub operations. P04 is reserved for Codex. Do not create other agents or parallel editing chats.
+
+Read before editing:
+1. AGENTS.md
+2. docs/execution/README.md
+3. docs/execution/STATUS.md
+4. docs/execution/WORKFLOW.md
+5. docs/execution/PROJECT_SPEC.md
+6. docs/execution/ARCHITECTURE.md
+7. docs/execution/CONTRACTS.md v1.3, especially C09
+8. docs/execution/DECISIONS.md, especially D30
+9. docs/execution/handoffs/P02-codex-closure-review.md
+10. docs/execution/packages/P03-diagnostics.md v1.2
+11. docs/execution/templates/WORKER_REPORT.md
+
+Verify STATUS releases P03 v1.2, the branch is feature/p03-diagnostics, and no other writer is active. Read Git status/diff, preserve existing work, record the actual starting HEAD, then claim operational ownership as DeepSeek:P03/in_progress. Do not switch branches yourself.
+
+The user explicitly authorized P03 while Twitch phone/2FA setup is unresolved. P02's local implementation and live OBS are verified; live Twitch P02-A/V06 and P03-D's real-chat portion remain deferred/unmet in GitHub issue #6. Do not attempt Twitch login, registration, authorization or real chat, request credentials, invent a client ID, or mark fixtures as live evidence. This hold does not block P03 implementation and local testing.
+
+Implement the packet end to end: three pure diagnostics; fresh read-only OBS evidence; bounded monitoring/report jobs; persistent incidents, findings, dedup and feedback; authenticated start/stop/manual-check/recheck/dismiss routes; coherent private/public projections; and minimal controls within the existing UI.
+
+Follow C09 precisely. SnapshotBundle is cached and RefreshDiscovery refreshes discovery only: add the scoped fresh diagnostic read with immutable revision/generation/context and bounded cancellation. Integrate the existing normalized Twitch OnCommand seam and existing ReplyQueue; remove contradictory/duplicate P02 idle acknowledgments when the coordinator is wired. Persist before publishing or acknowledging. Test failures and stale work across stop, restart, settings changes, reconnect and dismissal. Preserve all P02 lifecycle/security regression assertions.
+
+Keep the Go-only backend, current dependencies and patched SDK. No OBS mutations, proposal/approval engine, automatic unmute/reveal, stream start/stop, rehearsal, P05 redesign or P06 clear-history work. Do not change authoritative specifications or contracts; report a precise blocker/proposed change to Codex if needed. Ordinary in-scope implementation choices are yours.
+
+Use the existing portable Go toolchain and the exact checks in P03. Run focused tests during implementation, then the final Go suite, vet, formatting, CGo-free build, existing/new actual-JS fixtures and affected lifecycle checks. Existing WSL plus workspace Linux Go supports race testing; run it if your harness permits, otherwise explicitly hand that check to Codex. Do not install system-wide tools. All computer access stays background-only; hidden local browser checks only if available. Do not change the user's OBS setup or stop user-owned processes. Use isolated test data and ports; keep credentials and bootstrap URLs out of reports.
+
+No Git mutations: no commits, branch changes, push, stash, reset, clean, rebase, PRs, merges, issues, publishing or submission.
+
+Write docs/execution/handoffs/P03-worker-report.md and docs/implementation/P03-diagnostics.md. Map P03-A through P03-F and every boundary-test group to actual evidence. Include changed files, actual commands/results, tool versions, migration behavior, dependency changes, limitations and cleanup. Separate local fixtures, actual-script tests, rendered-browser checks, live OBS and deferred live Twitch. Do not silently carry untested local requirements forward.
+
+When finished, update only operational STATUS fields to ready_for_review (or blocked with a specific implementation blocker), owner Codex, no active writer. Stop all processes you started, stop editing, and do not begin P04.
+
+End with a short status summary and this exact handoff:
+"P03 worker handoff is ready. Read docs/execution/handoffs/P03-worker-report.md and docs/implementation/P03-diagnostics.md; inspect actual changes against P03 v1.2 and CONTRACTS v1.3/C09; reproduce focused diagnostics, persistence, session/lifecycle, route and UI boundary checks. DeepSeek has stopped editing. Record acceptance, consolidated corrections or specific blockers. Keep P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; do not count fixtures as live evidence. P04 remains held for Codex's explicit release and recording checkpoint."
+~~~
 
 This replaces the v1.0 launch instructions: Codex is also a production implementer. P04 is assigned to Codex in the main chat; its prompt below must not be sent to DeepSeek.
 
-## Current: P02-R03 v1.0 — paste into DeepSeek
+## Historical: P02-R03 v1.0 — completed; do not dispatch
 
 ~~~text
 Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P02-R03 v1.0.
@@ -193,23 +236,15 @@ Finish remaining in-scope tasks and required checks, fix failures, update the P0
 P01 worker handoff is ready. Read docs/execution/handoffs/P01-worker-report.md and docs/implementation/P01-environment.md, inspect the actual files against P01 v1.1 and the shared contracts, and perform the focused acceptance review. DeepSeek has stopped editing. Record accepted, changes required, or blocked. If you directly fix integration issues, take sole edit ownership and record your changes/tests. Then provide the consolidated correction prompt or release the next packet.
 ~~~
 
-## Later packet dispatch prompts — held until released
+## Phase prompt index — consult STATUS
 
 ### P02
 
-Use the current P02-R02 correction prompt at the top of this document; earlier dispatches are historical.
+P02 implementation/corrections are complete. Only deferred live Twitch verification remains; no worker correction is released.
 
 ### P03
 
-~~~text
-In C:\Users\Dv\Desktop\Twitch Hackathon, act as the sole DeepSeek implementation worker for P03 only.
-
-Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md, PROJECT_SPEC.md, ARCHITECTURE.md, CONTRACTS.md; docs/execution/packages/P03-diagnostics.md; and docs/execution/handoffs/P02-review.md. Proceed only if P02 is accepted, P03 is explicitly released and no other writer is active.
-
-Implement, test and debug the three diagnostics and incident lifecycle as specified. No OBS mutations, scope/contract changes or Git operations. Preserve unknown/stale evidence semantics and distinguish live from fixture results.
-
-Write docs/execution/handoffs/P03-worker-report.md using the worker template. Update operational STATUS fields, stop editing/processes, and give me a short Codex review prompt pointing to that report. Do not begin P04.
-~~~
+Use the full current P03 v1.2 prompt at the top of this document. Its D30 deferral supersedes the former unconditional P02 live-gate prerequisite; all implementation and truthful-evidence requirements remain.
 
 ### P04 — send to Codex in this main chat, not DeepSeek
 

@@ -161,7 +161,9 @@ return HTTP 409 and never overwrite newer data.
 ## Next packet
 
 P03 adds evidence-based diagnostics and the persistent incident lifecycle. It is
-not part of P02 and remains held until Codex accepts the live-connection gates.
+not part of P02; P03 v1.2 is released under the user's D30 sequencing decision.
+Live Twitch verification remains explicitly deferred in issue #6 until account/2FA
+setup is resolved, and is required before final release/submission readiness.
 See [execution status](execution/STATUS.md) for its current dispatch state.
 
 ## License

@@ -1,6 +1,17 @@
 # Decisions and assumptions
 
-Revision: 1.3
+Revision: 1.4
+
+## D30 — Conditional P02 baseline and P03 release (2026-11-01)
+
+User explicitly approved moving to P03 while live Twitch verification waits for their phone/2FA resolution. Codex accepts the completed P02 engineering/local/live-OBS work as the development baseline and releases P03 v1.2 under contracts v1.3. This is conditional progression, not full live Twitch acceptance; it supersedes D11/D26 and older P03 hold wording only for this transition.
+
+- P02-A/V06 remains deferred/unmet. P03-D's real Twitch report-to-OBS-finding portion is also deferred, not replaced by fixtures. Track both in [issue #6](https://github.com/desanv01/cuemender/issues/6).
+- Do not attempt Twitch login, registration or authorization until the user lifts the hold. Do not ask for credentials or invent a client ID. Local protocol fixtures, manual OBS checks and incident implementation proceed independently.
+- Keep the live gates required before final release/submission readiness and before claiming the real Twitch end-to-end flow works. Codex can review P03's local implementation while explicitly carrying these gates; the worker cannot waive them or release P04.
+- Merge the verified P02 development baseline through PR #5, retaining issue #6; dispatch P03 on feature/p03-diagnostics, tracked in [issue #7](https://github.com/desanv01/cuemender/issues/7). This is source integration, not a production release.
+- P04 remains Codex-owned, held until a separate review/release decision, with genuine implementation recording required. DeepSeek is the sole P03 writer only after claiming STATUS.
+- No application code changed for this decision. P03-specific API/intake details are clarified in C09; existing safety, persistence, provenance and OBS read-only constraints remain.
 
 | ID | Decision | Rationale / status |
 |---|---|---|

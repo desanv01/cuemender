@@ -1,6 +1,6 @@
 # Shared contracts
 
-Revision: 1.2 • Changes require Codex decision and affected-packet review.
+Revision: 1.3 • Changes require Codex decision and affected-packet review.
 
 This specifies observable behavior and data semantics, not mandatory function names. Introduce structures as consumed; P01 does not implement the full future state machine.
 
@@ -112,6 +112,8 @@ P01 has empty incidents, monitoring_active=false and truthful not_connected stat
 
 ## C04 — Twitch and observation adapters
 
+P03 dispatch clarification: C09 below defines the monitoring/manual-check route bodies and the transition from P02 idle acknowledgments to incident-aware replies. D30 defers live Twitch evidence, not the runtime readiness checks.
+
 Twitch command normalized fields: delivery_id, message_id, broadcaster_id, actor_id, received_at, command, category or public_incident_id, connection_generation. Retain only command metadata required for the feature, not full chat.
 
 Installed-client authorization uses the broadcaster's own identity: token subject, channel ID and sender ID must match the selected own-channel model. Request user:read:chat and user:write:chat for required outgoing replies, verify current API docs. Credentials stay backend-only. P02 implements validation at startup/hourly, serialized refresh and rotated-token persistence.
@@ -222,3 +224,38 @@ P02 monitoring_active is always false, incidents empty and public service_status
 OBS observations and discovery use typed domain structures, not SDK structs. Each field may be unknown independently. The adapter interface is read-only; SDK methods stay behind it. Same-name recreation/context loss must not silently inherit ready status. Partial/offline settings remain structurally saveable, with live resolution explicitly false until verified.
 
 Production startup may resume stored, validated integrations; explicit disconnect stops retries for the current run. Twitch disconnect clears credentials; OBS disconnect retains them as stated above. Persisted credentials are scoped to provider/client or endpoint, and old asynchronous results cannot restore a disconnected/replaced lifecycle. Tests must cover refresh/disconnect and config update races.
+
+## C09 — P03 implementation contract
+
+Codex clarification for P03 v1.2 against the completed P02 source. D30 permits development without live Twitch credentials; it does not authorize a production bypass or a fake connected state.
+
+### Private routes
+
+Use the existing C03 middleware/envelopes and strict JSON validation on all four routes. No new public mutation route.
+
+| Route | Body | Successful data / behavior |
+|---|---|---|
+| POST /api/v1/monitoring/start | {"expected_revision": integer} | 200 with monitoring_active=true and session_id. Require matching settings revision, connected Twitch and OBS, current known/resolved configured expectations, and at least one configured diagnostic. Require explicit track confirmation when a microphone is configured. Streaming need not be on: display actual true/false/unknown separately. Repeat start while active returns the same session, not a second session. |
+| POST /api/v1/monitoring/stop | {} | 200 with monitoring_active=false, session_id=null. Idempotent. Invalidate intake/jobs before acknowledging; old results cannot commit. Preserve history. |
+| POST /api/v1/incidents/check | {"category":"audio" or "video", "expected_revision": integer, "incident_id": optional internal ID} | 202 with incident_id, public_id and actual stage after durable scheduling. Explicit incident_id means recheck, never arbitrary state mutation. No ID: join the current category incident while monitoring; otherwise create a manual incident with its own operation/session identity. Manual checks work without Twitch and while stopped. |
+| POST /api/v1/incidents/{id}/dismiss | {} | 200 with incident_id and stage=dismissed. Repeat dismissal is idempotent. Unknown ID is 404; incompatible/terminal closed state is 409. Cancel the incident's pending check; late results cannot revive it. |
+
+Revision mismatch is 409. Start missing setup is 409; required connection unavailable is 503. Queue/admission saturation is 429 with no partially created work. Manual checks with absent/disconnected/partial OBS evidence can complete as insufficient_information with an explicit unavailable reason, never a fabricated healthy result. No provider call holds the coordinator or app state lock. Reject terminal rechecks; historical/stopped-session incidents cannot become active monitoring incidents. A new manual check is available instead.
+
+### Incident jobs, persistence and sessions
+
+- One logical coordinator owns mutations. At most one diagnostic job per category and two total; reports joining an incident coalesce and never start a job per message. Additional manual checks while that category is busy return the existing same-incident job or 429 for different work. Do not create an unbounded queue or goroutine per report.
+- Each accepted check gets an immutable request ID, scope/session ID, settings revision and OBS generation. On-demand OBS reads use a five-second total deadline, including admission. Validate the source/context and current revision/generation again before committing. Cached SnapshotBundle alone is not a diagnostic read. Cancellation must join owned work or return through the already bounded adapter lifecycle; never abandon network goroutines.
+- Starting/stopping monitoring, changed settings, relevant connection replacement/disconnect, dismiss and shutdown invalidate affected outstanding results. Preserve previous findings as timestamped historical evidence; do not relabel them as current. Restart leaves monitoring off and old open work interrupted, with old session feedback ineligible. No automatic recheck/replay on restart.
+- Manual intake does not increment viewer report_count/distinct_reporters. Reports in an active session atomically persist dedup identity, minimal report metadata, grouping/count changes and any newly created incident. Persist before cache/SSE/reply acknowledgment; failed commits publish nothing. Durable dedup enforces C04's retained delivery/message semantics across restart; the adapter's existing in-memory filter remains an early guard, not the durable authority. Do not apply the ten-second cooldown twice to the same accepted event.
+- Reporter identities are minimal backend-only IDs (or consistently keyed representations), not usernames/raw chat. Enforce bounded per-incident retained report detail (10,000 records); counts may continue to reflect accepted reports, but at the detail bound reject additional distinct identities instead of inventing exact distinct counts. Keep feedback latest-per-actor bounded to 10,000 actors per incident; existing actors can replace their vote. Document limits and safe rejection. C07 completed-history and dedup retention apply now; no clear-history UI until P06.
+- For no supported conflicts, every relevant configured check must have sufficient evidence. A known conflict can coexist with an unknown second check; preserve both outcomes. MIC_MUTED and MIC_TRACK_MISSING must both survive when both apply. Never claim OBS routing evidence measures viewer playback.
+- P03 track-mismatch incidents remain finding_available with supported_action_kind=ADD_MIC_TO_TRACK as descriptive metadata only. No proposal, approval button, action record or OBS write exists until P04. Manual-only findings enter awaiting_feedback. Negative feedback moves an eligible incident to unresolved; positive feedback only changes counts. Latest vote replaces that actor's prior vote; stale/unknown/terminal/old-session codes have no effect.
+
+### Existing adapter and projection integration
+
+- Use twitch.Options.OnCommand / CommandEvent as the normalized intake seam. The event loop must only submit bounded work, not wait for an OBS read. Preserve exact command parsing, own-account filtering, credential lifecycle, cooldown and dedup protections.
+- Replace P02's unconditional static idle acknowledgments when the coordinator is wired. Introduce a narrow typed reply outcome or generation-bound enqueue method using the existing ReplyQueue, never a second queue/bot. Fixed templates may include only the backend-generated public incident code. Acknowledgments follow durable acceptance, cannot falsely say monitoring is inactive during monitoring, and cannot duplicate the P02 acknowledgment. Dropped/rate-limited replies do not undo incidents. Revalidate session/generation before queuing deferred replies; queued copy must not claim a later diagnosis succeeded.
+- Help remains available while connected and idle. Idle issue commands do not open incidents. No outgoing text includes usernames, OBS identities, raw errors or evidence. No test sends a real Twitch message during the user hold.
+- Extend domain projections and existing app snapshots/SSE coherently. Private evidence is typed and bounded; public projection is a separately constructed C03 allowlist. Public incidents include only current monitoring-session incidents, not offline/manual history. Existing state_revision ordering and settings-save publication guarantees must remain intact.
+- Minimal controls add start/stop, manual audio/video check, recheck and dismiss, plus evidence/feedback counts and explicit repair-not-yet-available copy. Preserve setup/CSRF reload behavior, textContent rendering and CSP; no redesign, runtime framework or new dependency.

@@ -2,7 +2,7 @@
 
 Date: 2026-11-01. Scope: P02 v1.1, contracts v1.2, R01–R03 corrections and user-authorized Codex closure (D26–D29).
 
-**Outcome: local implementation and live OBS verification complete. P02 acceptance remains held for P02-A/V06 live Twitch only.** The user explicitly deferred Twitch login/registration/authorization because of phone-number/2FA setup. P03 remains unreleased; DeepSeek remains stopped.
+**Updated outcome under D30: local implementation and live OBS verification complete; P02 is conditionally accepted as the P03 development baseline.** The user explicitly authorized moving to P03 while Twitch phone/2FA setup is blocked. P02-A/V06 remains deferred/unmet, not passed. P03 v1.2 is released in STATUS; full live Twitch acceptance remains tracked in [issue #6](https://github.com/desanv01/cuemender/issues/6).
 
 ## What was closed
 
@@ -34,4 +34,4 @@ DeepSeek implemented the initial P02 and R01–R03 corrections. Codex's user-req
 
 The user enabled OBS WebSocket and authorized creating a dedicated test card. Root created that one source through an external local API setup script; no OBS write capability was added to the P02 product. The isolated CueMender process/data were cleaned up; the user's OBS and test card remain.
 
-Verified source checkpoint [1b068843](https://github.com/desanv01/cuemender/commit/1b068843e38bee905ff6ea80c44f612e88ed32d4) and [draft PR #5](https://github.com/desanv01/cuemender/pull/5) are published. Issues #2 and #4 are updated and remain open; P02 merge and P03 release remain held. Resume live Twitch only when the user lifts that hold. Complete the Public-client/device-flow/separate-viewer check before full P02 acceptance, or record a new explicit decision if the user changes the phase gate. Do not quietly waive it.
+Verified source checkpoint [1b068843](https://github.com/desanv01/cuemender/commit/1b068843e38bee905ff6ea80c44f612e88ed32d4) is integrated through [PR #5](https://github.com/desanv01/cuemender/pull/5) under D30; consult STATUS/GitHub for the actual merge checkpoint. The user's new sequencing decision permits source integration and P03 dispatch, not a release-quality claim. Local corrections are complete. Retain the Public-client/device-flow/separate-viewer check and P03 real-chat-to-finding check in issue #6 until actually verified; resume account work only when the user lifts the hold. P03 implementation is tracked in issue #7.

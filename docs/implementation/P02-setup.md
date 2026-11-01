@@ -189,4 +189,7 @@ save/reload/save passed. See [the closure review](../execution/handoffs/P02-code
 Only P02-A/V06 remains: no registered Public client, broadcaster device
 authorization or separate-viewer live command receipt/reply. The user explicitly
 deferred this work due to 2FA/phone setup. Local fixtures do not satisfy that gate;
-P02 full acceptance and P03 release remain held.
+Full live Twitch acceptance remains pending. Under the user's D30 decision, P03
+v1.2 may proceed on the verified local/live-OBS baseline; P02-A/V06 and P03-D's
+real-chat portion remain tracked in issue #6 before final readiness. Do not resume
+Twitch account work until the user lifts the hold.
