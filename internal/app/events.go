@@ -3,7 +3,7 @@ package app
 import (
 	"sync"
 
-	"livecheck/internal/httpui"
+	"github.com/desanv01/cuemender/internal/httpui"
 )
 
 type hubSubscriber struct {

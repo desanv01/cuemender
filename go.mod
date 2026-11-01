@@ -1,4 +1,4 @@
-module livecheck
+module github.com/desanv01/cuemender
 
 go 1.27.3
 

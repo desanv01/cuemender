@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"livecheck/internal/domain"
+	"github.com/desanv01/cuemender/internal/domain"
 )
 
 const (

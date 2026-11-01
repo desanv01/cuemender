@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"livecheck/internal/domain"
-	"livecheck/internal/store"
+	"github.com/desanv01/cuemender/internal/domain"
+	"github.com/desanv01/cuemender/internal/store"
 )
 
 func newStateTestApp(t *testing.T) *App {

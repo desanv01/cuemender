@@ -11,7 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"livecheck/internal/domain"
+	"github.com/desanv01/cuemender/internal/domain"
 )
 
 func testSettings(track int, mic string) domain.Expectations {

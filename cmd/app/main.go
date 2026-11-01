@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"livecheck/internal/app"
+	"github.com/desanv01/cuemender/internal/app"
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 }
 
 func run() int {
-	flags := flag.NewFlagSet("livecheck", flag.ContinueOnError)
+	flags := flag.NewFlagSet("cuemender", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	dataDir := flags.String("data-dir", "", "data directory (default: user config directory / LiveCheck)")
 	listen := flags.String("listen", "", "loopback listen address override, e.g. 127.0.0.1:8787")
@@ -32,7 +32,7 @@ func run() int {
 		return 2
 	}
 	if flags.NArg() > 0 {
-		fmt.Fprintln(os.Stderr, "livecheck: unexpected arguments:", flags.Args())
+		fmt.Fprintln(os.Stderr, "cuemender: unexpected arguments:", flags.Args())
 		return 2
 	}
 	if *showVersion {
@@ -52,11 +52,11 @@ func run() int {
 		Stderr:             os.Stderr,
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "livecheck:", err)
+		fmt.Fprintln(os.Stderr, "cuemender:", err)
 		return 1
 	}
 	if err := a.Run(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, "livecheck:", err)
+		fmt.Fprintln(os.Stderr, "cuemender:", err)
 		return 1
 	}
 	return 0

@@ -11,7 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"livecheck/internal/domain"
+	"github.com/desanv01/cuemender/internal/domain"
 )
 
 // ErrSchemaNewer indicates the database was created by a newer application

@@ -19,7 +19,7 @@
     if (state.service_status === 'idle') {
       return { status: 'Idle', detail: 'No active reports.' };
     }
-    return { status: 'Not connected', detail: 'Waiting for LiveCheck.' };
+    return { status: 'Not connected', detail: 'Waiting for CueMender.' };
   }
 
   function render(state) {
@@ -40,11 +40,11 @@
       render(JSON.parse(event.data));
     } catch (_) {
       statusNode.textContent = 'Not connected';
-      detailNode.textContent = 'Waiting for LiveCheck.';
+      detailNode.textContent = 'Waiting for CueMender.';
     }
   });
   events.addEventListener('error', () => {
     statusNode.textContent = 'Not connected';
-    detailNode.textContent = 'Waiting for LiveCheck.';
+    detailNode.textContent = 'Waiting for CueMender.';
   });
 })();

@@ -142,7 +142,7 @@
     } catch (error) {
       if (error.status === 401) {
         state.csrf = '';
-        showLocked('This page has no private session. Open the single-use link printed by LiveCheck.');
+        showLocked('This page has no private session. Open the single-use link printed by CueMender.');
       } else {
         showLocked('Private state could not be loaded. Check the console and retry.');
       }
@@ -167,7 +167,7 @@
       state.connected = true;
       return true;
     } catch (error) {
-      showLocked('The launch link is invalid, expired or already used. Restart LiveCheck for a new link.');
+      showLocked('The launch link is invalid, expired or already used. Restart CueMender for a new link.');
       return false;
     }
   }
@@ -227,7 +227,7 @@
         showNotice('Settings changed elsewhere. Reloading the current revision…', 'error');
         await loadState();
       } else if (error.status === 401) {
-        showLocked('The private session is no longer valid. Restart LiveCheck for a new link.');
+        showLocked('The private session is no longer valid. Restart CueMender for a new link.');
       } else {
         showNotice(error.message || 'Settings could not be saved.', 'error');
       }
