@@ -6,6 +6,8 @@ Maintain this from real work and reports. Codex updates the central record; Deep
 
 ## Current evidence
 
+P03 review, 2026-11-02 (Malaysia): DeepSeek implemented P03 v1.2. Codex independently inspected production changes and ran existing Go/Node/build/vet/race/lifecycle checks; added 13 failing Go review tests and an actual-script fixture exposing three evidence-rendering failures. P03-R01/issue #8 records corrections. Codex authored review fixtures/docs only this cycle, no P03 production fixes. P03 remains unaccepted; P04 remains reserved and unstarted; live Twitch remains deferred under D30.
+
 | Work | Tool/chat | Status | Evidence |
 |---|---|---|---|
 | Product architecture, contracts and execution packets | Current Codex chat | Completed documentation | Files in docs/execution and AGENTS.md |

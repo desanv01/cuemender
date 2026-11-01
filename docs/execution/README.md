@@ -1,8 +1,10 @@
 # CueMender execution pack
 
-Revision: 1.9 • Updated 2026-11-01 • P03 v1.2 released under D30; live Twitch deferred.
+Revision: 2.0 • Updated 2026-11-02 (Malaysia) • P03-R01 corrections released; live Twitch deferred.
 
 ## Immediate next action
+
+P03 v1.2 was implemented and reviewed: **changes required**. Read [P03 review](handoffs/P03-review.md), execute [P03-R01](corrections/P03-R01.md) using the current [prompt](PROMPTS.md), and follow STATUS. Existing suites pass but 13 added Go regressions and three actual-script assertions fail. No P04 release. The original release decision below remains context, not an instruction to restart P03.
 
 User approved P03 progression while Twitch phone/2FA setup remains blocked. **P03 v1.2 is released under D30**, with P02's completed local/live-OBS work accepted as its development baseline. See [the closure review](handoffs/P02-codex-closure-review.md), [D30](DECISIONS.md), [P03 packet](packages/P03-diagnostics.md) and [current prompt](PROMPTS.md). P02-A/V06 and P03-D's real-chat portion remain deferred/unmet in [issue #6](https://github.com/desanv01/cuemender/issues/6), required before final readiness. Do not restart Twitch login work. Follow [STATUS](STATUS.md) and claim sole ownership before implementing.
 
@@ -26,7 +28,7 @@ Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [init
 |---|---|---|
 | [P01 — Foundation](packages/P01-foundation.md) | Runnable local shell, persistent settings, credential boundary, private/public HTTP boundaries | Accepted after P01-R01 |
 | [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Development baseline conditionally accepted under D30; Twitch deferred |
-| [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | v1.2 released to DeepSeek; not implemented yet |
+| [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Implemented; changes required; P03-R01 released |
 | [P04 — Approved repair](packages/P04-approved-repair.md) | Codex implements approval, correction, reconciliation and tests | Planned; reserved for Codex |
 | [P05 — User experience](packages/P05-user-experience.md) | Finished setup, controls, overlay, confirmation, rehearsal | Planned |
 | [P06 — Release readiness](packages/P06-release-readiness.md) | Tested Windows ZIP and reproducible instructions | Planned |

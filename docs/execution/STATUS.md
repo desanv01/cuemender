@@ -1,47 +1,49 @@
 # Execution status
 
-Revision: 1.7
-Last update: 2026-11-01 — user-authorized P03 progression under D30
+Revision: 1.8
+Last update: 2026-11-02 (Asia/Kuala_Lumpur) — P03 reviewed with changes required
 Current packet: P03
-Current state: ready — released under D30; live Twitch deferred/unmet
+Current state: changes_required — P03-R01 v1.0 released
 Current owner: Codex
-Released packet revision: P03 v1.2; contracts v1.3 (C09)
-Code writer active: none — awaiting DeepSeek claim for P03
-Started at (UTC): not started for P03
+Released packet revision: P03-R01 v1.0 against P03 v1.2 and contracts v1.3 (C09)
+Code writer active: none — Codex review fixtures/docs complete; awaiting DeepSeek correction claim
+Started at (UTC): 2026-11-01T15:46Z
+P03 finished at (UTC): 2026-11-01T16:05Z
 P02 started at (UTC): 2026-11-01T09:05Z
 Correction started at (UTC): 2026-11-01T09:43Z
 R02 started at (UTC): 2026-11-01T10:03Z
 R03 started at (UTC): 2026-11-01T13:33Z
 DeepSeek R03 handoff at (UTC): 2026-11-01T13:39Z
 Codex closure verification finished at (UTC): 2026-11-01T14:40Z
-Worker/harness: DeepSeek planned for released P03; not yet claimed
-Implementation begun: no P03 implementation; P02 local/live-OBS closure complete
+Worker/harness: DeepSeek initial implementation; Codex review complete; DeepSeek correction pending
+Implementation begun: yes — P03 v1.2 implementation and local/race checks complete
 Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
 P02 tracking: https://github.com/desanv01/cuemender/issues/2
-Worker branch: feature/p03-diagnostics (checked out and published; worker verifies actual branch, no Git mutation)
+Worker branch: feature/p03-diagnostics (Codex review checkpoint; verify actual HEAD; no worker Git mutation)
 P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
 P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
-P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0 (P02 merge; subsequent dispatch-only documentation commits may follow)
+P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
 P03 tracking: https://github.com/desanv01/cuemender/issues/7
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
-Next report: docs/execution/handoffs/P03-worker-report.md (worker creates)
+Next report: docs/execution/handoffs/P03-worker-report.md
+Implementation: docs/implementation/P03-diagnostics.md
 Environment note: docs/implementation/P01-environment.md
-Review: docs/execution/handoffs/P02-codex-closure-review.md; exact evidence in docs/implementation/P02-codex-closure.md
-Correction: none active; P02-R03 and Codex closure complete
-Correction tracking: https://github.com/desanv01/cuemender/issues/4
+Review: docs/execution/handoffs/P03-review.md
+Correction: docs/execution/corrections/P03-R01.md v1.0
+Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 P02 setup: docs/implementation/P02-setup.md
-Unmet live gates: P02-A/V06 (Twitch own-channel authorization + separate viewer), plus P03-D real-chat-to-finding when implemented. Both deferred under D30/issue #6. P02-B/V07 live OBS passed.
-Next action: User dispatches the current P03 v1.2 prompt in PROMPTS. DeepSeek claims P03 and implements/tests only that packet. No Twitch account work until user lifts the hold. Codex reviews the actual P03 handoff; P04 remains held and reserved for Codex with recording checkpoint. No further P02 local correction is outstanding.
+Unmet live gates: P02-A/V06 (Twitch own-channel authorization + separate viewer) and P03-D live Twitch chat-to-finding, both deferred under D30/issue #6. P02-B/V07 live OBS passed earlier.
+Next action: Dispatch current P03-R01 prompt. Complete all six correction groups and local failure boundaries, preserve the 13 Go review regressions and three actual-script failure assertions, then hand back to Codex. P04 remains held. Live Twitch remains deferred, not passed.
 
 | Packet | State | Review | Dispatch condition |
 |---|---|---|---|
 | P01 | accepted | P01-R01-review.md | Accepted baseline published |
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
-| P03 | ready / released v1.2 | Not started | D30 authorizes implementation; claim sole writer ownership |
+| P03 | changes_required — P03-R01 released; live Twitch deferred | P03-review.md | All six local correction groups, then Codex review; P04 held |
 | P04 | planned / held — Codex implementation | Not started | P03 accepted; Codex takes sole code ownership |
 | P05 | planned / held | Not started | Codex acceptance of P04 and release |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
@@ -66,6 +68,8 @@ Only Codex updates acceptance, contract revisions, dispatch release or Git check
 Codex-owned implementation: P04 plus needed integration/debugging work after handoff. DeepSeek must remain stopped during those edits. P04 completion needs a Codex build/verification record, not a DeepSeek worker handoff. Verification of Codex-authored code must not be called independent review.
 
 ## History
+
+- 2026-11-02 (Malaysia): Codex independently reproduced existing full Go/Node suite, vet/build, WSL race and repeated lifecycle passes. Thirteen new Go review tests and an actual-script fixture with three failures expose P03 evidence/lifecycle/persistence/UI defects. P03-R01 issued under issue #8. Review tests/docs only authored by Codex; no production fix or P04 work. D30's deferred Twitch gates unchanged.
 
 - 2026-11-01: User explicitly authorized P03 now while Twitch 2FA remains blocked. D30 conditionally accepts the verified P02 development baseline and releases P03 v1.2/C09. Deferred live gates are tracked in issue #6, P03 implementation in issue #7. No P03 application code authored in this dispatch preparation; P04 still held with recording checkpoint.
 
