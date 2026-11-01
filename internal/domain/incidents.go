@@ -100,6 +100,7 @@ type Incident struct {
 	Feedback          FeedbackCounts    `json:"feedback"`
 	ClosedAt          *time.Time        `json:"closed_at,omitempty"`
 	EvidenceAt        *time.Time        `json:"evidence_at,omitempty"`
+	Streaming         *bool             `json:"streaming,omitempty"`
 	RepairAvailable   bool              `json:"repair_available"`
 }
 

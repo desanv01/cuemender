@@ -277,9 +277,10 @@
       meta.className = 'muted';
       const evidenceTime = incident.evidence_at ? new Date(incident.evidence_at).toISOString() : 'unknown';
       const revision = (incident.findings || []).length ? incident.findings[0].expectation_revision : 'unknown';
+      const streaming = typeof incident.streaming === 'boolean' ? String(incident.streaming) : 'unknown';
       meta.textContent = incident.category + ' · origin: ' + incident.origin + ' · reports: ' + incident.report_count +
         ' · distinct: ' + incident.distinct_reporters + ' · evidence: ' + evidenceTime + ' · expectation revision: ' + revision +
-        ' · local streaming: unknown · feedback: ' + incident.feedback.positive + ' positive / ' + incident.feedback.negative + ' negative';
+        ' · local streaming: ' + streaming + ' · feedback: ' + incident.feedback.positive + ' positive / ' + incident.feedback.negative + ' negative';
       card.appendChild(meta);
       const evidence = document.createElement('p');
       evidence.className = 'muted';

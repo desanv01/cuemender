@@ -285,6 +285,7 @@ func TestCoordinatorStopCancelsManualJobWithoutSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	close(release)
+	c.wg.Wait()
 	c.mu.Lock()
 	jobs := len(c.jobs)
 	c.mu.Unlock()

@@ -57,23 +57,30 @@ func (a *App) onTwitchCommand(event twitch.CommandEvent) {
 }
 
 func (a *App) processTwitchCommand(event twitch.CommandEvent) {
+	ctx := a.intakeCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	reply := ""
 	switch event.Command.Kind {
 	case twitch.CommandStreamHelp:
 		reply = p03Help
 	case twitch.CommandIssueAudio, twitch.CommandIssueVideo:
 		if a.coordinator != nil {
-			reply = a.coordinator.HandleIssueAt(context.Background(), event.Command.Category, event.DeliveryID, event.MessageID, event.ActorID, event.ConnectionGeneration, event.ReceivedAt)
+			reply = a.coordinator.HandleIssueAt(ctx, event.Command.Category, event.DeliveryID, event.MessageID, event.ActorID, event.ConnectionGeneration, event.ReceivedAt)
 		} else {
 			reply = p03Help
 		}
 	case twitch.CommandFixed, twitch.CommandStillBroken:
 		if a.coordinator != nil {
-			reply = a.coordinator.HandleFeedback(context.Background(), string(event.Command.Kind), event.Command.IncidentCode, event.ActorID)
+			reply = a.coordinator.HandleFeedbackAt(ctx, string(event.Command.Kind), event.Command.IncidentCode, event.ActorID, event.ConnectionGeneration, event.ReceivedAt)
 		}
 	}
 	if strings.TrimSpace(reply) != "" {
-		_ = a.twitchMgr.EnqueueReplyFor(event.ConnectionGeneration, reply)
+		session := a.coordinator.ActiveSession()
+		if session != nil && session.Active && !event.ReceivedAt.Before(session.StartedAt) {
+			_ = a.twitchMgr.EnqueueReplyFor(event.ConnectionGeneration, reply)
+		}
 	}
 }
 

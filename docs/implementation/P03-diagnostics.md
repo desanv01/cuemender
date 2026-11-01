@@ -86,11 +86,25 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 - Feedback is accepted only for current-session `awaiting_feedback`/`unresolved` incidents. `finding_available`, insufficient/reported/investigating, terminal/history/manual-offline feedback is ignored.
 - Public service status derives from monitoring/job state (`disconnected`/`ready`/`checking`). Private cards show per-finding guidance, limitations, category/origin, evidence time, expectation revision, feedback and repair-not-available copy; recheck is hidden for terminal/history and valid rechecks remain enabled for current-session nonterminal incidents.
 
+## P03-R02 corrections
+
+- Closed coordinators reject Start/Check/report/feedback/dismiss before persistence.
+- Job capacity is retained until the worker exits; canceled/dismissed reads no longer free a category for a second concurrent read. Stop records interrupted manual incidents and publishes truthful state; failed durable stop remains retryable.
+- Manual and monitoring commits revalidate session, settings revision, OBS generation and connection state inside the serialized operation gate. Settings and provider disconnects invalidate affected jobs and mark evidence interrupted.
+- App intake is a bounded cancellation-owned queue; issue/feedback validate current Twitch generation and receipt time, and replies require both the originating generation and active session.
+- Dedup expiry/retention and incident ordering use SQLite Julian-day chronology, fixing variable-width RFC3339Nano fractional comparisons. Recovery interrupts all open records (not the first page). Dismiss/stop reload pruned history.
+- Program-scene UUID is required when configured. Observation-stage diagnostic failure now invalidates/reconnects the OBS transport like discovery failure. Incident evidence carries actual streaming true/false/unknown.
+- Public monitoring/incidents/service status use one coordinator public snapshot and provider connectivity; private card text carries actual streaming evidence.
+- `TestP03ActualAppProtocolReportAndReply` is a full local acceptance path: real App, production OAuth/EventSub manager against local OAuth/Helix/WebSocket server, read-only OBS protocol server, real readiness, normalized chat report, fresh finding and actual Helix reply request. It does not inject readiness or invoke the command callback directly.
+
+
+
 ## Limits
 
 - **P03-D live Twitch chat-to-finding is deferred/unmet under D30/issue #6**: no real Twitch Public client/authorization/chat was attempted. Local normalized command callback and fixtures are not live evidence.
 - **P02-A/V06 remains deferred/unmet.** P02-B/V07 live OBS was previously verified by Codex; P03 did not repeat a live OBS comparison or alter the user's OBS.
-- The local app composition test still injects monitoring readiness because no live Twitch account exists; it exercises coordinator/store/OBS/command/reply wiring but is not proof of the production Twitch readiness path or actual EventSub socket intake. This remains an explicit local integration gap.
+- The full local protocol acceptance test exercises production readiness/EventSub/OBS/reply wiring with local servers. A separate lower-level composition test still injects readiness; it is not the acceptance path.
+- Startup recovery ignores store errors and loads at most 500 history rows for the in-memory view (all open records are interrupted in SQL). Recovery-error propagation/large-history display remains a known local gap.
 - No rendered-browser check was possible; actual-script Node VM fixtures are distinct. No OBS mutations.
 - The final WSL Linux race suite passed. One earlier full-race active-SSE timing failure was followed by focused 5/5 and a clean full rerun; retained in the worker report.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.

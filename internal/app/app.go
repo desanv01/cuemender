@@ -86,6 +86,7 @@ type App struct {
 	baseCancel   context.CancelFunc
 	closeOnce    sync.Once
 	intakeCh     chan twitch.CommandEvent
+	intakeCtx    context.Context
 	intakeCancel context.CancelFunc
 	intakeWG     sync.WaitGroup
 
@@ -207,6 +208,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		baseCancel:    baseCancel,
 	}
 	intakeCtx, intakeCancel := context.WithCancel(baseCtx)
+	a.intakeCtx = intakeCtx
 	a.intakeCancel = intakeCancel
 	a.intakeCh = make(chan twitch.CommandEvent, 32)
 	a.intakeWG.Add(1)
@@ -443,6 +445,9 @@ func (a *App) SaveSettings(ctx context.Context, expectedRevision int64, exp doma
 		return domain.Settings{}, err
 	}
 	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+	if a.coordinator != nil {
+		a.coordinator.Invalidate(ctx, "settings_changed")
+	}
 
 	// stateMu is the publication ordering lock: cache update, revision
 	// increment, both projections and both hub publications happen while a
@@ -522,18 +527,21 @@ func (a *App) privateLocked() domain.PrivateState {
 }
 
 func (a *App) publicLocked() domain.PublicState {
-	session := (*domain.MonitoringSessionInfo)(nil)
+	active := false
 	var publicIncidents []domain.PublicIncident
+	jobs := 0
 	if a.coordinator != nil {
-		session, _ = a.coordinator.Snapshot()
-		publicIncidents = a.coordinator.PublicIncidents()
+		active, publicIncidents, jobs = a.coordinator.PublicSnapshot()
 	}
-	active := session != nil && session.Active
 	status := domain.ServiceDisconnected
 	if active {
-		status = "ready"
-		if a.coordinator != nil && a.coordinator.ActiveJobs() > 0 {
-			status = "checking"
+		tw := a.twitchMgr.Snapshot()
+		obs, _, _, _ := a.obsMgr.SnapshotBundle(a.settings)
+		if tw.Status == domain.ConnectionConnected && obs.Status == domain.ConnectionConnected && !obs.Stale {
+			status = "ready"
+			if jobs > 0 {
+				status = "checking"
+			}
 		}
 	}
 	return domain.PublicState{

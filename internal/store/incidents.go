@@ -104,7 +104,7 @@ func (s *Store) PublicIncidentByID(ctx context.Context, publicID string) (domain
 
 func (s *Store) ActiveIncident(ctx context.Context, sessionID, category string) (*domain.Incident, error) {
 	inc, err := incidentFromRow(func(dest ...any) error {
-		return s.db.QueryRowContext(ctx, incidentSelect+` WHERE session_id = ? AND category = ? AND stage NOT IN (?,?,?,?) ORDER BY updated_at DESC LIMIT 1`,
+		return s.db.QueryRowContext(ctx, incidentSelect+` WHERE session_id = ? AND category = ? AND stage NOT IN (?,?,?,?) ORDER BY julianday(updated_at) DESC LIMIT 1`,
 			sessionID, category, domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated).Scan(dest...)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -120,7 +120,7 @@ func (s *Store) ListIncidents(ctx context.Context, limit int) ([]domain.Incident
 	if limit <= 0 || limit > 500 {
 		limit = 500
 	}
-	rows, err := s.db.QueryContext(ctx, incidentSelect+` ORDER BY updated_at DESC LIMIT ?`, limit)
+	rows, err := s.db.QueryContext(ctx, incidentSelect+` ORDER BY julianday(updated_at) DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 		return domain.Incident{}, false, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE retained_until <= ?`, formatTime(now)); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE julianday(retained_until) <= julianday(?)`, formatTime(now)); err != nil {
 		return domain.Incident{}, false, err
 	}
 	for _, key := range []string{"d:" + deliveryID, "m:" + messageID} {
@@ -159,12 +159,12 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 			return domain.Incident{}, false, nil
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE key NOT IN (SELECT key FROM report_dedup ORDER BY retained_until DESC, key ASC LIMIT 10000)`); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM report_dedup WHERE key NOT IN (SELECT key FROM report_dedup ORDER BY julianday(retained_until) DESC, key ASC LIMIT 10000)`); err != nil {
 		return domain.Incident{}, false, err
 	}
 
 	var existingID string
-	err = tx.QueryRowContext(ctx, `SELECT id FROM incidents WHERE session_id = ? AND category = ? AND stage NOT IN (?,?,?,?) ORDER BY updated_at DESC LIMIT 1`,
+	err = tx.QueryRowContext(ctx, `SELECT id FROM incidents WHERE session_id = ? AND category = ? AND stage NOT IN (?,?,?,?) ORDER BY julianday(updated_at) DESC LIMIT 1`,
 		sessionID, category, domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated).Scan(&existingID)
 	var inc domain.Incident
 	if errors.Is(err, sql.ErrNoRows) {
@@ -379,11 +379,11 @@ func (s *Store) InterruptOpenIncidents(ctx context.Context, now time.Time) error
 
 func (s *Store) PurgeCompletedIncidents(ctx context.Context, now time.Time) error {
 	cutoff := formatTime(now.Add(-30 * 24 * time.Hour))
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE stage IN (?,?,?,?) AND updated_at < ?`,
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE stage IN (?,?,?,?) AND julianday(updated_at) < julianday(?)`,
 		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated, cutoff); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE id IN (SELECT id FROM incidents WHERE stage IN (?,?,?,?) ORDER BY updated_at DESC LIMIT -1 OFFSET 500)`,
+	_, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE id IN (SELECT id FROM incidents WHERE stage IN (?,?,?,?) ORDER BY julianday(updated_at) DESC LIMIT -1 OFFSET 500)`,
 		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated)
 	return err
 }

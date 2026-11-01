@@ -83,13 +83,7 @@ func (c *Coordinator) restart() {
 	ctx := context.Background()
 	_ = c.store.StopAllMonitoringSessions(ctx, c.now())
 	_ = c.store.PurgeCompletedIncidents(ctx, c.now())
-	for _, inc := range c.mustList(ctx) {
-		if !domain.StageTerminal(inc.Stage) {
-			inc.Stage = domain.StageInterrupted
-			inc.UpdatedAt = c.now()
-			_ = c.store.SaveIncident(ctx, inc)
-		}
-	}
+	_ = c.store.InterruptOpenIncidents(ctx, c.now())
 	for _, inc := range c.mustList(ctx) {
 		c.incidents[inc.ID] = inc
 		c.order = append(c.order, inc.ID)
@@ -159,11 +153,19 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		for _, job := range c.jobs {
 			jobs = append(jobs, job)
 		}
-		c.jobs = map[string]*job{}
 		c.mu.Unlock()
+		if len(jobs) == 0 {
+			return nil
+		}
 		for _, job := range jobs {
 			job.cancel()
+			inc := job.incident
+			inc.Stage = domain.StageInterrupted
+			inc.UpdatedAt = c.now().UTC()
+			_ = c.store.SaveIncident(ctx, inc)
+			c.setIncident(inc)
 		}
+		c.publish()
 		return nil
 	}
 	id := c.session.ID
@@ -188,7 +190,6 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 	for _, job := range jobs {
 		job.cancel()
 	}
-	c.jobs = map[string]*job{}
 	c.mu.Unlock()
 	c.reload()
 	c.publish()
@@ -289,6 +290,12 @@ func (c *Coordinator) setIncident(inc domain.Incident) {
 func (c *Coordinator) Check(ctx context.Context, category string, expectedRevision int64, incidentID string) (domain.Incident, error) {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return domain.Incident{}, domain.ErrUnavailable
+	}
+	c.mu.Unlock()
 	if category != "audio" && category != "video" {
 		return domain.Incident{}, domain.ErrInvalidInput
 	}
@@ -404,6 +411,12 @@ func (c *Coordinator) HandleIssue(ctx context.Context, category, deliveryID, mes
 func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time) string {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return ""
+	}
+	c.mu.Unlock()
 	settings := c.settings()
 	c.mu.Lock()
 	session := c.session
@@ -446,8 +459,18 @@ func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, m
 }
 
 func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID string) string {
+	return c.HandleFeedbackAt(ctx, command, code, actorID, 0, time.Time{})
+}
+
+func (c *Coordinator) HandleFeedbackAt(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time) string {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return ""
+	}
+	c.mu.Unlock()
 	c.mu.Lock()
 	session := c.session
 	if session == nil || !session.Active {
@@ -466,6 +489,13 @@ func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID
 	c.mu.Unlock()
 	if !found || target.SessionID != session.ID || domain.StageTerminal(target.Stage) {
 		return "CueMender ignored unknown or stale feedback."
+	}
+	ready := c.status()
+	if ready.TwitchGeneration != 0 && generation != 0 && generation != ready.TwitchGeneration {
+		return "CueMender ignored feedback from a replaced Twitch connection."
+	}
+	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
+		return "CueMender ignored feedback from before this monitoring session."
 	}
 	if target.Stage != domain.StageAwaitingFeedback && target.Stage != domain.StageUnresolved {
 		return "CueMender ignored feedback before an eligible finding."
@@ -487,6 +517,10 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return domain.Incident{}, domain.ErrUnavailable
+	}
 	inc, ok := c.incidents[incidentID]
 	if !ok {
 		c.mu.Unlock()
@@ -501,7 +535,6 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 	}
 	if job := c.jobs[inc.Category]; job != nil && job.incident.ID == incidentID {
 		job.cancel()
-		delete(c.jobs, inc.Category)
 	}
 	c.mu.Unlock()
 	out, err := c.store.DismissIncident(ctx, incidentID, c.now().UTC())
@@ -510,6 +543,7 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 	}
 	c.setIncident(out)
 	_ = c.store.PurgeCompletedIncidents(ctx, c.now().UTC())
+	c.reload()
 	c.publish()
 	return out, nil
 }
@@ -544,6 +578,7 @@ func (c *Coordinator) schedule(inc domain.Incident, settings domain.Settings) {
 func (c *Coordinator) run(request *job) {
 	defer c.wg.Done()
 	defer request.cancel()
+	defer c.finishJob(request)
 	discovery, observation, readErr := c.read(request.ctx, request.settings)
 	result := diagnostics.Result{}
 	if readErr == nil {
@@ -556,29 +591,25 @@ func (c *Coordinator) run(request *job) {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 	c.mu.Lock()
-	if c.closed || c.jobs[request.incident.Category] != request {
+	if c.closed || c.jobs[request.incident.Category] != request || request.ctx.Err() != nil {
 		c.mu.Unlock()
 		return
 	}
-	if currentRevision != request.settings.Revision {
-		delete(c.jobs, request.incident.Category)
+	if currentRevision != request.settings.Revision || ready.OBSGeneration != request.generation {
 		c.mu.Unlock()
 		return
 	}
 	if inc, ok := c.incidents[request.incident.ID]; ok && inc.SessionID == c.sessionIDLocked() {
-		if c.session == nil || !c.session.Active || !ready.OBSConnected || ready.OBSGeneration != request.generation {
-			delete(c.jobs, request.incident.Category)
+		if c.session == nil || !c.session.Active || !ready.OBSConnected {
 			c.mu.Unlock()
 			return
 		}
 	}
 	current, ok := c.incidents[request.incident.ID]
 	if !ok || domain.StageTerminal(current.Stage) {
-		delete(c.jobs, request.incident.Category)
 		c.mu.Unlock()
 		return
 	}
-	delete(c.jobs, request.incident.Category)
 	c.mu.Unlock()
 	now := c.now().UTC()
 	current.UpdatedAt = now
@@ -615,6 +646,9 @@ func (c *Coordinator) run(request *job) {
 	if len(current.Findings) > 0 {
 		current.EvidenceAt = &now
 	}
+	if observation != nil {
+		current.Streaming = observation.Streaming
+	}
 	current.RepairAvailable = false
 	if err := c.store.SaveIncident(context.Background(), current); err != nil {
 		c.publish()
@@ -624,10 +658,70 @@ func (c *Coordinator) run(request *job) {
 	c.publish()
 }
 
+func (c *Coordinator) finishJob(request *job) {
+	c.mu.Lock()
+	if c.jobs[request.incident.Category] == request {
+		delete(c.jobs, request.incident.Category)
+	}
+	c.mu.Unlock()
+}
+
+func (c *Coordinator) Invalidate(ctx context.Context, reason string) {
+	c.opMu.Lock()
+	c.mu.Lock()
+	jobs := make([]*job, 0, len(c.jobs))
+	for _, job := range c.jobs {
+		jobs = append(jobs, job)
+	}
+	c.mu.Unlock()
+	if len(jobs) == 0 {
+		c.opMu.Unlock()
+		return
+	}
+	for _, job := range jobs {
+		job.cancel()
+		inc := job.incident
+		if current, ok := c.Find(inc.ID); ok {
+			inc = current
+		}
+		if !domain.StageTerminal(inc.Stage) {
+			inc.Stage = domain.StageInterrupted
+			inc.UpdatedAt = c.now().UTC()
+			if err := c.store.SaveIncident(ctx, inc); err == nil {
+				c.setIncident(inc)
+			}
+		}
+	}
+	c.opMu.Unlock()
+	c.publish()
+}
+
 func (c *Coordinator) ActiveJobs() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.jobs)
+}
+
+// PublicIncidents returns only current-session incidents with fixed messages.
+func (c *Coordinator) PublicSnapshot() (active bool, incidents []domain.PublicIncident, jobs int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.session == nil || !c.session.Active {
+		return false, []domain.PublicIncident{}, len(c.jobs)
+	}
+	out := []domain.PublicIncident{}
+	for _, id := range c.order {
+		inc := c.incidents[id]
+		if inc.SessionID != c.session.ID {
+			continue
+		}
+		out = append(out, domain.PublicIncident{
+			PublicID: inc.PublicID, Category: inc.Category, Stage: inc.Stage,
+			MessageCode: publicMessage(inc), LocalVerification: inc.LocalVerification,
+			FeedbackSummary: fmt.Sprintf("%d positive / %d negative", inc.Feedback.Positive, inc.Feedback.Negative),
+		})
+	}
+	return true, out, len(c.jobs)
 }
 
 // PublicIncidents returns only current-session incidents with fixed messages.

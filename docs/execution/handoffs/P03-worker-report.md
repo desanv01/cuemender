@@ -133,3 +133,41 @@ Correction started/finished UTC: 2026-11-01T17:24Z / 2026-11-01T17:34Z. Parent P
 - Migration 2 is forward-only; no downgrade/reset.
 
 P03-R01 corrections are ready for review. Read the appended P03-R01 evidence and inspect actual changes against docs/execution/corrections/P03-R01.md and docs/execution/handoffs/P03-review.md. Rerun the preserved review regressions and required app/protocol/persistence/lifecycle/UI failure paths. DeepSeek has stopped editing. Record acceptance or consolidated remaining corrections, keeping live Twitch deferred under D30/issue #6. P04 remains held for Codex release and recording.
+
+## P03-R02 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-01T17:48Z / 2026-11-01T17:57Z. Parent P03 v1.2/C09. Preserved original 13 review tests and R01 fixes. Six new failures were reproduced first, fixed, and promoted; the exact-bound test was preserved/promoted. No production fixes by Codex.
+
+### A–D matrix
+
+| Group | Implemented evidence | Result |
+|---|---|---|
+| A admission/cancellation/commit ownership | Closed coordinator rejects Start/Check/report/feedback/dismiss before persistence. Job maps are retained until workers exit; canceled/dismissed reads cannot admit an overlapping read. Stop records interrupted manual incidents and publishes; failed durable stop remains retryable. Manual and monitoring commits revalidate job/session/revision/OBS generation/connection inside the serialized gate; settings disconnect/provider invalidation marks affected evidence interrupted. Tests: `TestReviewR01ClosedCoordinatorRejectsCheck`, `ManualResultRejectsReplacedOBS`, `ManualStopRecordsInterrupted`, `CanceledReadRetainsCategoryAdmission`, plus existing late-read/concurrency tests. | pass local |
+| B intake/reply/protocol | App intake is a bounded queue with owned cancel context; commands/feedback carry Twitch generation and receipt time; zero generation is not an unconditional bypass; replies require originating generation and active current session. `TestP03ActualAppProtocolReportAndReply` now runs the real app with local OAuth/Helix/EventSub WebSocket and read-only OBS protocol servers: genuine readiness, actual socket report, fresh finding/persistence, and actual bounded outgoing Helix reply request. No readiness override or direct command callback. | pass local protocol; no live Twitch |
+| C durable ordering/recovery/retention | Dedup expiry/retention and incident ordering use SQLite Julian-day chronology, fixing fractional RFC3339Nano comparisons; exact TTL test passes. Feedback remains one transaction and merges counters. Startup interrupts all open records, not only the first page; retention reloads cache after dismiss/stop. `TestReviewR01DedupFractionalExpiry`, `TestReviewR01ExactReporterFeedbackBounds` (real 10,000 reports and 10,000 feedback actors) pass and are ordinary coverage. | pass local; recovery-error propagation remains partial |
+| D identity/recovery/projections/streaming | Configured scene UUID is required to match observed program UUID; missing identity is unknown. Observation-stage DiagnosticRead failure invalidates/reconnects transport. Incident evidence stores actual streaming true/false/unknown; private cards show it. Public monitoring/incidents/service status use one coordinator public snapshot plus live provider connectivity; stopped/disconnected status is truthful. UI guidance/limitations/recheck eligibility from R01 retained. | pass local; no rendered browser/live OBS |
+
+### Exact checks
+
+| Command/action | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=180s` | exit 0; all packages |
+| `go test -tags reviewrepro ./internal/diagnostics ./internal/incidents ./internal/store -run 'TestReviewP03|TestReviewR01' -count=1 -timeout=60s` | exit 0; original 13 + 6 R02 + exact-bound tests |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| `CGO_ENABLED=0 go build -trimpath -o dist/cuemender.exe ./cmd/app` | exit 0; 19,996,160 bytes; SHA256 `7BC644759A96D50360B2C8D9631A607973957F0191493B8BFCBF409667DE60D9`; `0.3.0-p03` |
+| App protocol/lifecycle repeats ×5 | `TestP03ActualAppProtocolReportAndReply`, active-SSE and blocked-provider shutdown all passed 5/5 |
+| Four Node fixtures | control/p02/p03/review all exit 0; review failures=[]; no rendered browser |
+| WSL Linux `go test -race ./... -count=1 -timeout=240s` | exit 0; all packages race-clean |
+
+### Changed in this correction
+
+`internal/incidents/coordinator.go` + tests; `internal/diagnostics/diagnostics.go` + tests; `internal/store/incidents.go` + tests; `internal/app/{app,diagnostics}.go`, new `p03_protocol_test.go`; `internal/twitch/manager.go`; `internal/obs/manager.go`; `internal/domain/incidents.go`; `web/control/app.js`; promoted review tests; P03 docs. No new dependency/SDK/spec/OBS-write/Git changes.
+
+### Remaining gaps
+
+- Live P02-A/V06 and P03-D under D30/issue #6 remain deferred/unmet; local OAuth/EventSub/OBS protocol fixtures are not live evidence.
+- Startup recovery still ignores store errors and in-memory history is capped at 500 (all open records are interrupted in SQL); recovery-error propagation/large-history presentation remains partial.
+- Settings/provider invalidation is wired but a dedicated blocked-result-after-SaveSettings app test was not added.
+- No rendered-browser verification. Live OBS comparison was not repeated.
+
+P03-R02 corrections are ready for review. Read the appended P03-R02 evidence and inspect actual changes against docs/execution/corrections/P03-R02.md and docs/execution/handoffs/P03-R01-review.md. Rerun preserved regressions and the required actual-app/protocol/cancellation/persistence/projection boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections; live Twitch remains deferred under D30/issue #6, and P04 stays held for Codex release and recording.

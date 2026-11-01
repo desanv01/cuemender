@@ -871,6 +871,7 @@ func (m *Manager) DiagnosticRead(ctx context.Context, settings domain.Settings) 
 	}
 	observation, err := m.readObservation(readCtx, gen, backend, discovery, settings.Expectations)
 	if err != nil {
+		m.handleTransportLoss(workerCtx, gen, backend)
 		return nil, nil, ErrUnavailable
 	}
 	m.mu.Lock()

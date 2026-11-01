@@ -190,7 +190,7 @@ func evaluateVisual(ev Evidence, stale bool) domain.DiagnosticCheck {
 		check.Status, check.Explanation = "unknown", "program_scene_unknown"
 		return check
 	}
-	if (visual.SceneUUID != "" && ev.Observation.ProgramSceneUUID != "" && visual.SceneUUID != ev.Observation.ProgramSceneUUID) ||
+	if (visual.SceneUUID != "" && ev.Observation.ProgramSceneUUID != visual.SceneUUID) ||
 		(visual.Scene != "" && visual.Scene != ev.Observation.ProgramScene) {
 		return unknownCheck(check, "configured_item_outside_program_scene")
 	}
