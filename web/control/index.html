@@ -154,11 +154,26 @@
           </div>
         </form>
       </section>
+
+      <section class="panel" aria-labelledby="monitoring-heading">
+        <h2 id="monitoring-heading">Monitoring and incidents</h2>
+        <p class="muted">Reports create bounded incidents. Manual checks use a fresh read-only OBS observation. No repair action exists yet.</p>
+        <div class="actions">
+          <button id="monitor-start" type="button">Start monitoring</button>
+          <button id="monitor-stop" type="button" class="secondary">Stop monitoring</button>
+        </div>
+        <div class="actions">
+          <button id="manual-audio" type="button" class="secondary">Manual audio check</button>
+          <button id="manual-video" type="button" class="secondary">Manual video check</button>
+        </div>
+        <p id="monitor-status" class="connection-status">Monitoring is stopped.</p>
+        <div id="incident-list"></div>
+      </section>
     </section>
   </main>
 
   <footer>
-    <p>Local only · loopback HTTP · P02 setup only; no monitoring or repair actions</p>
+    <p>Local only · loopback HTTP · evidence and incident lifecycle; no OBS mutating repair actions</p>
   </footer>
   <noscript>JavaScript is required for the private control surface.</noscript>
   <script src="app.js"></script>

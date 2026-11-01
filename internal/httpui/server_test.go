@@ -37,6 +37,8 @@ type testBackend struct {
 	obsAddress    string
 	obsPassword   *string
 	routeErr      error
+	monitoring    bool
+	incidents     []domain.Incident
 }
 
 func newTestBackend(t *testing.T) *testBackend {
@@ -110,9 +112,11 @@ func (b *testBackend) SubscribePublic() httpui.Subscription {
 
 func (b *testBackend) privateLocked() domain.PrivateState {
 	return domain.PrivateState{
-		Mode:          domain.ModeLive,
-		StateRevision: b.stateRevision,
-		Settings:      b.settings,
+		Mode:             domain.ModeLive,
+		StateRevision:    b.stateRevision,
+		MonitoringActive: b.monitoring,
+		Incidents:        b.incidents,
+		Settings:         b.settings,
 		Setup: domain.SetupReadiness{
 			MicrophoneConfigured:  b.settings.Microphone != nil,
 			StreamTrackConfigured: b.settings.StreamTrack != nil,
@@ -150,12 +154,77 @@ func (b *testBackend) OBSDiscovery(context.Context) (domain.OBSDiscovery, error)
 	return *b.discovery, nil
 }
 
+func (b *testBackend) StartMonitoring(_ context.Context, revision int64) (domain.MonitoringSessionInfo, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.routeErr != nil {
+		return domain.MonitoringSessionInfo{}, b.routeErr
+	}
+	if revision != b.settings.Revision {
+		return domain.MonitoringSessionInfo{}, domain.ErrRevisionConflict
+	}
+	b.monitoring = true
+	b.stateRevision++
+	return domain.MonitoringSessionInfo{ID: "sess-test", Active: true, StartedAt: b.now().UTC()}, nil
+}
+
+func (b *testBackend) StopMonitoring(context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.monitoring = false
+	return b.routeErr
+}
+
+func (b *testBackend) CheckIncident(_ context.Context, category string, _ int64, incidentID string) (domain.Incident, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.routeErr != nil {
+		return domain.Incident{}, b.routeErr
+	}
+	if category != "audio" && category != "video" {
+		return domain.Incident{}, domain.ErrInvalidInput
+	}
+	if incidentID != "" {
+		for _, inc := range b.incidents {
+			if inc.ID == incidentID {
+				return inc, nil
+			}
+		}
+		return domain.Incident{}, domain.ErrIncidentNotFound
+	}
+	return domain.Incident{ID: "inc-test", PublicID: "CM-TEST", Category: category, Stage: domain.StageInvestigating}, nil
+}
+
+func (b *testBackend) DismissIncident(_ context.Context, incidentID string) (domain.Incident, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.routeErr != nil {
+		return domain.Incident{}, b.routeErr
+	}
+	for i := range b.incidents {
+		if b.incidents[i].ID == incidentID {
+			b.incidents[i].Stage = domain.StageDismissed
+			return b.incidents[i], nil
+		}
+	}
+	if incidentID == "inc-test" {
+		return domain.Incident{ID: "inc-test", Stage: domain.StageDismissed}, nil
+	}
+	return domain.Incident{}, domain.ErrIncidentNotFound
+}
+
 func (b *testBackend) publicLocked() domain.PublicState {
+	public := make([]domain.PublicIncident, 0, len(b.incidents))
+	for _, inc := range b.incidents {
+		if inc.PublicID != "" {
+			public = append(public, domain.PublicIncident{PublicID: inc.PublicID, Category: inc.Category, Stage: inc.Stage, MessageCode: "finding_available"})
+		}
+	}
 	return domain.PublicState{
 		Mode:          domain.ModeLive,
 		StateRevision: b.stateRevision,
 		ServiceStatus: domain.ServiceDisconnected,
-		Incidents:     []domain.PublicIncident{},
+		Incidents:     public,
 	}
 }
 

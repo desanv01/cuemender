@@ -41,6 +41,66 @@ INSERT OR IGNORE INTO app_settings (id, revision, settings_json, updated_at)
 VALUES (1, 0, '{}', '1970-01-01T00:00:00Z');
 `,
 	},
+	{
+		version: 2,
+		sql: `
+CREATE TABLE IF NOT EXISTS monitoring_sessions (
+    id TEXT PRIMARY KEY,
+    active INTEGER NOT NULL CHECK (active IN (0,1)),
+    started_at TEXT NOT NULL,
+    stopped_at TEXT
+);
+CREATE TABLE IF NOT EXISTS incidents (
+    id TEXT PRIMARY KEY,
+    public_id TEXT NOT NULL UNIQUE,
+    session_id TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    category TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    report_count INTEGER NOT NULL DEFAULT 0,
+    distinct_reporters INTEGER NOT NULL DEFAULT 0,
+    local_verification TEXT NOT NULL DEFAULT 'not_attempted',
+    feedback_positive INTEGER NOT NULL DEFAULT 0,
+    feedback_negative INTEGER NOT NULL DEFAULT 0,
+    closed_at TEXT,
+    evidence_at TEXT,
+    incident_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS incidents_session_stage ON incidents(session_id, stage);
+CREATE TABLE IF NOT EXISTS findings (
+    id TEXT PRIMARY KEY,
+    incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    code TEXT NOT NULL,
+    category TEXT NOT NULL,
+    finding_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS findings_incident ON findings(incident_id);
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL,
+    delivery_id TEXT,
+    message_id TEXT,
+    actor_id TEXT NOT NULL,
+    received_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS reports_incident_actor ON reports(incident_id, actor_id);
+CREATE TABLE IF NOT EXISTS report_dedup (
+    key TEXT PRIMARY KEY,
+    retained_until TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS feedback (
+    incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    actor_id TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (incident_id, actor_id)
+);
+`,
+	},
 }
 
 // Store owns the local SQLite database. SQL and schema details stay here.

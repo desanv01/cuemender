@@ -831,6 +831,59 @@ func inputResolves(inputs []domain.OBSInput, ref domain.InputRef) bool {
 	return matches == 1
 }
 
+// DiagnosticRead performs a fresh, read-only snapshot for P03 under the same
+// admission/cancellation ownership as RefreshDiscovery. It returns immutable
+// revision/generation evidence and never installs cached state.
+func (m *Manager) DiagnosticRead(ctx context.Context, settings domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+	m.mu.Lock()
+	backend, gen, revision := m.backend, m.gen, m.configRevision
+	if backend == nil || m.closed || m.conn.Status != domain.ConnectionConnected {
+		m.mu.Unlock()
+		return nil, nil, ErrUnavailable
+	}
+	if settings.Revision != revision {
+		m.mu.Unlock()
+		return nil, nil, ErrUnavailable
+	}
+	select {
+	case m.operations <- struct{}{}:
+	default:
+		m.mu.Unlock()
+		return nil, nil, ErrBusy
+	}
+	m.workerWG.Add(1)
+	workerCtx := m.workerCtx
+	if workerCtx == nil {
+		workerCtx = m.ctx
+	}
+	m.mu.Unlock()
+	defer m.workerWG.Done()
+	defer func() { <-m.operations }()
+	readCtx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(workerCtx, cancel)
+	defer func() { stop(); cancel() }()
+	readCtx, deadline := context.WithTimeout(readCtx, 5*time.Second)
+	defer deadline()
+	discovery, err := m.readDiscoveryAt(readCtx, gen, backend, revision)
+	if err != nil {
+		m.handleTransportLoss(workerCtx, gen, backend)
+		return nil, nil, ErrUnavailable
+	}
+	observation, err := m.readObservation(readCtx, gen, backend, discovery, settings.Expectations)
+	if err != nil {
+		return nil, nil, ErrUnavailable
+	}
+	m.mu.Lock()
+	valid := m.gen == gen && m.backend == backend && !m.closed &&
+		m.configRevision == revision && readCtx.Err() == nil
+	m.mu.Unlock()
+	if !valid || discovery.ConfigRevision != revision || discovery.Generation != gen ||
+		observation.ConfigRevision != revision || observation.Generation != gen {
+		return nil, nil, ErrUnavailable
+	}
+	return discovery, observation, nil
+}
+
 // RefreshDiscovery performs a bounded fresh read using the active transport.
 // It never returns a forever-cached snapshot as refreshed.
 func (m *Manager) RefreshDiscovery(ctx context.Context) (*domain.OBSDiscovery, error) {

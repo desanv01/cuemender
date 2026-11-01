@@ -20,17 +20,18 @@ var (
 )
 
 type Options struct {
-	Context       context.Context
-	OAuth         *OAuth
-	Store         *CredentialStore
-	Dialer        Dialer
-	Endpoints     Endpoints
-	ClientID      string
-	Now           func() time.Time
-	OnUpdate      func()
-	OnCommand     func(CommandEvent)
-	StorageMode   string
-	RefreshPeriod time.Duration
+	Context               context.Context
+	OAuth                 *OAuth
+	Store                 *CredentialStore
+	Dialer                Dialer
+	Endpoints             Endpoints
+	ClientID              string
+	Now                   func() time.Time
+	OnUpdate              func()
+	OnCommand             func(CommandEvent)
+	SuppressStaticReplies bool
+	StorageMode           string
+	RefreshPeriod         time.Duration
 	// MaintenanceWait is a deterministic timer seam; nil uses a cancellable timer.
 	MaintenanceWait func(context.Context, time.Duration) bool
 	RetryWait       func(context.Context, time.Duration) bool
@@ -46,6 +47,7 @@ type Manager struct {
 	now             func() time.Time
 	onUpdate        func()
 	onCommand       func(CommandEvent)
+	suppressStatic  bool
 	storageMode     string
 	refreshPeriod   time.Duration
 	maintenanceWait func(context.Context, time.Duration) bool
@@ -102,6 +104,7 @@ func NewManager(opts Options) *Manager {
 		now:             opts.Now,
 		onUpdate:        opts.OnUpdate,
 		onCommand:       opts.OnCommand,
+		suppressStatic:  opts.SuppressStaticReplies,
 		storageMode:     opts.StorageMode,
 		refreshPeriod:   opts.RefreshPeriod,
 		maintenanceWait: opts.MaintenanceWait,
@@ -817,7 +820,7 @@ func (m *Manager) handleChat(gen uint64, event ChatEvent, deliveryID string) {
 			ConnectionGeneration: connectionGeneration,
 		})
 	}
-	if reply != nil {
+	if reply != nil && !m.suppressStatic {
 		switch cmd.Kind {
 		case CommandStreamHelp:
 			reply.Enqueue(replyHelp)
@@ -825,6 +828,17 @@ func (m *Manager) handleChat(gen uint64, event ChatEvent, deliveryID string) {
 			reply.Enqueue(replyAck)
 		}
 	}
+}
+
+// EnqueueReply lets the P03 coordinator use the existing bounded queue for
+// durable, generation-bound acknowledgments.
+func (m *Manager) EnqueueReply(text string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.reply == nil || m.closed {
+		return false
+	}
+	return m.reply.Enqueue(text)
 }
 
 func (m *Manager) startReplyQueue(gen uint64) {
