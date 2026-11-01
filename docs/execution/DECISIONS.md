@@ -1,0 +1,33 @@
+# Decisions and assumptions
+
+Revision: 1.2
+
+| ID | Decision | Rationale / status |
+|---|---|---|
+| D01 | Go only backend; mixed backend deferred | Explicit user choice |
+| D02 | Windows 11 x64 local executable, browser UI | Accepted implementation direction; exact host version unverified |
+| D03 | Vanilla JS/HTML/CSS, embedded assets, SSE | Small interface; no separate Node runtime |
+| D04 | SQLite modernc driver and OS keyring | Local persistence without a server; explicit session-only fallback |
+| D05 | goobs and focused Twitch adapter with coder/websocket | Selected adapters; exact versions require compile verification |
+| D06 | Three checks; one track-add repair | Fixed MVP; mute/visibility remain manual |
+| D07 | No required runtime AI or mixed worker services | Preserve a dependable baseline |
+| D08 | Codex specifies, implements P04, verifies and handles integration fixes; DeepSeek implements/tests P01/P02/P03/P05/P06 | Revised shared-folder workflow; supersedes planning/review-only restriction |
+| D09 | One writer, six packages, explicit handoff | Avoid shared-file conflicts and excessive relays |
+| D10 | CueMender public name; public cuemender repository | User finalized name/visibility; existing livecheck identifiers remain temporarily until Codex coordinates the rename |
+| D11 | Later packet release follows previous acceptance | Instructions may be refined using real integration findings |
+| D12 | Direct scene-item visibility only in MVP | Bounded implementation interpretation; nested groups need future work |
+| D13 | Device grant with Twitch public client | Official flow for a distributed desktop client; verify real registration in P02 |
+| D14 | No inferred truth/approval from chat volume | Community reports are evidence, not control authority |
+| D15 | No guaranteed exclusive access to OBS | Other clients can race writes; detect disagreement, never claim atomic compare-and-set |
+| D16 | No Git initialization during docs preparation | Existing folder preserved; Codex can establish checkpoint after implementation review |
+| D17 | Reserve the approval/repair engine for Codex | Concrete product contribution rather than relying solely on planning or incidental bug fixes; no eligibility guarantee |
+| D18 | Label self-verification accurately | Codex-authored work is not independently reviewed merely because Codex later checks it |
+| D19 | Track actual contributions and footage, not quotas | No invented minimum percentage, generated session IDs, backdated commits or cosmetic code changes to imply authorship |
+| D20 | state_revision is process-local; settings.revision persists | Clarifies SSE reconnect semantics without requiring a durable event journal |
+| D21 | Codex authorized for Git/GitHub lifecycle | Public repo, meaningful commits, issues, PRs, merges and closure; accepted baseline follows P01 acceptance; see GIT_WORKFLOW |
+
+## Change record procedure
+
+New entry: date, author/approver, affected contracts/packets, decision, reason, migration or retest effect. Workers propose changes in their reports rather than editing this file.
+
+Reasonable local function naming, CSS choices within a released design brief and small test helpers are not architectural decisions. Dependency substitution, state/API semantics, platform scope and automatic side effects are.
