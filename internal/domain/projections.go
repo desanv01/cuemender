@@ -27,6 +27,9 @@ type SetupReadiness struct {
 	MicrophoneConfigured   bool `json:"microphone_configured"`
 	StreamTrackConfigured  bool `json:"stream_track_configured"`
 	VisualConfigured       bool `json:"visual_configured"`
+	TwitchAuthorized       bool `json:"twitch_authorized"`
+	OBSConnected           bool `json:"obs_connected"`
+	OBSDiscoveryReady      bool `json:"obs_discovery_ready"`
 	LiveOBSResolutionReady bool `json:"live_obs_resolution_ready"`
 }
 
@@ -39,15 +42,17 @@ type StartupInfo struct {
 // PrivateState is the projection served only to an authenticated control
 // session. It contains no credentials or bootstrap capability.
 type PrivateState struct {
-	Mode             string            `json:"mode"`
-	StateRevision    uint64            `json:"state_revision"`
-	MonitoringActive bool              `json:"monitoring_active"`
-	Settings         Settings          `json:"settings"`
-	Setup            SetupReadiness    `json:"setup"`
-	Secrets          SecretsStatus     `json:"secrets"`
-	Twitch           IntegrationStatus `json:"twitch"`
-	OBS              IntegrationStatus `json:"obs"`
-	Startup          StartupInfo       `json:"startup"`
+	Mode             string           `json:"mode"`
+	StateRevision    uint64           `json:"state_revision"`
+	MonitoringActive bool             `json:"monitoring_active"`
+	Settings         Settings         `json:"settings"`
+	Setup            SetupReadiness   `json:"setup"`
+	Secrets          SecretsStatus    `json:"secrets"`
+	Twitch           TwitchConnection `json:"twitch"`
+	OBS              OBSConnection    `json:"obs"`
+	OBSDiscovery     *OBSDiscovery    `json:"obs_discovery,omitempty"`
+	OBSObservation   *OBSObservation  `json:"obs_observation,omitempty"`
+	Startup          StartupInfo      `json:"startup"`
 }
 
 // PublicIncident is the allowlisted public shape for future incidents. P01

@@ -1,12 +1,12 @@
 # CueMender execution pack
 
-Revision: 1.3 • Updated 2026-11-01 • P01 accepted; P02 v1.1 released.
+Revision: 1.9 • Updated 2026-11-01 • P03 v1.2 released under D30; live Twitch deferred.
 
 ## Immediate next action
 
-P01-R01 is accepted in [the final review](handoffs/P01-R01-review.md). Dispatch **P02 v1.1** from [PROMPTS.md](PROMPTS.md), using [the live-connection packet](packages/P02-live-connections.md). The portable Go toolchain is present. The public repository is [desanv01/cuemender](https://github.com/desanv01/cuemender). Twitch Public client registration is still needed for live validation; fixture development can start.
+User approved P03 progression while Twitch phone/2FA setup remains blocked. **P03 v1.2 is released under D30**, with P02's completed local/live-OBS work accepted as its development baseline. See [the closure review](handoffs/P02-codex-closure-review.md), [D30](DECISIONS.md), [P03 packet](packages/P03-diagnostics.md) and [current prompt](PROMPTS.md). P02-A/V06 and P03-D's real-chat portion remain deferred/unmet in [issue #6](https://github.com/desanv01/cuemender/issues/6), required before final readiness. Do not restart Twitch login work. Follow [STATUS](STATUS.md) and claim sole ownership before implementing.
 
-This revision replaces the earlier Codex-only-plans/reviews arrangement. DeepSeek remains the main implementer for P01/P02/P03/P05/P06. Codex directly implements P04 and its tests, plus needed integration fixes when it owns edits. Use the current P02 v1.1 prompt, not an earlier copied P01 prompt. This division provides substantive planned Codex work but is not an organizer guarantee of eligibility.
+DeepSeek remains the planned implementer for P03/P05/P06 after their release. Codex owns the current P02 closure and directly implements P04 and its tests. This division provides substantive Codex work but is not an organizer guarantee of eligibility.
 
 ## Reading order
 
@@ -16,7 +16,7 @@ This revision replaces the earlier Codex-only-plans/reviews arrangement. DeepSee
 4. [Product specification](PROJECT_SPEC.md)
 5. [Architecture](ARCHITECTURE.md)
 6. [Contracts](CONTRACTS.md)
-7. [Assigned packet](packages/P02-live-connections.md)
+7. [Assigned packet](packages/P03-diagnostics.md)
 
 Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [initial workspace baseline](BASELINE.md) and [official sources](SOURCES.md) as needed.
 
@@ -25,8 +25,8 @@ Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [init
 | Packet | Outcome | Dispatch state |
 |---|---|---|
 | [P01 — Foundation](packages/P01-foundation.md) | Runnable local shell, persistent settings, credential boundary, private/public HTTP boundaries | Accepted after P01-R01 |
-| [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Released v1.1; live prerequisites pending |
-| [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Planned |
+| [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Development baseline conditionally accepted under D30; Twitch deferred |
+| [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | v1.2 released to DeepSeek; not implemented yet |
 | [P04 — Approved repair](packages/P04-approved-repair.md) | Codex implements approval, correction, reconciliation and tests | Planned; reserved for Codex |
 | [P05 — User experience](packages/P05-user-experience.md) | Finished setup, controls, overlay, confirmation, rehearsal | Planned |
 | [P06 — Release readiness](packages/P06-release-readiness.md) | Tested Windows ZIP and reproducible instructions | Planned |

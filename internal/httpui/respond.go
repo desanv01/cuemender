@@ -65,7 +65,11 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 
 func writeData(w http.ResponseWriter, r *http.Request, data any) {
-	writeJSON(w, http.StatusOK, successEnvelope{Data: data, RequestID: requestID(r)})
+	writeDataStatus(w, r, http.StatusOK, data)
+}
+
+func writeDataStatus(w http.ResponseWriter, r *http.Request, status int, data any) {
+	writeJSON(w, status, successEnvelope{Data: data, RequestID: requestID(r)})
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string) {

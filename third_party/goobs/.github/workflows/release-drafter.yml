@@ -1,0 +1,67 @@
+name: Release Drafter
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-drafter
+  cancel-in-progress: false
+
+jobs:
+  update-release-draft:
+    # Fork PRs get a read-only GITHUB_TOKEN on the `pull_request` trigger, so
+    # release-drafter's "Create a release" API call 403s. The `pull_request_target`
+    # trigger already handles fork PRs with the base repo's write token, so the
+    # `pull_request` run is redundant and only produces noise. Skip it for forks.
+    if: >
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.draft-release.outputs.tag_name }}
+    steps:
+    - name: draft release
+      id: draft-release
+      uses: release-drafter/release-drafter@v7
+      with:
+        config-name: release-drafter.yml
+        disable-autolabeler: false
+        commitish: main
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+  # only when protocol changes
+  publish-release-draft:
+    needs: [update-release-draft]
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.user.login == 'cathy-cloud[bot]' &&
+      contains(github.event.pull_request.labels.*.name, 'protocol')
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: tibdex/github-app-token@v2
+      id: generate-token
+      with:
+        app_id: ${{ secrets.CATHY_CLOUD_APP_ID }}
+        private_key: ${{ secrets.CATHY_CLOUD_APP_PRIVATE_KEY }}
+    - name: publish release
+      env:
+        GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+      run: |
+        gh release edit "${{ needs.update-release-draft.outputs.tag_name }}" --draft=false

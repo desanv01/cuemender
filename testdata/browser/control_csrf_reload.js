@@ -20,6 +20,8 @@ function makeNode() {
     title: '',
     className: '',
     handler: null,
+    replaceChildren() {},
+    add() {},
     addEventListener(type, fn) {
       if (type === 'submit') {
         this.handler = fn;
@@ -96,6 +98,14 @@ async function runScenario(name, { hash, snapshot, fetchedState, expectedRevisio
       }
     },
     URLSearchParams,
+    Option: class {
+      constructor(label, value) {
+        this.label = label;
+        this.value = value;
+        this.dataset = {};
+        this.disabled = false;
+      }
+    },
     EventSource: class {
       addEventListener() {}
     },

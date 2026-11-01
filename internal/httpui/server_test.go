@@ -32,6 +32,11 @@ type testBackend struct {
 	stateRevision uint64
 	privateHub    *testHub
 	publicHub     *testHub
+	discovery     *domain.OBSDiscovery
+	twitchClient  string
+	obsAddress    string
+	obsPassword   *string
+	routeErr      error
 }
 
 func newTestBackend(t *testing.T) *testBackend {
@@ -113,11 +118,36 @@ func (b *testBackend) privateLocked() domain.PrivateState {
 			StreamTrackConfigured: b.settings.StreamTrack != nil,
 			VisualConfigured:      b.settings.Visual != nil,
 		},
-		Secrets: domain.SecretsStatus{Mode: domain.SecretsModeOS, Available: true},
-		Twitch:  domain.IntegrationStatus{Status: domain.IntegrationNotConnected},
-		OBS:     domain.IntegrationStatus{Status: domain.IntegrationNotConnected},
-		Startup: domain.StartupInfo{ListenAddress: "127.0.0.1:8787", OBSAddress: "ws://127.0.0.1:4455"},
+		Secrets:      domain.SecretsStatus{Mode: domain.SecretsModeOS, Available: true},
+		Twitch:       domain.TwitchConnection{Status: domain.ConnectionNotConnected},
+		OBS:          domain.OBSConnection{Status: domain.ConnectionNotConnected},
+		OBSDiscovery: b.discovery,
+		Startup:      domain.StartupInfo{ListenAddress: "127.0.0.1:8787", OBSAddress: "ws://127.0.0.1:4455"},
 	}
+}
+
+func (b *testBackend) TwitchConnect(_ context.Context, clientID string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.twitchClient = clientID
+	return b.routeErr
+}
+func (b *testBackend) TwitchDisconnect(context.Context) error { return b.routeErr }
+func (b *testBackend) OBSConnect(_ context.Context, address string, password *string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.obsAddress = address
+	b.obsPassword = password
+	return b.routeErr
+}
+func (b *testBackend) OBSDisconnect(context.Context) error { return b.routeErr }
+func (b *testBackend) OBSDiscovery(context.Context) (domain.OBSDiscovery, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.discovery == nil {
+		return domain.OBSDiscovery{}, domain.ErrUnavailable
+	}
+	return *b.discovery, nil
 }
 
 func (b *testBackend) publicLocked() domain.PublicState {
@@ -618,6 +648,110 @@ func TestStaticAssetsAndSecurityHeaders(t *testing.T) {
 	resp, _ = doJSON(t, client, http.MethodGet, ts.URL+"/nope", "", nil)
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("unknown route = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestP02PrivateRoutesBoundaryAndRedaction(t *testing.T) {
+	ts, ui, backend := newTestServer(t, nil)
+	client := newClient(t, ts)
+	csrf := bootstrap(t, ts, client, ui.BootstrapToken())
+	headers := map[string]string{"Origin": ts.URL, "X-CSRF-Token": csrf}
+
+	resp, _ := doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/twitch/connect",
+		`{"client_id":"publicclient123"}`, headers)
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("twitch connect = %d, want 202", resp.StatusCode)
+	}
+	backend.mu.Lock()
+	gotClient := backend.twitchClient
+	backend.mu.Unlock()
+	if gotClient != "publicclient123" {
+		t.Fatalf("twitch client = %q", gotClient)
+	}
+	resp, _ = doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/twitch/connect",
+		`{"client_id":"publicclient123","unknown":true}`, headers)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown field = %d, want 400", resp.StatusCode)
+	}
+	resp, _ = doJSON(t, client, http.MethodGet, ts.URL+"/api/v1/twitch/connect", "", headers)
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET connect = %d, want 405", resp.StatusCode)
+	}
+	resp, _ = doJSON(t, &http.Client{}, http.MethodPost, ts.URL+"/api/v1/twitch/connect",
+		`{"client_id":"publicclient123"}`, headers)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no-session connect = %d, want 401", resp.StatusCode)
+	}
+	resp, _ = doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/twitch/connect",
+		`{"client_id":"publicclient123"}`, map[string]string{"Origin": ts.URL})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("missing CSRF = %d, want 403", resp.StatusCode)
+	}
+
+	resp, _ = doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/obs/connect",
+		`{"address":"ws://127.0.0.1:4455","password":"private-obs-password"}`, headers)
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("obs connect = %d, want 202", resp.StatusCode)
+	}
+	backend.mu.Lock()
+	if backend.obsAddress != "ws://127.0.0.1:4455" || backend.obsPassword == nil || *backend.obsPassword != "private-obs-password" {
+		t.Fatalf("obs connect body not propagated: %q %v", backend.obsAddress, backend.obsPassword)
+	}
+	backend.mu.Unlock()
+	resp, _ = doJSON(t, client, http.MethodGet, ts.URL+"/api/v1/obs/discovery", "", nil)
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable discovery = %d, want 503", resp.StatusCode)
+	}
+	sentinel := "SENTINEL_OBS_SOURCE_7f21"
+	backend.mu.Lock()
+	backend.discovery = &domain.OBSDiscovery{
+		Generation: 3,
+		CapturedAt: time.Now().UTC(),
+		Inputs:     []domain.OBSInput{{Name: sentinel, UUID: "uuid-sentinel"}},
+		Scenes:     []domain.OBSScene{{Name: "Private Scene", UUID: "scene-sentinel", Items: []domain.OBSSceneItem{{ID: 4, SourceName: sentinel}}}},
+	}
+	backend.mu.Unlock()
+	resp, body := doJSON(t, client, http.MethodGet, ts.URL+"/api/v1/obs/discovery", "", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("discovery = %d, want 200", resp.StatusCode)
+	}
+	if !strings.Contains(fmt.Sprint(body), sentinel) {
+		t.Fatal("private discovery did not contain the source sentinel")
+	}
+	resp, publicBody := doJSON(t, client, http.MethodGet, ts.URL+"/public/v1/state", "", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("public state = %d", resp.StatusCode)
+	}
+	publicJSON, _ := json.Marshal(publicBody)
+	if strings.Contains(string(publicJSON), sentinel) {
+		t.Fatal("public state leaked an OBS source name")
+	}
+	sseCtx, sseCancel := context.WithCancel(context.Background())
+	defer sseCancel()
+	sseResp := openSSE(t, client, ts.URL+"/public/v1/events", sseCtx)
+	defer sseResp.Body.Close()
+	sseEvent := newSSEReader(sseResp.Body).next(t)
+	if strings.Contains(string(sseEvent.Data), sentinel) {
+		t.Fatal("public SSE leaked an OBS source name")
+	}
+
+	backend.mu.Lock()
+	backend.routeErr = domain.ErrBusy
+	backend.mu.Unlock()
+	resp, _ = doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/twitch/disconnect", `{}`, headers)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("busy disconnect = %d, want 409", resp.StatusCode)
+	}
+	backend.mu.Lock()
+	backend.routeErr = nil
+	backend.mu.Unlock()
+	resp, _ = doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/twitch/disconnect", `{}`, headers)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("twitch disconnect = %d, want 200", resp.StatusCode)
+	}
+	resp, _ = doJSON(t, client, http.MethodPost, ts.URL+"/api/v1/obs/disconnect", `{}`, headers)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("obs disconnect = %d, want 200", resp.StatusCode)
 	}
 }
 

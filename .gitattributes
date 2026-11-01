@@ -7,3 +7,7 @@
 *.json text eol=lf
 *.sum text eol=lf
 *.mod text eol=lf
+# Preserve pinned module text across Windows checkouts.
+third_party/goobs/** text=auto eol=lf
+# This unmodified upstream document intentionally ends with a blank line.
+third_party/goobs/docs/request-mapping.md whitespace=-blank-at-eof

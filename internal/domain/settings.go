@@ -33,6 +33,7 @@ type InputRef struct {
 // the value means the expectation is enabled.
 type VisualExpectation struct {
 	Scene       string   `json:"scene"`
+	SceneUUID   string   `json:"scene_uuid,omitempty"`
 	SceneItemID string   `json:"scene_item_id"`
 	Source      InputRef `json:"source"`
 }
@@ -70,6 +71,11 @@ func (e Expectations) Validate() error {
 	if e.Visual != nil {
 		if err := validateText("visual.scene", e.Visual.Scene, true, 256); err != nil {
 			return err
+		}
+		if e.Visual.SceneUUID != "" {
+			if err := validateText("visual.scene_uuid", e.Visual.SceneUUID, false, 256); err != nil {
+				return err
+			}
 		}
 		if err := validateText("visual.scene_item_id", e.Visual.SceneItemID, true, 256); err != nil {
 			return err
