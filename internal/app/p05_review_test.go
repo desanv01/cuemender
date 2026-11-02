@@ -20,7 +20,7 @@ func p05ReviewApp(t *testing.T) *App {
 }
 
 func TestReviewP05RehearsalSelectedTrackAndReadback(t *testing.T) {
-	r := newRehearsalState(domain.Settings{})
+	r := newRehearsalState(domain.Settings{Revision: 1})
 	r.tracks["track2"] = true
 	r.tracks["track3"] = false
 	req := domain.TrackRepairRequest{ActionID: "a", Input: domain.InputRef{Name: "Rehearsal Mic", UUID: "rehearsal-mic", Context: "Rehearsal"}, Generation: 1, ConfigRevision: 1, ExpectedTracks: cloneTrackMap(r.tracks), SelectedTrack: 3}
@@ -35,7 +35,7 @@ func TestReviewP05RehearsalSelectedTrackAndReadback(t *testing.T) {
 }
 
 func TestReviewP05RehearsalPreflightUsesActualMap(t *testing.T) {
-	r := newRehearsalState(domain.Settings{})
+	r := newRehearsalState(domain.Settings{Revision: 1})
 	expected := cloneTrackMap(r.tracks)
 	r.tracks["track1"] = false
 	calls := 0
@@ -46,7 +46,7 @@ func TestReviewP05RehearsalPreflightUsesActualMap(t *testing.T) {
 }
 
 func TestReviewP05RehearsalCanceledRepairCannotWrite(t *testing.T) {
-	r := newRehearsalState(domain.Settings{})
+	r := newRehearsalState(domain.Settings{Revision: 1})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	calls := 0

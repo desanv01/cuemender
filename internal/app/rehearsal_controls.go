@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"time"
 
 	"github.com/desanv01/cuemender/internal/domain"
 	"github.com/desanv01/cuemender/internal/store"
@@ -17,19 +16,6 @@ func (a *App) RehearsalScenario(ctx context.Context, scenario string) (domain.Se
 	default:
 		return domain.Settings{}, domain.ErrInvalidInput
 	}
-	if a.coordinator.ActiveJobs() > 0 {
-		return domain.Settings{}, domain.ErrBusy
-	}
-	_, actionRecords := a.coordinator.RepairSnapshot()
-	for _, action := range actionRecords {
-		if domain.ActionPending(action.Status) {
-			return domain.Settings{}, domain.ErrBusy
-		}
-	}
-	if err := a.coordinator.Stop(ctx); err != nil {
-		return domain.Settings{}, err
-	}
-	a.coordinator.Invalidate(ctx, "scenario_change")
 	track := 2
 	expectations := domain.Expectations{
 		Microphone:  &domain.InputRef{Name: "Rehearsal Mic", UUID: "rehearsal-mic", Context: "Rehearsal"},
@@ -41,15 +27,19 @@ func (a *App) RehearsalScenario(ctx context.Context, scenario string) (domain.Se
 			Source: domain.InputRef{Name: "Rehearsal Camera", UUID: "rehearsal-camera", Context: "Rehearsal"},
 		}
 	}
+	now := a.now().UTC()
+	expectations.TrackConfirmedAt = &now
+	a.saveMu.Lock()
+	defer a.saveMu.Unlock()
 	current := a.currentSettings()
-	previous := a.rehearsal.snapshot()
-	a.rehearsal.setScenario(scenario)
-	updated, err := a.SaveSettings(ctx, current.Revision, expectations)
-	if err != nil {
-		a.rehearsal.restore(previous)
-		return domain.Settings{}, err
-	}
-	return updated, nil
+	return a.coordinator.ReplaceRehearsal(ctx, current.Revision, expectations, func(updated domain.Settings, caches func()) {
+		a.stateMu.Lock()
+		defer a.stateMu.Unlock()
+		a.rehearsal.setScenario(scenario)
+		a.rehearsal.setRevision(updated.Revision)
+		a.settings = updated
+		caches()
+	})
 }
 
 func (a *App) RehearsalReport(ctx context.Context, category string) (domain.Incident, error) {
@@ -64,23 +54,8 @@ func (a *App) RehearsalReport(ctx context.Context, category string) (domain.Inci
 		return domain.Incident{}, domain.ErrNotReady
 	}
 	id := "rehearsal-" + store.NewSessionID()
-	reply := a.coordinator.HandleIssueInSessionAt(ctx, category, id+"-d", id+"-m", "rehearsal-viewer", 1, a.now().UTC(), session.ID)
-	if reply == "" {
-		return domain.Incident{}, domain.ErrInvalidInput
-	}
-	_, list := a.coordinator.Snapshot()
-	var found domain.Incident
-	for _, inc := range list {
-		if inc.SessionID == session.ID && inc.Category == category {
-			if found.ID == "" || inc.UpdatedAt.After(found.UpdatedAt) {
-				found = inc
-			}
-		}
-	}
-	if found.ID == "" {
-		return domain.Incident{}, domain.ErrUnavailable
-	}
-	return found, nil
+	result := a.coordinator.IssueResult(ctx, category, id+"-d", id+"-m", "rehearsal-viewer", 1, a.now().UTC(), session.ID)
+	return result.Incident, result.Err
 }
 
 func (a *App) RehearsalFeedback(ctx context.Context, publicID, vote string) (domain.Incident, error) {
@@ -94,27 +69,10 @@ func (a *App) RehearsalFeedback(ctx context.Context, publicID, vote string) (dom
 	if session == nil || !session.Active {
 		return domain.Incident{}, domain.ErrNotReady
 	}
-	_, list := a.coordinator.Snapshot()
-	for _, inc := range list {
-		if inc.PublicID != publicID {
-			continue
-		}
-		if inc.SessionID != session.ID || (inc.Stage != domain.StageAwaitingFeedback && inc.Stage != domain.StageUnresolved) {
-			return domain.Incident{}, domain.ErrClosureIneligible
-		}
-		if domain.StageTerminal(inc.Stage) {
-			return domain.Incident{}, domain.ErrTerminalIncident
-		}
-		command := vote
-		if vote == "stillbroken" {
-			command = "still_broken"
-		}
-		reply := a.coordinator.HandleFeedbackInSessionAt(ctx, command, publicID, "rehearsal-viewer", 1, time.Now().UTC(), session.ID)
-		if reply == "" {
-			return domain.Incident{}, domain.ErrTerminalIncident
-		}
-		got, _ := a.coordinator.Find(inc.ID)
-		return got, nil
+	command := vote
+	if vote == "stillbroken" {
+		command = "still_broken"
 	}
-	return domain.Incident{}, domain.ErrIncidentNotFound
+	result := a.coordinator.FeedbackResult(ctx, command, publicID, "rehearsal-viewer", 1, a.now().UTC(), session.ID)
+	return result.Incident, result.Err
 }

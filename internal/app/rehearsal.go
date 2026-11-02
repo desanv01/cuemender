@@ -79,10 +79,21 @@ func (r *rehearsalState) setScenario(name string) {
 	}
 }
 
-func (r *rehearsalState) Read(_ context.Context, settings domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+func (r *rehearsalState) setRevision(revision int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.revision = settings.Revision
+	r.revision = revision
+}
+
+func (r *rehearsalState) Read(ctx context.Context, settings domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	if settings.Revision != r.revision {
+		return nil, nil, domain.ErrRevisionConflict
+	}
 	now := time.Now().UTC()
 	discovery := &domain.OBSDiscovery{
 		Generation: r.generation, ConfigRevision: settings.Revision, SceneCollection: "Rehearsal", CollectionKnown: true,
@@ -114,11 +125,14 @@ func cloneTrackMap(in map[string]bool) map[string]bool {
 	return out
 }
 
-func (r *rehearsalState) ReadTrack(_ context.Context, req domain.TrackStateRequest) (domain.TrackState, error) {
+func (r *rehearsalState) ReadTrack(ctx context.Context, req domain.TrackStateRequest) (domain.TrackState, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return domain.TrackState{}, err
+	}
 	if req.Input.Name != "Rehearsal Mic" || req.Input.UUID != "rehearsal-mic" || req.Input.Context != "Rehearsal" ||
-		req.Generation != r.generation || (r.revision != 0 && req.ConfigRevision != r.revision) {
+		req.Generation != r.generation || req.ConfigRevision != r.revision {
 		return domain.TrackState{}, domain.ErrActionConflict
 	}
 	return domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(r.tracks), Generation: r.generation, ConfigRevision: r.revision, ObservedAt: time.Now().UTC()}, nil
@@ -140,7 +154,7 @@ func (r *rehearsalState) Repair(ctx context.Context, req domain.TrackRepairReque
 	if req.Input.Name != "Rehearsal Mic" || req.Input.UUID != "rehearsal-mic" || req.Input.Context != "Rehearsal" {
 		return invalid("input_identity_mismatch")
 	}
-	if req.Generation != generation || (revision != 0 && req.ConfigRevision != revision) {
+	if req.Generation != generation || req.ConfigRevision != revision {
 		return invalid("generation_or_revision_mismatch")
 	}
 	if req.SelectedTrack < 1 || req.SelectedTrack > 6 {
@@ -149,15 +163,20 @@ func (r *rehearsalState) Repair(ctx context.Context, req domain.TrackRepairReque
 	if len(actual) != 6 {
 		return invalid("track_map_incomplete")
 	}
+	for track := 1; track <= 6; track++ {
+		if _, ok := actual["track"+strconv.Itoa(track)]; !ok {
+			return invalid("track_map_incomplete")
+		}
+	}
+	key := "track" + strconv.Itoa(req.SelectedTrack)
 	for key, value := range actual {
-		if req.ExpectedTracks[key] != value {
+		if expected, ok := req.ExpectedTracks[key]; !ok || (expected != value && !(key == "track"+strconv.Itoa(req.SelectedTrack) && value)) {
 			return invalid("track_map_changed")
 		}
 	}
 	if len(req.ExpectedTracks) != 6 {
 		return invalid("track_map_changed")
 	}
-	key := "track" + strconv.Itoa(req.SelectedTrack)
 	desired := cloneTrackMap(actual)
 	desired[key] = true
 	preflight := domain.TrackRepairPreflight{
@@ -183,6 +202,20 @@ func (r *rehearsalState) Repair(ctx context.Context, req domain.TrackRepairReque
 		return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairUnknown, DetailCode: "simulated_unknown", DispatchAdmitted: true, PossiblyTransmitted: true, Preflight: &preflight}
 	}
 	r.mu.Lock()
+	if r.generation != generation || r.revision != revision {
+		r.mu.Unlock()
+		return invalid("provider_replaced_before_write")
+	}
+	if err := ctx.Err(); err != nil {
+		r.mu.Unlock()
+		return invalid("canceled_before_write")
+	}
+	for key, value := range actual {
+		if r.tracks[key] != value {
+			r.mu.Unlock()
+			return invalid("track_map_changed_before_write")
+		}
+	}
 	r.tracks[key] = true
 	r.written = true
 	observed := domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(r.tracks), Generation: req.Generation, ConfigRevision: req.ConfigRevision, ObservedAt: time.Now().UTC()}

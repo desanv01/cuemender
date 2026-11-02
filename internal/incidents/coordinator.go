@@ -595,15 +595,25 @@ func (c *Coordinator) HandleIssueInSessionAt(ctx context.Context, category, deli
 	return c.handleIssue(ctx, category, deliveryID, messageID, actorID, generation, receivedAt, sessionID)
 }
 
+type IntakeResult struct {
+	Incident domain.Incident
+	Reply    string
+	Err      error
+}
+
 func (c *Coordinator) handleIssue(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time, expectedSession string) string {
+	return c.IssueResult(ctx, category, deliveryID, messageID, actorID, generation, receivedAt, expectedSession).Reply
+}
+
+func (c *Coordinator) IssueResult(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time, expectedSession string) IntakeResult {
 	if err := c.acquire(ctx); err != nil {
-		return ""
+		return IntakeResult{Err: err}
 	}
 	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	c.mu.Unlock()
 	settings := c.settings()
@@ -611,44 +621,44 @@ func (c *Coordinator) handleIssue(ctx context.Context, category, deliveryID, mes
 	session := c.session
 	if session == nil || !session.Active || session.ID == "" {
 		c.mu.Unlock()
-		return "CueMender monitoring is not active. Help: !streamhelp"
+		return IntakeResult{Reply: "CueMender monitoring is not active. Help: !streamhelp", Err: domain.ErrNotReady}
 	}
 	if expectedSession != "*" && (expectedSession == "" || expectedSession != session.ID) {
 		c.mu.Unlock()
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
 		c.mu.Unlock()
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	if len(c.jobs) >= maxJobs && c.jobs[category] == nil {
 		c.mu.Unlock()
-		return "CueMender diagnostics are busy. Please retry shortly."
+		return IntakeResult{Reply: "CueMender diagnostics are busy. Please retry shortly.", Err: domain.ErrBusy}
 	}
 	c.mu.Unlock()
 	ready := c.status()
 	if !ready.TwitchConnected || ready.TwitchGeneration == 0 || generation != ready.TwitchGeneration {
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	incidentID, publicID := store.NewIncidentIDs()
 	inc, accepted, err := c.store.AcceptReport(ctx, session.ID, category, deliveryID, messageID, actorID, incidentID, publicID, c.now().UTC())
 	if err != nil {
 		if errors.Is(err, store.ErrReportBound) {
-			return "CueMender cannot accept more distinct reporters for this incident."
+			return IntakeResult{Reply: "CueMender cannot accept more distinct reporters for this incident.", Err: domain.ErrBusy}
 		}
-		return ""
+		return IntakeResult{Err: err}
 	}
 	if !accepted {
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	c.setIncident(inc)
 	c.publish()
 	scheduled := inc.Stage == domain.StageReported || inc.Stage == domain.StageInvestigating
 	if scheduled {
 		c.schedule(inc, settings)
-		return fmt.Sprintf("CueMender received your %s report for %s. Diagnostics are running.", category, inc.PublicID)
+		return IntakeResult{Incident: inc, Reply: fmt.Sprintf("CueMender received your %s report for %s. Diagnostics are running.", category, inc.PublicID)}
 	}
-	return fmt.Sprintf("CueMender added your %s report to existing incident %s.", category, inc.PublicID)
+	return IntakeResult{Incident: inc, Reply: fmt.Sprintf("CueMender added your %s report to existing incident %s.", category, inc.PublicID)}
 }
 
 func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID string) string {
@@ -664,21 +674,25 @@ func (c *Coordinator) HandleFeedbackInSessionAt(ctx context.Context, command, co
 }
 
 func (c *Coordinator) handleFeedback(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time, expectedSession string) string {
+	return c.FeedbackResult(ctx, command, code, actorID, generation, receivedAt, expectedSession).Reply
+}
+
+func (c *Coordinator) FeedbackResult(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time, expectedSession string) IntakeResult {
 	if err := c.acquire(ctx); err != nil {
-		return ""
+		return IntakeResult{Err: err}
 	}
 	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	c.mu.Unlock()
 	c.mu.Lock()
 	session := c.session
 	if session == nil || !session.Active {
 		c.mu.Unlock()
-		return "CueMender feedback is only accepted during an active monitoring session."
+		return IntakeResult{Reply: "CueMender feedback is only accepted during an active monitoring session.", Err: domain.ErrClosureIneligible}
 	}
 	var target domain.Incident
 	found := false
@@ -691,17 +705,17 @@ func (c *Coordinator) handleFeedback(ctx context.Context, command, code, actorID
 	}
 	c.mu.Unlock()
 	if !found || target.SessionID != session.ID || (expectedSession != "*" && expectedSession != session.ID) || domain.StageTerminal(target.Stage) {
-		return "CueMender ignored unknown or stale feedback."
+		return IntakeResult{Reply: "CueMender ignored unknown or stale feedback.", Err: domain.ErrClosureIneligible}
 	}
 	ready := c.status()
 	if !ready.TwitchConnected || ready.TwitchGeneration == 0 || generation != ready.TwitchGeneration {
-		return ""
+		return IntakeResult{Err: domain.ErrNotReady}
 	}
 	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
-		return "CueMender ignored feedback from before this monitoring session."
+		return IntakeResult{Reply: "CueMender ignored feedback from before this monitoring session.", Err: domain.ErrClosureIneligible}
 	}
 	if target.Stage != domain.StageAwaitingFeedback && target.Stage != domain.StageUnresolved {
-		return "CueMender ignored feedback before an eligible finding."
+		return IntakeResult{Reply: "CueMender ignored feedback before an eligible finding.", Err: domain.ErrClosureIneligible}
 	}
 	vote := "positive"
 	if command == "still_broken" {
@@ -709,11 +723,11 @@ func (c *Coordinator) handleFeedback(ctx context.Context, command, code, actorID
 	}
 	updated, err := c.store.AddFeedback(ctx, target.ID, actorID, vote, c.now().UTC())
 	if err != nil {
-		return ""
+		return IntakeResult{Err: err}
 	}
 	c.setIncident(updated)
 	c.publish()
-	return "CueMender recorded your feedback."
+	return IntakeResult{Incident: updated, Reply: "CueMender recorded your feedback."}
 }
 
 // CloseIncident is the broadcaster closure authority. Feedback/recheck and

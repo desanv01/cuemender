@@ -30,12 +30,16 @@ type repairFixture struct {
 }
 
 func newRepairFixture(t *testing.T, onChange ...func(*repairFixture)) *repairFixture {
+	return newRepairFixtureMode(t, domain.ModeLive, onChange...)
+}
+
+func newRepairFixtureMode(t *testing.T, mode string, onChange ...func(*repairFixture)) *repairFixture {
 	t.Helper()
 	f := &repairFixture{before: make(chan struct{}, 1), resume: make(chan struct{}), sent: make(chan struct{}, 1), finish: make(chan struct{})}
 	f.clock.Store(time.Now().UTC().UnixNano())
 	ctx := context.Background()
 	var err error
-	f.st, err = store.Open(ctx, filepath.Join(t.TempDir(), "repair.db"))
+	f.st, err = store.OpenMode(ctx, filepath.Join(t.TempDir(), "repair.db"), mode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +49,7 @@ func newRepairFixture(t *testing.T, onChange ...func(*repairFixture)) *repairFix
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.c, err = NewChecked(Options{Store: f.st, Now: f.now, OnChange: func() {
+	f.c, err = NewChecked(Options{Mode: mode, Store: f.st, Now: f.now, OnChange: func() {
 		for _, changed := range onChange {
 			changed(f)
 		}

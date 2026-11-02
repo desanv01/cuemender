@@ -3,8 +3,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const queryAll = (selector) => typeof document.querySelectorAll === 'function' ? Array.from(document.querySelectorAll(selector)) : [];
-  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor', sectionChosen: false, closeOutcomes: {}, rehearsalPublicID: '' };
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor', sectionChosen: false, closeOutcomes: {}, rehearsalPublicID: '', appliedScenario: '', approving: new Set() };
   let events = null;
+  try {
+    const saved = sessionStorage.getItem('cuemender-control-section');
+    if (['setup','monitor','rehearsal'].includes(saved)) { state.section = saved; state.sectionChosen = true; }
+  } catch (_) { /* Storage is optional; never store secrets. */ }
 
   class ApiError extends Error {
     constructor(status, body) {
@@ -263,6 +267,30 @@
     renderIncidents(state.incidents);
   }
 
+  // Patch rendered evidence while preserving the actual keyed form controls.
+  // Moving focus back after replacing a select does not preserve its interaction.
+  function patchIncidentNode(old, fresh) {
+    if (!old || old.tagName !== fresh.tagName) return fresh;
+    old.className = fresh.className;
+    old.hidden = fresh.hidden;
+    if ('disabled' in fresh) old.disabled = fresh.disabled;
+    if (old.tagName === 'SELECT') return old;
+    if (!fresh.children.length) { old.textContent = fresh.textContent; return old; }
+    const previous = Array.from(old.children);
+    const used = new Set();
+    const wanted = Array.from(fresh.children).map((child, index) => {
+      const prior = child.id ? previous.find(n => n.id === child.id) : previous[index];
+      if (prior && !used.has(prior) && prior.id === child.id && prior.tagName === child.tagName) {
+        used.add(prior);
+        return patchIncidentNode(prior, child);
+      }
+      return child;
+    });
+    wanted.forEach((child, index) => { if (old.children[index] !== child) old.insertBefore(child, old.children[index] || null); });
+    for (const child of Array.from(old.children)) if (!wanted.includes(child)) child.remove();
+    return old;
+  }
+
   function renderIncidents(incidents) {
     const list = $('incident-list');
     if (!list) {
@@ -271,18 +299,19 @@
     const focusedID = document.activeElement && document.activeElement.id ? document.activeElement.id : '';
     const priorCards = Array.from(list.children || []);
     const cards = [];
+    if (incidents.length && !priorCards.length) list.textContent = '';
     if (!incidents.length) {
       list.replaceChildren();
       list.textContent = 'No incidents in this session.';
       return;
     }
     for (const incident of incidents) {
+      const relatedProposals = (state.proposals || []).filter(p => p.incident_id === incident.id);
+      const relatedActions = (state.actionRecords || []).filter(a => a.incident_id === incident.id);
       const signature = JSON.stringify({
-        stage: incident.stage, feedback: incident.feedback, local_verification: incident.local_verification,
-        closure_outcome: incident.closure_outcome, report_count: incident.report_count,
-        findings: (incident.findings || []).map((finding) => finding.code),
-        checks: (incident.checks || []).map((check) => check.unavailable_reason || check.status),
-        streaming: incident.streaming,
+        incident: { ...incident, updated_at: undefined }, session: state.monitoringSessionId,
+        revision: state.currentRevision, proposals: relatedProposals, actions: relatedActions, approving: Array.from(state.approving),
+        expired: relatedProposals.map(p => Date.now() >= Date.parse(p.expires_at))
       });
       const prior = priorCards.find((card) => card.dataset && card.dataset.incidentId === incident.id && card.dataset.signature === signature);
       if (prior) {
@@ -290,7 +319,8 @@
         continue;
       }
       const card = document.createElement('div');
-      card.dataset = { incidentId: incident.id, signature };
+      card.dataset.incidentId = incident.id;
+      card.dataset.signature = signature;
       card.className = 'device-box';
       const title = document.createElement('p');
       title.className = 'connection-status';
@@ -332,6 +362,7 @@
         card.appendChild(guidance);
       }
       const actions = document.createElement('div');
+      actions.id = 'incident-actions-' + incident.id;
       actions.className = 'actions';
       const pendingAction = (state.actionRecords || []).find((entry) => entry.incident_id === incident.id && ['reserved', 'intent_recorded', 'write_sent', 'unknown'].includes(entry.status));
       const proposal = (state.proposals || []).find((entry) => entry.incident_id === incident.id && entry.status === 'proposed');
@@ -340,8 +371,10 @@
         detail.textContent = 'Add ' + proposal.input.name + ' to confirmed track ' + proposal.selected_track + '. Preserve assignments: ' + Object.entries(proposal.expected_tracks).map(([key, value]) => key + '=' + value).join(', ') + '. Expires ' + new Date(proposal.expires_at).toISOString() + '. Other findings remain. Another OBS client may change assignments between the read and write.';
         card.appendChild(detail);
         const approve = document.createElement('button'); approve.type = 'button'; approve.textContent = 'Approve track addition';
-        approve.disabled = !state.monitoringSessionId || proposal.session_id !== state.monitoringSessionId || Date.now() >= Date.parse(proposal.expires_at) || Boolean(pendingAction);
-        approve.addEventListener('click', async () => { approve.disabled = true; try { await postPrivate('/api/v1/proposals/' + encodeURIComponent(proposal.id) + '/approve', { expected_revision: proposal.config_revision }); await loadState(); } catch (error) { showNotice(error.message || 'Approval could not be accepted.', 'error'); await loadState(); } });
+        approve.id = 'approve-' + proposal.id;
+        if (typeof setTimeout === 'function') setTimeout(() => { approve.disabled = true; }, Math.max(0, Date.parse(proposal.expires_at) - Date.now()));
+        approve.disabled = state.approving.has(proposal.id) || !state.monitoringSessionId || proposal.session_id !== state.monitoringSessionId || Date.now() >= Date.parse(proposal.expires_at) || Boolean(pendingAction);
+        approve.addEventListener('click', async () => { if (state.approving.has(proposal.id)) return; state.approving.add(proposal.id); approve.disabled = true; try { await postPrivate('/api/v1/proposals/' + encodeURIComponent(proposal.id) + '/approve', { expected_revision: proposal.config_revision }); } catch (error) { showNotice(error.message || 'Approval could not be accepted.', 'error'); } finally { state.approving.delete(proposal.id); await loadState(); } });
         actions.appendChild(approve);
       }
       const lastAction = (state.actionRecords || []).filter((entry) => entry.incident_id === incident.id).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
@@ -374,6 +407,7 @@
         dismiss.textContent = 'Dismiss';
         dismiss.addEventListener('click', () => dismissIncident(incident.id));
         actions.appendChild(dismiss);
+        if (['finding_available','awaiting_approval','awaiting_feedback','unresolved','no_supported_finding','insufficient_information','interrupted'].includes(incident.stage)) {
         const closeLabel = document.createElement('label');
         closeLabel.textContent = 'Close outcome';
         closeLabel.htmlFor = 'close-' + incident.id;
@@ -396,15 +430,28 @@
         actions.appendChild(closeLabel);
         actions.appendChild(closeSelect);
         actions.appendChild(closeButton);
+        }
       }
       card.appendChild(actions);
-      cards.push(card);
+      const previous = priorCards.find(item => item.dataset && item.dataset.incidentId === incident.id);
+      if (previous && typeof previous.insertBefore === 'function') {
+        patchIncidentNode(previous, card);
+        previous.dataset.signature = signature;
+        cards.push(previous);
+      } else {
+        cards.push(card);
+      }
     }
-    list.replaceChildren();
-    for (const card of cards) list.appendChild(card);
+    if (typeof list.insertBefore === 'function') {
+      cards.forEach((card, index) => { if (list.children[index] !== card) list.insertBefore(card, list.children[index] || null); });
+      for (const old of Array.from(list.children)) if (!cards.includes(old)) old.remove();
+    } else { // Minimal Node fixture DOM; browsers use keyed reconciliation above.
+      list.replaceChildren();
+      for (const card of cards) list.appendChild(card);
+    }
     if (focusedID && typeof document.getElementById === 'function') {
       const restored = document.getElementById(focusedID);
-      if (restored && typeof restored.focus === 'function') restored.focus();
+      if (restored && document.activeElement !== restored && typeof restored.focus === 'function') restored.focus();
     }
   }
 
@@ -489,7 +536,10 @@
   }
 
   function applySection(section, chosen) {
-    if (chosen) state.sectionChosen = true;
+    if (chosen) {
+      state.sectionChosen = true;
+      try { sessionStorage.setItem('cuemender-control-section', section); } catch (_) {}
+    }
     state.section = section;
     for (const panel of Array.from(document.querySelectorAll ? document.querySelectorAll('#app > section.panel') : [])) {
       if (panel.id === 'rehearsal-panel') {
@@ -525,13 +575,18 @@
   }
 
   function render(privateState) {
+    if (Number.isFinite(privateState.state_revision)) {
+      if (state.lastStateRevision !== undefined && privateState.state_revision < state.lastStateRevision) return;
+      state.lastStateRevision = privateState.state_revision;
+    }
     showApp();
     if (typeof privateState.csrf_token === 'string' && privateState.csrf_token) {
       state.csrf = privateState.csrf_token;
     }
     state.currentRevision = privateState.settings ? privateState.settings.revision : 0;
-    renderMonitoring(privateState);
+    state.hasVisualExpectation = Boolean(privateState.settings && privateState.settings.visual);
     renderMode(privateState.mode || 'live');
+    renderMonitoring(privateState);
     if (!state.sectionChosen) {
       const settings = privateState.settings;
       const unconfigured = !settings || (!settings.microphone && !settings.visual && !settings.stream_track);
@@ -572,7 +627,7 @@
       try {
         const privateState = JSON.parse(event.data);
         render(privateState);
-        setText('notice', 'Live state updated.');
+        // Keep action errors/success visible across unrelated state updates.
       } catch (_) {
         showNotice('A state update could not be read.', 'error');
       }
@@ -781,6 +836,8 @@
   async function applyRehearsalScenario() {
     try {
       await postPrivate('/api/v1/rehearsal/scenario', { scenario: $('rehearsal-scenario').value });
+      state.rehearsalPublicID = '';
+      state.appliedScenario = $('rehearsal-scenario').value;
       $('rehearsal-status').textContent = 'Scenario applied. Start monitoring, then simulate a report.';
       await loadState();
     } catch (error) {
@@ -790,8 +847,8 @@
 
   async function simulateRehearsalReport() {
     try {
-      const scenario = $('rehearsal-scenario') ? $('rehearsal-scenario').value : 'track_missing';
-      const category = scenario === 'wrong_scene' ? 'video' : 'audio';
+      const scenario = state.appliedScenario;
+      const category = scenario === 'wrong_scene' || (!scenario && state.hasVisualExpectation) ? 'video' : 'audio';
       const incident = await postPrivate('/api/v1/rehearsal/report', { category });
       state.rehearsalPublicID = incident && incident.public_id ? incident.public_id : '';
       $('rehearsal-status').textContent = 'Simulated ' + category + ' viewer report accepted for ' + (state.rehearsalPublicID || 'the current incident') + '.';
@@ -806,7 +863,7 @@
       incident.session_id === state.monitoringSessionId &&
       (incident.stage === 'awaiting_feedback' || incident.stage === 'unresolved'));
     const preferred = eligible.find((incident) => incident.public_id === state.rehearsalPublicID);
-    if (preferred) return preferred;
+    if (state.rehearsalPublicID) return preferred || null;
     return eligible.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0] || null;
   }
 

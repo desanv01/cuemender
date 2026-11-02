@@ -497,6 +497,9 @@ func (a *App) SaveSettings(ctx context.Context, expectedRevision int64, exp doma
 	install := func() {
 		a.stateMu.Lock()
 		defer a.stateMu.Unlock()
+		if a.rehearsal != nil {
+			a.rehearsal.setRevision(settings.Revision)
+		}
 		a.settings = settings
 		a.stateRevision++
 		privateJSON, errPrivate := json.Marshal(a.privateLocked())

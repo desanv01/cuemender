@@ -17,7 +17,7 @@
       case 'applying': return 'Applying approved local change';
       case 'action_unknown': return 'Action outcome unknown; read-only reconciliation';
       case 'awaiting_feedback':
-        return incident.local_verification === 'verified' ? 'Local configuration verified; manual findings remain' : 'Verification needs viewer feedback';
+        return incident.local_verification === 'verified' ? 'Local configuration verified; viewer feedback is separate' : 'Verification needs viewer feedback';
       case 'no_supported_finding': return 'No supported conflict found';
       case 'insufficient_information':
       case 'interrupted': return 'Evidence is incomplete';
