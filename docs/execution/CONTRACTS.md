@@ -1,6 +1,6 @@
 # Shared contracts
 
-Revision: 1.3 • Changes require Codex decision and affected-packet review.
+Revision: 1.4 • Changes require Codex decision and affected-packet review.
 
 This specifies observable behavior and data semantics, not mandatory function names. Introduce structures as consumed; P01 does not implement the full future state machine.
 
@@ -259,3 +259,15 @@ Revision mismatch is 409. Start missing setup is 409; required connection unavai
 - Help remains available while connected and idle. Idle issue commands do not open incidents. No outgoing text includes usernames, OBS identities, raw errors or evidence. No test sends a real Twitch message during the user hold.
 - Extend domain projections and existing app snapshots/SSE coherently. Private evidence is typed and bounded; public projection is a separately constructed C03 allowlist. Public incidents include only current monitoring-session incidents, not offline/manual history. Existing state_revision ordering and settings-save publication guarantees must remain intact.
 - Minimal controls add start/stop, manual audio/video check, recheck and dismiss, plus evidence/feedback counts and explicit repair-not-yet-available copy. Preserve setup/CSRF reload behavior, textContent rendering and CSP; no redesign, runtime framework or new dependency.
+
+## C10 — P04 integration clarifications (D33)
+
+These details resolve C06 against the accepted P03 implementation; no generic mutation route or monitoring bypass is introduced.
+
+- `POST /api/v1/proposals/{id}/approve` accepts only `{"expected_revision": N}`. ID comes from the path. It uses the existing private session, Host/Origin, bounded JSON and CSRF rules. Unknown fields or caller-supplied target/map/action are rejected. Return the reserved/current action as an ordinary data envelope; repeated approval returns that same action and never causes another dispatch. Missing proposal is 404, expired unused proposal 410, stale state/revision or unavailable mode/session 409, provider unavailable 503, capacity busy 429.
+- Proposals are generated only for fresh committed microphone-track findings belonging to the currently active monitoring session. Manual checks inside that session can qualify; offline/manual-history incidents cannot. Store/retain the exact complete source identity, context and six-track map that supported the proposal. Private state may expose typed proposals/actions; public state remains its existing allowlist and fixed safe copy.
+- Proposal expiry/invalidation changes the proposal's executability, not the incident into a terminal record. Keep its diagnostic findings visible and allow explicit fresh recheck where C09 otherwise permits it. Never silently renew expiry without a new diagnosis/proposal. In-flight or uncertain actions prevent a recheck/dismiss from discarding their audit.
+- Preflight precedence: exact expected map permits the one selected false-to-true addition; exact desired map is a no-op/currently-assigned result with zero writes; any other map difference invalidates the proposal. No-op does not prove CueMender changed anything.
+- A common coordinator authority boundary serializes current settings commit/invalidation, session transitions, reservation and final dispatch admission. Provider I/O happens outside coordinator/state mutexes. The adapter invokes a callback after fresh preflight; the callback atomically revalidates authority, commits intent and claims dispatch. If stop/reconfigure wins first there is no dispatch; if dispatch admission wins first the action is already in flight and must be retained/reconciled. An adapter rejection before SDK invocation may still establish definitely-not-sent. After invocation, classify uncertainty conservatively.
+- Startup invalidates saved approvals and converts unfinished intent/write records to unknown before ordinary incident interruption/retention can erase them. Read-only reconciliation uses the saved input/context/desired map against fresh current-generation evidence; process-local generations cannot be compared across restart as durable identities. No reconciliation path calls the writer. Old-session action evidence may settle its own audit but must not mutate a new session's incident.
+- One action may be reserved/in flight at a time. Bounded work joins during close. Preserve all other assignments and remaining findings, especially mute. Verified write read-back means local OBS configuration only; after unknown outcome, matching configuration is reported without attributing its cause.

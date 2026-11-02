@@ -2,7 +2,7 @@
 
 Revision: 2.4
 
-Current dispatch: **none**. P03 accepted locally after R06 and Codex closure; DeepSeek remains stopped. Live Twitch remains deferred under D30/issue #6. P04 is Codex-owned and held for explicit release/recording. The prompts below are historical and must not be executed unless STATUS explicitly releases that work.
+Current dispatch: **P04 is Codex-owned, not a DeepSeek prompt.** User requested Sol 6.1 high subagents; consult STATUS for the single implementation writer. Recording is verified/running; contracts v1.4/C10 and P04 v1.3 apply. P05 remains held. Historical worker prompts below are not active dispatches.
 
 ## Historical: P03-R06 v1.0 — completed
 

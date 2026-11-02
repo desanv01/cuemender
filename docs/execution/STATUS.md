@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 2.4
+Revision: 2.5
 Last update: 2026-11-02T02:49Z
-Current packet: P03
-Current state: accepted local development baseline under D30/D31; live Twitch deferred
+Current packet: P04
+Current state: in_progress — recording verified; P04 implementation released
 Current owner: Codex
-Released packet revision: none — P03 v1.2/R06 completed; P04 held
-Code writer active: none — Codex closure complete; DeepSeek stopped
+Released packet revision: P04 v1.3 under D32; live Twitch and dependent real approval trial remain pending
+Code writer active: Codex / p04_obs_audit (sole production writer, narrow OBS adapter first); DeepSeek stopped
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -33,7 +33,7 @@ Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
 P02 tracking: https://github.com/desanv01/cuemender/issues/2
-Worker branch: feature/p03-diagnostics (read actual HEAD at dispatch; no worker Git mutation)
+Worker branch: feature/p04-approved-repair; starting baseline 01a6e3d68cd919b5e90e80bc96e5d61e8c0204e4
 P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
 P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
 P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
@@ -51,7 +51,7 @@ Correction: P03-R06 complete; no active correction dispatch
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch, both deferred under D30/issue #6; P02-B/V07 live OBS remains passed from closure.
-Next action: finish PR #9 integration and close local P03 issues #7/#8; retain live Twitch issue #6. P04 remains held pending explicit Codex release and recording checkpoint.
+Next action: implement P04 in one-writer substeps with Sol 6.1 high agents; record actual work, verify local boundaries, retain live Twitch #6. P05 remains held.
 P02 setup: docs/implementation/P02-setup.md
 
 | Packet | State | Review | Dispatch condition |
@@ -59,7 +59,7 @@ P02 setup: docs/implementation/P02-setup.md
 | P01 | accepted | P01-R01-review.md | Accepted baseline published |
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
 | P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 held for release/recording |
-| P04 | planned / held — Codex implementation | Not started | P03 accepted; Codex takes sole code ownership |
+| P04 | released / in_progress — Codex with explicitly authorized Sol 6.1 high agents | Recording test passed; production implementation beginning | One writer; no live Twitch or gate bypass |
 | P05 | planned / held | Not started | Codex acceptance of P04 and release |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
 | Submission | planned | Not started | Release review and user-controlled external steps |
