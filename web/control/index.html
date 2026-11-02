@@ -12,7 +12,7 @@
       <h1>CueMender</h1>
       <p class="subtitle">Community-assisted stream diagnostics · connection setup</p>
     </div>
-    <span class="badge">P02</span>
+    <span class="badge">Read-only diagnostics</span>
   </header>
 
   <main>
@@ -36,7 +36,7 @@
           <div><dt>Twitch</dt><dd id="twitch">not connected</dd></div>
           <div><dt>OBS</dt><dd id="obs">not connected</dd></div>
         </dl>
-        <p class="note">Twitch and OBS setup is live. Monitoring, incidents and repairs are not implemented in P02.</p>
+        <p class="note">Run manual checks, or connect Twitch and OBS to monitor community reports. Repairs are not available yet.</p>
       </section>
 
       <section class="panel" aria-labelledby="twitch-heading">
@@ -60,7 +60,7 @@
 
       <section class="panel" aria-labelledby="obs-heading">
         <h2 id="obs-heading">OBS connection</h2>
-        <p class="muted">Read-only local discovery. CueMender never changes OBS scenes, sources or tracks in P02.</p>
+        <p class="muted">Read-only local discovery and diagnostics. CueMender does not change OBS scenes, sources or tracks.</p>
         <label for="obs-address">WebSocket address</label>
         <input id="obs-address" type="text" maxlength="256" autocomplete="off" spellcheck="false">
         <label for="obs-password">WebSocket password <span class="optional">(leave blank if none)</span></label>

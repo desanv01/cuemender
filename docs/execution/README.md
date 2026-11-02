@@ -1,14 +1,12 @@
 # CueMender execution pack
 
-Revision: 2.5 • Updated 2026-11-02 (Malaysia) • P03-R06 corrections released; live Twitch deferred.
+Revision: 2.6 • Updated 2026-11-02 (Malaysia) • P03 accepted locally; live Twitch deferred.
 
 ## Immediate next action
 
-P03-R05 re-review: **changes required**. Read [latest review](handoffs/P03-R05-review.md), execute [P03-R06](corrections/P03-R06.md) using the current [prompt](PROMPTS.md), and follow STATUS. Ordinary suite, earlier regressions, build/vet/format and four Node fixtures pass. Database-blocked Close join and store conditional protection now pass independently. Canceled-job settlement uses the wrong expected timestamp; fixture cancellation and complete cache/protocol ordering evidence remain. No P04 release. The original release below is context, not an instruction to restart P03.
+**P03 local implementation is accepted.** Read the [closure review](handoffs/P03-codex-closure-review.md) and [implementation/verification record](../implementation/P03-codex-closure.md). R06 plus Codex takeover completed the remaining ordering, retry, socket cleanup and concurrent test work. Actual headless-browser checks passed. No DeepSeek dispatch is active.
 
-User approved P03 progression while Twitch phone/2FA setup remains blocked. **P03 v1.2 is released under D30**, with P02's completed local/live-OBS work accepted as its development baseline. See [the closure review](handoffs/P02-codex-closure-review.md), [D30](DECISIONS.md), [P03 packet](packages/P03-diagnostics.md) and [current prompt](PROMPTS.md). P02-A/V06 and P03-D's real-chat portion remain deferred/unmet in [issue #6](https://github.com/desanv01/cuemender/issues/6), required before final readiness. Do not restart Twitch login work. Follow [STATUS](STATUS.md) and claim sole ownership before implementing.
-
-DeepSeek remains the planned implementer for P03/P05/P06 after their release. Codex owns the current P02 closure and directly implements P04 and its tests. This division provides substantive Codex work but is not an organizer guarantee of eligibility.
+P02-A/V06 and P03-D real Twitch remain deferred under D30/D31 in [issue #6](https://github.com/desanv01/cuemender/issues/6), required before final readiness. Do not restart Twitch account work. P04 remains held for explicit release and its genuine implementation recording checkpoint. DeepSeek remains stopped; Codex owns GitHub integration through PR #9. This is local source acceptance, not an eligibility guarantee or release/submission readiness.
 
 ## Reading order
 
@@ -28,8 +26,8 @@ Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [init
 |---|---|---|
 | [P01 — Foundation](packages/P01-foundation.md) | Runnable local shell, persistent settings, credential boundary, private/public HTTP boundaries | Accepted after P01-R01 |
 | [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Development baseline conditionally accepted under D30; Twitch deferred |
-| [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Partially corrected; P03-R06 released |
-| [P04 — Approved repair](packages/P04-approved-repair.md) | Codex implements approval, correction, reconciliation and tests | Planned; reserved for Codex |
+| [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Accepted local baseline under D30/D31 |
+| [P04 — Approved repair](packages/P04-approved-repair.md) | Codex implements approval, correction, reconciliation and tests | Held for explicit release and recording; reserved for Codex |
 | [P05 — User experience](packages/P05-user-experience.md) | Finished setup, controls, overlay, confirmation, rehearsal | Planned |
 | [P06 — Release readiness](packages/P06-release-readiness.md) | Tested Windows ZIP and reproducible instructions | Planned |
 | [Final integration/submission](SUBMISSION.md) | Codex review, actual demonstration, accurate entry | Codex/user stage |

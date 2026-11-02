@@ -64,6 +64,7 @@ type Coordinator struct {
 	incidents map[string]domain.Incident
 	order     []string
 	closed    bool
+	closeOnce sync.Once
 	wg        sync.WaitGroup
 }
 
@@ -85,6 +86,7 @@ func NewChecked(opts Options) (*Coordinator, error) {
 	}
 	c.opCtx, c.opCancel = context.WithCancel(context.Background())
 	if err := c.restart(); err != nil {
+		c.opCancel()
 		return nil, err
 	}
 	return c, nil
@@ -131,6 +133,16 @@ func (c *Coordinator) acquire(ctx context.Context) error {
 	case <-opDone:
 		return context.Canceled
 	case c.gate <- struct{}{}:
+		// A ready gate and cancellation can win the select together. Do not
+		// admit a canceled operation just because the gate happened to be free.
+		if err := ctx.Err(); err != nil {
+			c.release()
+			return err
+		}
+		if c.opCtx != nil && c.opCtx.Err() != nil {
+			c.release()
+			return c.opCtx.Err()
+		}
 		return nil
 	}
 }
@@ -205,19 +217,9 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		jobs = append(jobs, job)
 	}
 	c.mu.Unlock()
-	for id := range pending {
-		current, err := c.store.GetIncident(ctx, id)
-		if err != nil {
-			return err
-		}
-		if current.Stage != domain.StageReported && current.Stage != domain.StageInvestigating {
-			c.mu.Lock()
-			delete(c.pending, id)
-			c.mu.Unlock()
-			continue
-		}
+	for id, observed := range pending {
 		now := c.now().UTC()
-		updated, changed, err := c.store.InterruptIncident(ctx, id, current.UpdatedAt, now)
+		updated, changed, err := c.store.InterruptIncident(ctx, id, observed.UpdatedAt, now)
 		if err != nil {
 			return err
 		}
@@ -237,12 +239,16 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		}
 		for _, job := range jobs {
 			job.cancel()
-			inc := job.incident
+			inc, ok := c.Find(job.incident.ID)
+			if !ok || domain.StageTerminal(inc.Stage) {
+				continue
+			}
+			observed := inc
 			inc.Stage = domain.StageInterrupted
 			inc.UpdatedAt = c.now().UTC()
 			if err := c.store.SaveIncident(ctx, inc); err != nil {
 				c.mu.Lock()
-				c.pending[inc.ID] = inc
+				c.pending[inc.ID] = observed
 				c.mu.Unlock()
 				return err
 			}
@@ -276,29 +282,22 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 }
 
 func (c *Coordinator) Close() {
-	c.mu.Lock()
-	if c.closed {
+	c.closeOnce.Do(func() {
+		if c.opCancel != nil {
+			c.opCancel()
+		}
+		c.gate <- struct{}{}
+		c.mu.Lock()
+		c.closed = true
+		for _, job := range c.jobs {
+			job.cancel()
+		}
 		c.mu.Unlock()
-		return
-	}
-	c.mu.Unlock()
-	if c.opCancel != nil {
-		c.opCancel()
-	}
-	c.gate <- struct{}{}
-	defer c.release()
-	c.mu.Lock()
-	if c.closed {
-		c.mu.Unlock()
-		return
-	}
-	c.closed = true
-	for _, job := range c.jobs {
-		job.cancel()
-	}
-	c.jobs = map[string]*job{}
-	c.mu.Unlock()
-	c.wg.Wait()
+		// Final settlement also owns the gate. Release before joining workers;
+		// admission remains closed through opCtx and closed.
+		c.release()
+		c.wg.Wait()
+	})
 }
 
 func (c *Coordinator) ActiveSession() *domain.MonitoringSessionInfo {
@@ -799,33 +798,49 @@ func (c *Coordinator) installSettled(inc domain.Incident) {
 }
 
 func (c *Coordinator) finishJob(request *job) {
-	var interrupted *domain.Incident
-	var observedUpdated time.Time
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// Cleanup is allowed after admission closes, but shares the operation gate
+	// with dismiss/recheck through durable write, cache installation and publish.
+	select {
+	case c.gate <- struct{}{}:
+		defer c.release()
+	case <-ctx.Done():
+		c.mu.Lock()
+		if c.jobs[request.incident.Category] == request {
+			if inc, ok := c.incidents[request.incident.ID]; !request.settled && ok &&
+				(inc.Stage == domain.StageReported || inc.Stage == domain.StageInvestigating) {
+				c.pending[inc.ID] = inc
+			}
+			delete(c.jobs, request.incident.Category)
+		}
+		c.mu.Unlock()
+		c.publish()
+		return
+	}
+	var observed *domain.Incident
 	c.mu.Lock()
-	if !request.settled {
+	if !request.settled && c.jobs[request.incident.Category] == request {
 		if inc, ok := c.incidents[request.incident.ID]; ok && (inc.Stage == domain.StageReported || inc.Stage == domain.StageInvestigating) {
-			observedUpdated = inc.UpdatedAt
-			inc.Stage = domain.StageInterrupted
-			inc.UpdatedAt = c.now().UTC()
-			interrupted = &inc
+			observed = &inc
 		}
 	}
-	if c.jobs[request.incident.Category] == request {
-		delete(c.jobs, request.incident.Category)
-	}
 	c.mu.Unlock()
-	if interrupted != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		updated, ok, err := c.store.InterruptIncident(ctx, interrupted.ID, observedUpdated, interrupted.UpdatedAt)
-		cancel()
+	if observed != nil {
+		updated, ok, err := c.store.InterruptIncident(ctx, observed.ID, observed.UpdatedAt, c.now().UTC())
 		if err != nil {
 			c.mu.Lock()
-			c.pending[interrupted.ID] = *interrupted
+			c.pending[observed.ID] = *observed
 			c.mu.Unlock()
 		} else if ok {
 			c.installSettled(updated)
 		}
 	}
+	c.mu.Lock()
+	if c.jobs[request.incident.Category] == request {
+		delete(c.jobs, request.incident.Category)
+	}
+	c.mu.Unlock()
 	c.publish()
 }
 

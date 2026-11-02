@@ -147,6 +147,10 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 						}
 					}
 				}()
+				defer func() {
+					_ = conn.Close()
+					<-readDone
+				}()
 				select {
 				case <-chat.help:
 					_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "help-1", "message_type": "notification", "message_timestamp": "2026-11-01T00:00:00Z"}, "payload": map[string]any{

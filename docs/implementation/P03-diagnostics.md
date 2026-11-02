@@ -154,3 +154,7 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 - The final WSL Linux race suite passed.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.
 - Feedback transition UI is minimal; P05 owns final incident experience. P04 repair/approval code is absent.
+
+## Codex closure superseding R06 local gaps — 2026-11-02
+
+Codex completed the missing two-goroutine cleanup/dismiss/recheck coverage and fixed final settlement serialization, stale pending retry ownership and concurrent Close joining. Upgraded socket reader cleanup is joined on handler exits. Full local checks and actual headless-browser verification passed. See [implementation record](P03-codex-closure.md) and [acceptance](../execution/handoffs/P03-codex-closure-review.md). Earlier remaining-local-gap statements are historical. Live Twitch remains deferred under D30/#6; no fresh live OBS evidence. P04 held.

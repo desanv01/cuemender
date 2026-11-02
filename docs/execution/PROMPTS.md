@@ -1,10 +1,10 @@
 # Copy-paste prompts
 
-Revision: 2.3
+Revision: 2.4
 
-Current dispatch: P03-R06 v1.0. Session regressions, blocked-database join and store conditional protection pass; coordinator cleanup version/caching and cancellation/provider protocol evidence remain. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
+Current dispatch: **none**. P03 accepted locally after R06 and Codex closure; DeepSeek remains stopped. Live Twitch remains deferred under D30/issue #6. P04 is Codex-owned and held for explicit release/recording. The prompts below are historical and must not be executed unless STATUS explicitly releases that work.
 
-## Current: P03-R06 v1.0 — paste into DeepSeek
+## Historical: P03-R06 v1.0 — completed
 
 ~~~text
 Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R06 v1.0.
