@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 2.1
-Last update: 2026-11-02 (Malaysia), Codex P03-R03 review
+Revision: 2.2
+Last update: 2026-11-02 (Malaysia), Codex P03-R04 review
 Current packet: P03
-Current state: changes_required — P03-R04 v1.0 released
+Current state: changes_required — P03-R05 v1.0 released
 Current owner: Codex
-Released packet revision: P03-R04 v1.0 against P03 v1.2 and contracts v1.3 (C09)
-Code writer active: none — review complete; DeepSeek may claim P03-R04 when dispatched
+Released packet revision: P03-R05 v1.0 against P03 v1.2 and contracts v1.3 (C09)
+Code writer active: none — review complete; DeepSeek may claim P03-R05 when dispatched
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -15,6 +15,8 @@ R02 started at (UTC): 2026-11-01T17:48Z
 R02 finished at (UTC): 2026-11-01T17:57Z
 R03 started at (UTC): 2026-11-02T01:14Z
 R03 finished at (UTC): 2026-11-02T01:22Z
+R04 started at (UTC): 2026-11-02T01:44Z
+R04 finished at (UTC): 2026-11-02T01:48Z
 P02 started at (UTC): 2026-11-01T09:05Z
 Correction started at (UTC): 2026-11-01T09:43Z
 P02-R02 started at (UTC): 2026-11-01T10:03Z
@@ -22,7 +24,7 @@ P02-R03 started at (UTC): 2026-11-01T13:33Z
 DeepSeek P02-R03 handoff at (UTC): 2026-11-01T13:39Z
 Codex closure verification finished at (UTC): 2026-11-01T14:40Z
 Worker/harness: DeepSeek (deepseek-flash via DeepSeek Harness)
-Implementation begun: yes — P03-R03 progress verified; four reproduced runtime failures and remaining R03 boundaries require P03-R04
+Implementation begun: yes — P03-R04 regressions pass; idle queued-report failure and unfinished session/cleanup boundaries require P03-R05
 Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
@@ -33,26 +35,26 @@ P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D
 P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
 P03 tracking: https://github.com/desanv01/cuemender/issues/7
 P03 draft PR: https://github.com/desanv01/cuemender/pull/9 (unaccepted, unmerged)
-P03 worker checkpoint: 36845378cece73847e27198d9841b4cb25714dbf (P03-R03, unaccepted)
-P03 review checkpoint: see feature/p03-diagnostics history after 3684537 (review fixtures/docs only; no production fixes)
+P03 worker checkpoint: e980d086247f4a03ad31e8b05e99cf6ab54f2b00 (P03-R04, unaccepted)
+P03 review checkpoint: see feature/p03-diagnostics history after e980d08 (review fixtures/docs only; no production fixes)
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
 Next report: docs/execution/handoffs/P03-worker-report.md
 Implementation: docs/implementation/P03-diagnostics.md
 Environment note: docs/implementation/P01-environment.md
-Review: docs/execution/handoffs/P03-R03-review.md
-Correction: docs/execution/corrections/P03-R04.md v1.0
+Review: docs/execution/handoffs/P03-R04-review.md
+Correction: docs/execution/corrections/P03-R05.md v1.0
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch, both deferred under D30/issue #6; P02-B/V07 live OBS remains passed from closure.
-Next action: Dispatch P03-R04 using PROMPTS.md. Finish runtime retained loading, durable retry/cleanup, final publication, operation/session ownership and the named app/protocol boundaries. Live Twitch stays deferred; P04 remains held for Codex release and recording.
+Next action: Dispatch P03-R05 using PROMPTS.md. Finish captured-session mutation/reply validation, atomic cleanup ownership and remaining named provider/database/failure-path evidence. Preserve passing R04 work. P04 stays held; live Twitch stays deferred.
 P02 setup: docs/implementation/P02-setup.md
 
 | Packet | State | Review | Dispatch condition |
 |---|---|---|---|
 | P01 | accepted | P01-R01-review.md | Accepted baseline published |
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
-| P03 | changes_required — P03-R04 released; live Twitch deferred under D30 | P03-R03-review.md | Complete A–C; Codex acceptance required; P04 held |
+| P03 | changes_required — P03-R05 released; live Twitch deferred under D30 | P03-R04-review.md | Complete A–C; Codex acceptance required; P04 held |
 | P04 | planned / held — Codex implementation | Not started | P03 accepted; Codex takes sole code ownership |
 | P05 | planned / held | Not started | Codex acceptance of P04 and release |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
@@ -77,6 +79,8 @@ Only Codex updates acceptance, contract revisions, dispatch release or Git check
 Codex-owned implementation: P04 plus needed integration/debugging work after handoff. DeepSeek must remain stopped during those edits. P04 completion needs a Codex build/verification record, not a DeepSeek worker handoff. Verification of Codex-authored code must not be called independent review.
 
 ## History
+
+- 2026-11-02 (Malaysia): P03-R04 full suite, previous five regressions, protocol/SSE/OBS allowlist, vet/format/build and four Node fixtures pass independently; build hash matches worker. Two new queue tests: captured old-session event is rejected, but idle event can enter a later session when timestamps match. Source session commit/reply and atomic cleanup gaps are separate from reproduced evidence. P03-R05 finishes R04 scope under issue #8/draft PR #9; no production edits by Codex, no P04 release/live Twitch work.
 
 - 2026-11-02 (Malaysia): P03-R03 full ordinary suite, earlier regressions, local protocol success, vet/format/build and four Node fixtures pass. Independent build hash matches worker. Five new review tests: production-gate cancellation passes; retained reload, recoverable stop retry, settled-count publication and late Start after Close fail. P03-R04 records unfinished R03 work under existing issue #8/draft PR #9. Codex tests/docs only; no P04 release or live Twitch work.
 

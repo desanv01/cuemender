@@ -1,10 +1,31 @@
 # Copy-paste prompts
 
-Revision: 2.1
+Revision: 2.2
 
-Current dispatch: P03-R04 v1.0. Earlier regressions and the actual protocol success path pass; runtime persistence/ownership failures and remaining named boundaries prevent acceptance. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
+Current dispatch: P03-R05 v1.0. Earlier regressions and protocol/SSE/OBS allowlist pass; captured-session/cleanup ownership and remaining named local evidence prevent acceptance. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
 
-## Current: P03-R04 v1.0 — paste into DeepSeek
+## Current: P03-R05 v1.0 — paste into DeepSeek
+
+~~~text
+Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R05 v1.0.
+
+Read AGENTS.md; docs/execution/README.md, STATUS.md, WORKFLOW.md, CONTRACTS.md v1.3 and DECISIONS.md D30; packages/P03-diagnostics.md; corrections/P03-R04.md and P03-R05.md; handoffs/P03-R04-review.md and the appended worker report. Paths after docs/execution refer to that directory.
+
+Confirm STATUS releases P03-R05, branch feature/p03-diagnostics, and no active writer. Inspect Git status/diff and actual HEAD, preserve R04 improvements, then claim ownership. Codex authored review tests/docs only; do not restart P03.
+
+Complete all P03-R05 A-C requirements: captured-session identity through intake, durable mutation and reply dispatch; atomic cleanup versus dismiss/recheck and bounded blocked-database shutdown; automatic provider replacement, explicit settings/evidence revision and late-result assertions, and failure-path socket cleanup. The idle-to-later-session test in internal/app/p03_r04_review_test.go fails; the captured-old-session test passes. Preserve/promote both and keep all prior passing coverage. Timestamp comparisons do not replace session identity. A separate read then unconditional write does not prove atomic cleanup ownership.
+
+Complete every named boundary with a test name and executed result. Do not repeat the same missing local checks as approved deferrals. Report a concrete failing prerequisite if genuinely blocked. Preserve the now-passing active HTTP/SSE shutdown, local protocol success, SQLite evidence and OBS request allowlist.
+
+No specification changes, dependencies/services, OBS writes, P04 code, UI redesign, new agents or Git/GitHub mutations. Background-only computer access; no live OBS configuration changes. Live Twitch remains deferred under D30/issue #6: no account work or real chat. Fixtures are not live evidence.
+
+Run focused tests, then full Go tests, vet, formatting, CGo-free build, all four Node fixtures, affected repeated lifecycle/protocol checks and configured WSL race. Append P03-R05 A-C evidence to handoffs/P03-worker-report.md; update implementation/P03-diagnostics.md. Preserve historical reports. Stop owned processes, transfer STATUS to Codex with ready_for_review or a concrete blocker and no writer, then stop editing. P04 remains held for release and recording.
+
+Return:
+"P03-R05 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R05.md and docs/execution/handoffs/P03-R04-review.md. Inspect actual changes and verify captured-session mutation/replies, atomic cleanup and the named provider/database/settings/protocol failure boundaries, preserving all prior regressions. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch stays deferred under D30/issue #6; P04 remains held for Codex release and recording."
+~~~
+
+## Historical: P03-R04 v1.0 — partial completion; use R05
 
 ~~~text
 Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R04 v1.0.
