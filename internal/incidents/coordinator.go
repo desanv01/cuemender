@@ -42,6 +42,7 @@ type job struct {
 	settings   domain.Settings
 	requestID  string
 	generation uint64
+	settled    bool
 }
 
 type Coordinator struct {
@@ -55,6 +56,7 @@ type Coordinator struct {
 
 	mu        sync.Mutex
 	opMu      sync.Mutex
+	gate      chan struct{}
 	session   *domain.MonitoringSessionInfo
 	jobs      map[string]*job
 	incidents map[string]domain.Incident
@@ -64,6 +66,11 @@ type Coordinator struct {
 }
 
 func New(opts Options) *Coordinator {
+	c, _ := NewChecked(opts)
+	return c
+}
+
+func NewChecked(opts Options) (*Coordinator, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
@@ -71,23 +78,37 @@ func New(opts Options) *Coordinator {
 		store: opts.Store, read: opts.Read, settings: opts.Settings, status: opts.Status,
 		reply: opts.Reply, onChange: opts.OnChange, now: opts.Now,
 		jobs: map[string]*job{}, incidents: map[string]domain.Incident{},
+		gate: make(chan struct{}, 1),
 	}
-	c.restart()
-	return c
+	if err := c.restart(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
-func (c *Coordinator) restart() {
+func (c *Coordinator) restart() error {
 	if c.store == nil {
-		return
+		return nil
 	}
 	ctx := context.Background()
-	_ = c.store.StopAllMonitoringSessions(ctx, c.now())
-	_ = c.store.PurgeCompletedIncidents(ctx, c.now())
-	_ = c.store.InterruptOpenIncidents(ctx, c.now())
-	for _, inc := range c.mustList(ctx) {
+	if err := c.store.StopAllMonitoringSessions(ctx, c.now()); err != nil {
+		return err
+	}
+	if err := c.store.PurgeCompletedIncidents(ctx, c.now()); err != nil {
+		return err
+	}
+	if err := c.store.InterruptOpenIncidents(ctx, c.now()); err != nil {
+		return err
+	}
+	list, err := c.store.ListRetainedIncidents(ctx)
+	if err != nil {
+		return err
+	}
+	for _, inc := range list {
 		c.incidents[inc.ID] = inc
 		c.order = append(c.order, inc.ID)
 	}
+	return nil
 }
 
 func (c *Coordinator) mustList(ctx context.Context) []domain.Incident {
@@ -98,9 +119,22 @@ func (c *Coordinator) mustList(ctx context.Context) []domain.Incident {
 	return list
 }
 
+func (c *Coordinator) acquire(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case c.gate <- struct{}{}:
+		return nil
+	}
+}
+
+func (c *Coordinator) release() { <-c.gate }
+
 func (c *Coordinator) Start(ctx context.Context, expectedRevision int64) (domain.MonitoringSessionInfo, error) {
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
+	if err := c.acquire(ctx); err != nil {
+		return domain.MonitoringSessionInfo{}, err
+	}
+	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -145,8 +179,10 @@ func (c *Coordinator) Start(ctx context.Context, expectedRevision int64) (domain
 }
 
 func (c *Coordinator) Stop(ctx context.Context) error {
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
+	if err := c.acquire(ctx); err != nil {
+		return err
+	}
+	defer c.release()
 	c.mu.Lock()
 	if c.session == nil || !c.session.Active {
 		jobs := make([]*job, 0, len(c.jobs))
@@ -157,12 +193,18 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		if len(jobs) == 0 {
 			return nil
 		}
+		updated := make([]domain.Incident, 0, len(jobs))
 		for _, job := range jobs {
 			job.cancel()
 			inc := job.incident
 			inc.Stage = domain.StageInterrupted
 			inc.UpdatedAt = c.now().UTC()
-			_ = c.store.SaveIncident(ctx, inc)
+			if err := c.store.SaveIncident(ctx, inc); err != nil {
+				return err
+			}
+			updated = append(updated, inc)
+		}
+		for _, inc := range updated {
 			c.setIncident(inc)
 		}
 		c.publish()
@@ -197,11 +239,9 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 }
 
 func (c *Coordinator) Close() {
-	c.opMu.Lock()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
-		c.opMu.Unlock()
 		return
 	}
 	c.closed = true
@@ -210,7 +250,6 @@ func (c *Coordinator) Close() {
 	}
 	c.jobs = map[string]*job{}
 	c.mu.Unlock()
-	c.opMu.Unlock()
 	c.wg.Wait()
 }
 
@@ -288,8 +327,10 @@ func (c *Coordinator) setIncident(inc domain.Incident) {
 // Check schedules one manual or join/recheck diagnostic job. It returns after
 // the incident is durably in investigating state, not after the OBS read.
 func (c *Coordinator) Check(ctx context.Context, category string, expectedRevision int64, incidentID string) (domain.Incident, error) {
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
+	if err := c.acquire(ctx); err != nil {
+		return domain.Incident{}, err
+	}
+	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -409,8 +450,10 @@ func (c *Coordinator) HandleIssue(ctx context.Context, category, deliveryID, mes
 }
 
 func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time) string {
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
+	if err := c.acquire(ctx); err != nil {
+		return ""
+	}
+	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -434,7 +477,7 @@ func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, m
 	}
 	c.mu.Unlock()
 	ready := c.status()
-	if ready.TwitchGeneration != 0 && generation != 0 && generation != ready.TwitchGeneration {
+	if !ready.TwitchConnected || ready.TwitchGeneration == 0 || generation != ready.TwitchGeneration {
 		return ""
 	}
 	incidentID, publicID := store.NewIncidentIDs()
@@ -463,8 +506,10 @@ func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID
 }
 
 func (c *Coordinator) HandleFeedbackAt(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time) string {
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
+	if err := c.acquire(ctx); err != nil {
+		return ""
+	}
+	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -491,7 +536,7 @@ func (c *Coordinator) HandleFeedbackAt(ctx context.Context, command, code, actor
 		return "CueMender ignored unknown or stale feedback."
 	}
 	ready := c.status()
-	if ready.TwitchGeneration != 0 && generation != 0 && generation != ready.TwitchGeneration {
+	if !ready.TwitchConnected || ready.TwitchGeneration == 0 || generation != ready.TwitchGeneration {
 		return "CueMender ignored feedback from a replaced Twitch connection."
 	}
 	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
@@ -514,8 +559,10 @@ func (c *Coordinator) HandleFeedbackAt(ctx context.Context, command, code, actor
 }
 
 func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.Incident, error) {
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
+	if err := c.acquire(ctx); err != nil {
+		return domain.Incident{}, err
+	}
+	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -586,10 +633,12 @@ func (c *Coordinator) run(request *job) {
 			Settings: request.settings, Discovery: discovery, Observation: observation, Now: c.now(),
 		}, request.incident.Category)
 	}
+	if err := c.acquire(request.ctx); err != nil {
+		return
+	}
+	defer c.release()
 	currentRevision := c.settings().Revision
 	ready := c.status()
-	c.opMu.Lock()
-	defer c.opMu.Unlock()
 	c.mu.Lock()
 	if c.closed || c.jobs[request.incident.Category] != request || request.ctx.Err() != nil {
 		c.mu.Unlock()
@@ -655,19 +704,42 @@ func (c *Coordinator) run(request *job) {
 		return
 	}
 	c.setIncident(current)
+	request.settled = true
 	c.publish()
 }
 
 func (c *Coordinator) finishJob(request *job) {
+	var interrupted *domain.Incident
 	c.mu.Lock()
+	if !request.settled {
+		if inc, ok := c.incidents[request.incident.ID]; ok && (inc.Stage == domain.StageReported || inc.Stage == domain.StageInvestigating) {
+			inc.Stage = domain.StageInterrupted
+			inc.UpdatedAt = c.now().UTC()
+			interrupted = &inc
+		}
+	}
 	if c.jobs[request.incident.Category] == request {
 		delete(c.jobs, request.incident.Category)
 	}
 	c.mu.Unlock()
+	if interrupted != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err := c.store.SaveIncident(ctx, *interrupted)
+		cancel()
+		if err == nil {
+			c.setIncident(*interrupted)
+		}
+	}
+	if !request.settled {
+		c.publish()
+	}
 }
 
 func (c *Coordinator) Invalidate(ctx context.Context, reason string) {
-	c.opMu.Lock()
+	if err := c.acquire(ctx); err != nil {
+		return
+	}
+	defer c.release()
 	c.mu.Lock()
 	jobs := make([]*job, 0, len(c.jobs))
 	for _, job := range c.jobs {
@@ -675,7 +747,6 @@ func (c *Coordinator) Invalidate(ctx context.Context, reason string) {
 	}
 	c.mu.Unlock()
 	if len(jobs) == 0 {
-		c.opMu.Unlock()
 		return
 	}
 	for _, job := range jobs {
@@ -692,7 +763,6 @@ func (c *Coordinator) Invalidate(ctx context.Context, reason string) {
 			}
 		}
 	}
-	c.opMu.Unlock()
 	c.publish()
 }
 

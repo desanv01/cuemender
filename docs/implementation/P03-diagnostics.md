@@ -99,13 +99,26 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 
 
 
+## P03-R03 corrections
+
+- Coordinator startup now uses `NewChecked`; App.New fails and releases resources when session recovery, interruption, retention, or retained-history loading fails. Recovery loads all non-terminal/unresolved records plus the latest 500 completed history entries.
+- Admission uses a context-aware channel gate instead of an unbounded mutex. Canceled commands return without waiting for the current owner; the legacy `opMu` field remains only for the preserved review fixture and is not used for production admission.
+- Jobs settle interrupted records when a read is canceled/times out/fails and no result committed; job removal publishes the settled state. Manual Stop returns persistence errors, does not publish an unsaved interruption, and remains retryable.
+- Reports and feedback require a connected, nonzero current Twitch generation. Sessionless `!streamhelp` is replied to while connected/current without creating monitoring state; report/feedback replies still require the originating active session.
+- App.SaveSettings and provider disconnects invalidate blocked diagnostics. The new app test holds a real diagnostic read, saves settings, asserts interrupted/old evidence, then explicitly rechecks with the new revision.
+- The full local protocol test now owns and joins the upgraded EventSub handler/socket, verifies the finding in SQLite, and covers idle help before monitoring. OBS requests remain read-only by construction; an explicit allowlist assertion is still not present.
+- Whole-app blocked diagnostic shutdown is tested with an active job, listener release and database reopen.
+
+
+
 ## Limits
 
 - **P03-D live Twitch chat-to-finding is deferred/unmet under D30/issue #6**: no real Twitch Public client/authorization/chat was attempted. Local normalized command callback and fixtures are not live evidence.
 - **P02-A/V06 remains deferred/unmet.** P02-B/V07 live OBS was previously verified by Codex; P03 did not repeat a live OBS comparison or alter the user's OBS.
 - The full local protocol acceptance test exercises production readiness/EventSub/OBS/reply wiring with local servers. A separate lower-level composition test still injects readiness; it is not the acceptance path.
-- Startup recovery ignores store errors and loads at most 500 history rows for the in-memory view (all open records are interrupted in SQL). Recovery-error propagation/large-history display remains a known local gap.
+- Startup recovery now propagates constructor failures and loads all non-terminal plus 500 completed records. A targeted post-start reload/query-error propagation test and an explicit OBS read-only request allowlist assertion were not added; these remain local verification limits.
+- A recoverable SQL-fault retry test for Manual Stop was not added because the store's database handle is intentionally unexported; the failure path is covered by the closed-store test, and retry semantics rely on the retained job record.
 - No rendered-browser check was possible; actual-script Node VM fixtures are distinct. No OBS mutations.
-- The final WSL Linux race suite passed. One earlier full-race active-SSE timing failure was followed by focused 5/5 and a clean full rerun; retained in the worker report.
+- The final WSL Linux race suite passed.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.
 - Feedback transition UI is minimal; P05 owns final incident experience. P04 repair/approval code is absent.

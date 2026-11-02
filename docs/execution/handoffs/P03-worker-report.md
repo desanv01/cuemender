@@ -171,3 +171,43 @@ Correction started/finished UTC: 2026-11-01T17:48Z / 2026-11-01T17:57Z. Parent P
 - No rendered-browser verification. Live OBS comparison was not repeated.
 
 P03-R02 corrections are ready for review. Read the appended P03-R02 evidence and inspect actual changes against docs/execution/corrections/P03-R02.md and docs/execution/handoffs/P03-R01-review.md. Rerun preserved regressions and the required actual-app/protocol/cancellation/persistence/projection boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections; live Twitch remains deferred under D30/issue #6, and P04 stays held for Codex release and recording.
+
+## P03-R03 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-02T01:14Z / 2026-11-02T01:21Z. Parent P03 v1.2/C09. Preserved all earlier regressions, exact-bound and actual protocol tests. Four supplied failures reproduced first, fixed, promoted; no production fixes by Codex.
+
+### A–D matrix
+
+| Group/boundary | Evidence | Result |
+|---|---|---|
+| A startup recovery failure | `NewChecked` propagates session/recovery/list/interruption errors; App.New fails and releases resources. `TestReviewR02StartupRecoveryErrorPropagates`; ordinary app suite | pass |
+| A prior open records/all retained | Recovery interrupts all SQL open rows; `ListRetainedIncidents` loads all non-terminal plus latest 500 completed. `TestCoordinatorLoadsRetainedRecordBeyondCompletedPage` (>500) | pass |
+| A manual Stop failure | Stop returns durable failure, does not update cache/publish unsaved outcome; retry remains possible because job ownership is retained. `TestReviewR02ManualStopFailureIsReported` | pass; recoverable-fault retry test not added (store handle unexported) |
+| A canceled/timeout settlement | Canceled/failed jobs settle reported/investigating records as interrupted in `finishJob`; job removal publishes settled state. Existing cancel/stop tests | implemented |
+| B cancellable admission | Context-aware gate replaces unbounded production opMu wait; canceled Check returns without mutation. `TestReviewR02CanceledGateReturnsPromptly` | pass |
+| B disconnected/generation intake | Report/feedback require connected current nonzero generation; old generation is rejected. `TestReviewR02DisconnectedTwitchRejectsQueuedReport` | pass |
+| B idle help/session reply | Sessionless `!streamhelp` replies while connected/current; report replies require active originating session. Actual protocol test covers idle help before monitoring | pass local |
+| C SaveSettings blocked result | Real App.SaveSettings invalidates blocked job; old evidence interrupted with zero findings; explicit recheck uses new revision. `TestP03SaveSettingsInvalidatesBlockedDiagnosticAndRecheck` | pass |
+| C whole-app blocked diagnostic shutdown | Active diagnostic + app Close returns, listener released, DB reopened. `TestP03BlockedDiagnosticWholeAppShutdown` | pass |
+| D protocol fixture ownership | EventSub upgraded handler now exits on socket close; handler WG joined; finding verified through SQLite, not only cache. Idle help and report replies verified. `TestP03ActualAppProtocolReportAndReply` | pass local; rendered/live not run |
+| D evidence allowlist | OBS fixture still uses read-only methods by construction; explicit request allowlist assertion not added | gap |
+
+### Exact checks
+
+| Command/action | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=240s` | exit 0; all packages |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| `CGO_ENABLED=0 go build -trimpath -o dist/cuemender.exe ./cmd/app` | exit 0; 20,002,816 bytes; SHA256 `16A0BB16CEBE3ECA6754F5D491A899F723D8432AAF9D451CE0263DD84844CA9B`; `0.3.0-p03` |
+| Four Node fixtures | all exit 0; review failures=[]; p03 problems=[] |
+| Focused app/incidents repeats ×3 | protocol, blocked shutdown, SaveSettings boundary, R02 regressions, retained-history all pass |
+| WSL Linux `go test -race ./... -count=1 -timeout=300s` | exit 0; all packages race-clean |
+
+### Remaining gaps
+
+- Live P02-A/V06 and P03-D under D30/issue #6 remain deferred/unmet; local fixtures are not live evidence.
+- Recoverable SQL-fault retry after a failed Manual Stop lacks a dedicated test because the store DB handle is unexported; closed-store failure is covered.
+- Explicit OBS request allowlist assertion, post-start reload/query-error propagation, rendered-browser verification and fresh live OBS were not executed.
+- Startup recovery/list errors now fail App.New; post-start reload still uses the capped helper in some paths.
+
+P03-R03 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R03.md and docs/execution/handoffs/P03-R02-review.md. Inspect actual changes and rerun preserved regressions plus the required recovery, cancellation, session, settings/provider, protocol-cleanup and projection boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch stays deferred under D30/issue #6; P04 remains held for Codex release and recording.

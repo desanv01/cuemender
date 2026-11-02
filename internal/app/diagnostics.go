@@ -77,6 +77,14 @@ func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 		}
 	}
 	if strings.TrimSpace(reply) != "" {
+		tw := a.twitchMgr.Snapshot()
+		if tw.Status != domain.ConnectionConnected || event.ConnectionGeneration == 0 || tw.ConnectionGeneration != event.ConnectionGeneration {
+			return
+		}
+		if event.Command.Kind == twitch.CommandStreamHelp {
+			_ = a.twitchMgr.EnqueueReplyFor(event.ConnectionGeneration, reply)
+			return
+		}
 		session := a.coordinator.ActiveSession()
 		if session != nil && session.Active && !event.ReceivedAt.Before(session.StartedAt) {
 			_ = a.twitchMgr.EnqueueReplyFor(event.ConnectionGeneration, reply)

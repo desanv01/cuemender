@@ -8,6 +8,7 @@ import (
 	"net"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -59,6 +60,157 @@ func (d p03Dialer) Connect(context.Context, string, string) (obs.Backend, error)
 	return d.backend, nil
 }
 
+type blockingBackend struct {
+	p03Backend
+	entered chan struct{}
+	block   atomic.Bool
+}
+
+func (b *blockingBackend) InputMute(ctx context.Context, ref domain.InputRef) (*bool, error) {
+	if !b.block.Load() {
+		return b.p03Backend.InputMute(ctx, ref)
+	}
+	close(b.entered)
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestP03SaveSettingsInvalidatesBlockedDiagnosticAndRecheck(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	backend := &blockingBackend{entered: make(chan struct{})}
+	a, err := newWithDependencies(context.Background(), Options{
+		DataDir: t.TempDir(), ListenAddress: fmt.Sprintf("127.0.0.1:%d", port),
+		NoBrowser: true, SessionOnlySecrets: true, Stdout: io.Discard, Stderr: io.Discard,
+	}, appDependencies{
+		configureOBS: func(opts *obs.Options) { opts.Dialer = blockingDialer{backend: backend} },
+		monitoringStatus: func() incidents.Readiness {
+			return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	ctx := context.Background()
+	track := 2
+	settings, err := a.SaveSettings(ctx, 0, domain.Expectations{Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid", Context: "Collection"}, StreamTrack: &track})
+	if err != nil {
+		t.Fatal(err)
+	}
+	password := ""
+	if err := a.OBSConnect(ctx, "ws://127.0.0.1:4455", &password); err != nil {
+		t.Fatal(err)
+	}
+	waitP03Obs(t, a)
+	backend.block.Store(true)
+	if _, err := a.StartMonitoring(ctx, settings.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CheckIncident(ctx, "audio", settings.Revision, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-backend.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("diagnostic did not block")
+	}
+	updated, err := a.SaveSettings(ctx, settings.Revision, domain.Expectations{Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid", Context: "Collection"}, StreamTrack: &track})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, list := a.coordinator.Snapshot()
+	if len(list) == 0 || list[0].Stage != domain.StageInterrupted || len(list[0].Findings) != 0 {
+		t.Fatalf("stale blocked result was not invalidated: %+v", list)
+	}
+	backend.block.Store(false)
+	if _, err := a.CheckIncident(ctx, "audio", updated.Revision, list[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		got, _ := a.coordinator.Find(list[0].ID)
+		if len(got.Findings) > 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("explicit recheck after settings change did not diagnose")
+}
+
+func TestP03BlockedDiagnosticWholeAppShutdown(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	dataDir := t.TempDir()
+	backend := &blockingBackend{entered: make(chan struct{})}
+	a, err := newWithDependencies(context.Background(), Options{
+		DataDir: dataDir, ListenAddress: fmt.Sprintf("127.0.0.1:%d", port),
+		NoBrowser: true, SessionOnlySecrets: true, Stdout: io.Discard, Stderr: io.Discard,
+	}, appDependencies{
+		configureOBS: func(opts *obs.Options) { opts.Dialer = blockingDialer{backend: backend} },
+		monitoringStatus: func() incidents.Readiness {
+			return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	track := 2
+	if _, err := a.SaveSettings(ctx, 0, domain.Expectations{Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid", Context: "Collection"}, StreamTrack: &track}); err != nil {
+		t.Fatal(err)
+	}
+	password := ""
+	if err := a.OBSConnect(ctx, "ws://127.0.0.1:4455", &password); err != nil {
+		t.Fatal(err)
+	}
+	waitP03Obs(t, a)
+	backend.block.Store(true)
+	if _, err := a.StartMonitoring(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CheckIncident(ctx, "audio", 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-backend.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("diagnostic did not reach blocked observation")
+	}
+	closed := make(chan struct{})
+	go func() { a.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(3 * time.Second):
+		t.Fatal("whole-app shutdown blocked on diagnostic")
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	ln, err = net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("listener not released: %v", err)
+	}
+	_ = ln.Close()
+	db, err := store.Open(ctx, filepath.Join(dataDir, databaseFileName))
+	if err != nil {
+		t.Fatalf("database not reopenable: %v", err)
+	}
+	_ = db.Close()
+}
+
+type blockingDialer struct{ backend obs.Backend }
+
+func (d blockingDialer) Connect(context.Context, string, string) (obs.Backend, error) {
+	return d.backend, nil
+}
+
 func waitP03Obs(t *testing.T, a *App) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
@@ -85,7 +237,7 @@ func TestP03ApplicationWiringPersistsIncidentAndRestart(t *testing.T) {
 	}, appDependencies{
 		configureOBS: func(opts *obs.Options) { opts.Dialer = p03Dialer{backend: p03Backend{}} },
 		monitoringStatus: func() incidents.Readiness {
-			return incidents.Readiness{TwitchConnected: true, OBSConnected: true, ResolutionReady: true}
+			return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
 		},
 	})
 	if err != nil {
@@ -109,6 +261,7 @@ func TestP03ApplicationWiringPersistsIncidentAndRestart(t *testing.T) {
 	}
 	a.onTwitchCommand(twitch.CommandEvent{
 		ActorID: "viewer-1", DeliveryID: "delivery-1", MessageID: "message-1",
+		ConnectionGeneration: 1, ReceivedAt: time.Now().UTC(),
 		Command: twitch.Command{Kind: twitch.CommandIssueAudio, Category: "audio"},
 	})
 	deadline := time.Now().Add(3 * time.Second)

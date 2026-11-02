@@ -2,6 +2,7 @@ package incidents
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -34,8 +35,10 @@ func coordinatorFixture(t *testing.T) (*Coordinator, *domain.Settings, *store.St
 				&domain.OBSObservation{Generation: 1, ConfigRevision: 1, SceneCollection: "Collection", ObservedAt: now, Microphone: &domain.InputRef{Name: "Mic", UUID: "mic"}, Mute: &mute, Tracks: tracks, ProgramScene: scene}, nil
 		},
 		Settings: func() domain.Settings { return *settings },
-		Status:   func() Readiness { return Readiness{TwitchConnected: true, OBSConnected: true, ResolutionReady: true} },
-		Now:      time.Now,
+		Status: func() Readiness {
+			return Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
+		},
+		Now: time.Now,
 	})
 	t.Cleanup(c.Close)
 	return c, settings, st
@@ -150,7 +153,9 @@ func TestCoordinatorStopRejectsLateBlockedRead(t *testing.T) {
 			return nil, nil, context.Canceled
 		},
 		Settings: func() domain.Settings { return settings },
-		Status:   func() Readiness { return Readiness{TwitchConnected: true, OBSConnected: true, ResolutionReady: true} },
+		Status: func() Readiness {
+			return Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
+		},
 	})
 	defer c.Close()
 	if _, err := c.Start(context.Background(), 1); err != nil {
@@ -195,13 +200,13 @@ func TestCoordinatorFeedbackLatestVoteAndTerminalRejection(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.setIncident(inc)
-	if reply := c.HandleFeedback(ctx, "still_broken", inc.PublicID, "actor-1"); reply == "" {
+	if reply := c.HandleFeedbackAt(ctx, "still_broken", inc.PublicID, "actor-1", 1, time.Now()); reply == "" {
 		t.Fatal("negative feedback rejected")
 	}
 	if got, _ := c.Find(id); got.Feedback.Negative != 1 || got.Stage != domain.StageUnresolved {
 		t.Fatalf("negative feedback = %+v", got)
 	}
-	if reply := c.HandleFeedback(ctx, "fixed", inc.PublicID, "actor-1"); reply == "" {
+	if reply := c.HandleFeedbackAt(ctx, "fixed", inc.PublicID, "actor-1", 1, time.Now()); reply == "" {
 		t.Fatal("positive replacement rejected")
 	}
 	if got, _ := c.Find(id); got.Feedback.Positive != 1 || got.Feedback.Negative != 0 {
@@ -210,9 +215,43 @@ func TestCoordinatorFeedbackLatestVoteAndTerminalRejection(t *testing.T) {
 	if _, err := c.Dismiss(ctx, id); err != nil {
 		t.Fatal(err)
 	}
-	_ = c.HandleFeedback(ctx, "fixed", inc.PublicID, "actor-2")
+	_ = c.HandleFeedbackAt(ctx, "fixed", inc.PublicID, "actor-2", 1, time.Now())
 	if got, _ := c.Find(id); got.Feedback.Positive != 1 {
 		t.Fatal("terminal incident accepted new feedback")
+	}
+}
+
+func TestCoordinatorLoadsRetainedRecordBeyondCompletedPage(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "retained.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Now().UTC()
+	open, err := st.CreateManualIncident(ctx, "old-session", "audio", "open-incident", "CM-OPEN", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 510; i++ {
+		inc, err := st.CreateManualIncident(ctx, "old-session", "video", fmt.Sprintf("done-%03d", i), fmt.Sprintf("CM-D%03d", i), now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inc.Stage = domain.StageDismissed
+		if err := st.SaveIncident(ctx, inc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, err := NewChecked(Options{Store: st, Read: func(context.Context, domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+		return nil, nil, context.Canceled
+	}, Settings: func() domain.Settings { return domain.Settings{} }, Status: func() Readiness { return Readiness{} }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if got, ok := c.Find(open.ID); !ok || got.ID != open.ID {
+		t.Fatal("retained open record outside the completed-history page was not loaded")
 	}
 }
 
@@ -274,7 +313,9 @@ func TestCoordinatorStopCancelsManualJobWithoutSession(t *testing.T) {
 			return nil, nil, context.Canceled
 		},
 		Settings: func() domain.Settings { return settings },
-		Status:   func() Readiness { return Readiness{TwitchConnected: true, OBSConnected: true, ResolutionReady: true} },
+		Status: func() Readiness {
+			return Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
+		},
 	})
 	defer c.Close()
 	if _, err := c.Check(context.Background(), "audio", 1, ""); err != nil {

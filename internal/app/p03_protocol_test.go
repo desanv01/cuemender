@@ -81,9 +81,11 @@ func localOBSServer(t *testing.T) *httptest.Server {
 }
 
 type protocolChat struct {
-	welcome chan string
-	chat    chan string
-	replies chan string
+	welcome   chan string
+	help      chan string
+	chat      chan string
+	replies   chan string
+	handlerWG sync.WaitGroup
 }
 
 func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
@@ -119,9 +121,20 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 				if err != nil {
 					return
 				}
+				chat.handlerWG.Add(1)
+				defer chat.handlerWG.Done()
 				defer conn.Close()
 				_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "welcome", "message_type": "session_welcome", "message_timestamp": "2026-11-01T00:00:00Z"}, "payload": map[string]any{"session": map[string]any{"id": "session", "status": "connected", "keepalive_timeout_seconds": 30}}})
 				chat.welcome <- "ok"
+				select {
+				case <-chat.help:
+					_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "help-1", "message_type": "notification", "message_timestamp": "2026-11-01T00:00:00Z"}, "payload": map[string]any{
+						"subscription": map[string]any{"type": "channel.chat.message", "version": "1"},
+						"event":        map[string]any{"broadcaster_user_id": "user-1", "chatter_user_id": "user-2", "message_id": "help-message", "message_type": "text", "message": map[string]any{"text": "!streamhelp"}},
+					}})
+				case <-time.After(5 * time.Second):
+					return
+				}
 				select {
 				case <-chat.chat:
 					_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "delivery-1", "message_type": "notification", "message_timestamp": "2026-11-01T00:00:01Z"}, "payload": map[string]any{
@@ -130,7 +143,11 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 					}})
 				case <-time.After(5 * time.Second):
 				}
-				select {}
+				for {
+					if _, _, err := conn.ReadMessage(); err != nil {
+						return
+					}
+				}
 			}
 			http.NotFound(w, r)
 		}
@@ -153,7 +170,7 @@ func waitStatus(t *testing.T, f func() string, want string) {
 
 func TestP03ActualAppProtocolReportAndReply(t *testing.T) {
 	obsServer := localOBSServer(t)
-	chat := &protocolChat{welcome: make(chan string, 1), chat: make(chan string, 1), replies: make(chan string, 1)}
+	chat := &protocolChat{welcome: make(chan string, 1), help: make(chan string, 1), chat: make(chan string, 1), replies: make(chan string, 1)}
 	twitchServer := localTwitchServer(t, chat)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -197,6 +214,15 @@ func TestP03ActualAppProtocolReportAndReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitStatus(t, func() string { return a.twitchMgr.Snapshot().Status }, domain.ConnectionConnected)
+	chat.help <- "go"
+	select {
+	case help := <-chat.replies:
+		if !strings.Contains(help, "streamhelp") && !strings.Contains(help, "CueMender") {
+			t.Fatalf("unexpected idle help reply %q", help)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("idle !streamhelp did not receive a reply")
+	}
 	if _, err := a.StartMonitoring(ctx, settings.Revision); err != nil {
 		t.Fatal(err)
 	}
@@ -223,6 +249,10 @@ func TestP03ActualAppProtocolReportAndReply(t *testing.T) {
 	if !found {
 		t.Fatal("actual EventSub report did not create a persisted finding")
 	}
+	persisted, err := a.store.ListIncidents(ctx, 10)
+	if err != nil || len(persisted) == 0 || len(persisted[0].Findings) == 0 {
+		t.Fatalf("finding was not durable in SQLite: incidents=%d err=%v", len(persisted), err)
+	}
 	// The reply is bounded; allow the 3-second aggregate interval.
 	select {
 	case reply := <-chat.replies:
@@ -237,5 +267,13 @@ func TestP03ActualAppProtocolReportAndReply(t *testing.T) {
 	case <-runDone:
 	case <-time.After(3 * time.Second):
 		t.Fatal("app did not stop")
+	}
+	a.Close()
+	handlersDone := make(chan struct{})
+	go func() { chat.handlerWG.Wait(); close(handlersDone) }()
+	select {
+	case <-handlersDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("upgraded EventSub handler/socket did not join")
 	}
 }

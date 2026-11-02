@@ -255,7 +255,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 	a.obsMgr = obs.NewManager(obsOptions)
 	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
 	a.monitoringStatusOverride = deps.monitoringStatus
-	a.coordinator = incidents.New(incidents.Options{
+	coordinator, err := incidents.NewChecked(incidents.Options{
 		Store: st,
 		Read: func(ctx context.Context, snapshot domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
 			return a.obsMgr.DiagnosticRead(ctx, snapshot)
@@ -266,6 +266,11 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		OnChange: a.onIncidentUpdate,
 		Now:      a.now,
 	})
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	a.coordinator = coordinator
 
 	ui, err := httpui.New(httpui.Options{
 		Backend: a,

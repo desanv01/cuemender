@@ -136,6 +136,31 @@ func (s *Store) ListIncidents(ctx context.Context, limit int) ([]domain.Incident
 	return out, rows.Err()
 }
 
+// ListRetainedIncidents returns every non-terminal incident plus the latest
+// 500 completed history entries. C06's 500/30-day cap applies to completed
+// history, not to retained open/unresolved records.
+func (s *Store) ListRetainedIncidents(ctx context.Context) ([]domain.Incident, error) {
+	rows, err := s.db.QueryContext(ctx, incidentSelect+` WHERE stage NOT IN (?,?,?,?) OR id IN (
+		SELECT id FROM incidents WHERE stage IN (?,?,?,?)
+		ORDER BY julianday(updated_at) DESC, id DESC LIMIT 500
+	) ORDER BY julianday(updated_at) DESC, id DESC`,
+		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated,
+		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Incident, 0)
+	for rows.Next() {
+		inc, err := incidentFromRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, inc)
+	}
+	return out, rows.Err()
+}
+
 // AcceptReport atomically enforces durable delivery/message dedup, groups the
 // report into one active category incident, and records bounded reporter detail.
 func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryID, messageID, actorID string, incidentID, publicID string, now time.Time) (domain.Incident, bool, error) {
