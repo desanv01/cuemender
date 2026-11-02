@@ -11,7 +11,7 @@ narration: no
 ---
 
 ## Intent
-Silent, demo-first hackathon film for Codex x TwitchCon judges. Creator: Desan Vasu. Keep MajuPilot's authentic capture/HyperFrames assembly technique. The user rejected the first pale cut and explicitly selected the ErrataScope demo's exact theme, layout and animation system on 2026-11-02. Root authors; Sol6.1high audits read only. See REFERENCE-ANALYSIS.md and SPEC.md.
+Silent, demo-first film for Codex x TwitchCon Hackathon 2026 judges. Creator: Desan Vasu. Keep MajuPilot's authentic capture/HyperFrames assembly technique. The user rejected the first pale cut and explicitly selected the ErrataScope demo's exact theme, layout and animation system on 2026-11-02. Root authors; Sol6.1high audits read only. See REFERENCE-ANALYSIS.md and SPEC.md.
 
 ## Assets
 - ../../.tools/p04-recording/p04-build-01.mkv — actual Codex implementation footage (absolute source recorded in capture manifest).

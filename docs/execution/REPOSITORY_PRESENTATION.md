@@ -32,7 +32,7 @@ Use the same presentation pattern with original CueMender content:
 - Title: CueMender.
 - Suggested tagline: "Hear the report. Check the evidence. Approve the fix."
 - Description: community-assisted Twitch/OBS configuration diagnostics with explicit streamer approval.
-- Attribution: Codex x TwitchCon Hackathon; author Desan Vasu.
+- Attribution: Codex x TwitchCon Hackathon 2026; author Desan Vasu.
 - Jump links: Features, Demo, Get started, Built with Codex, Testing guide. Add video/download links only when the actual targets exist.
 - Hero: real private incident panel and/or public overlay, with a clear caption identifying live or rehearsal footage.
 - Feature grid: community reports, evidence-based checks, deliberate approval, one narrow correction, viewer feedback and isolated rehearsal. Publish each as implemented only after its acceptance evidence exists.
@@ -48,11 +48,11 @@ Use the same presentation pattern with original CueMender content:
 
 At the initial foundation-only publication, use an honest development description, for example:
 
-> Go foundation for community-assisted Twitch/OBS diagnostics | Codex x TwitchCon Hackathon
+> Go foundation for community-assisted Twitch/OBS diagnostics | Codex x TwitchCon Hackathon 2026
 
 When the required workflow is implemented and verified, update to:
 
-> Community-assisted Twitch and OBS diagnostics with streamer-approved repairs | Codex x TwitchCon Hackathon
+> Local Twitch chat-to-OBS diagnostics and isolated repair rehearsal | Codex x TwitchCon Hackathon 2026
 
 Suggested relevant topics: twitch, obs-studio, golang, streamers, stream-overlay, diagnostics, codex, hackathon. Use a verified project/demo URL for the homepage when one exists; no placeholder website.
 
