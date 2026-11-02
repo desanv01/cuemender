@@ -111,13 +111,25 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 
 
 
+## P03-R04 corrections
+
+- Runtime reload after stop/dismiss/retention uses retained loading (all non-terminal/unresolved plus latest 500 completed). Reload errors no longer replace cache with empty history.
+- Failed manual interruption is retained as pending durable work after the diagnostic exits; Stop retry settles the stored incident and refuses to overwrite newer terminal/recheck state.
+- Job cleanup conditionally settles only older investigating records, retains failed saves as pending, and publishes the settled job count after both success and failure.
+- Close cancels admission, waits for the current operation gate holder, then marks closed; no admitted Start/Check/report/feedback/dismiss commits after Close returns. Operation gate is context-aware.
+- Intake captures the monitoring session ID; queued report/feedback is dropped if that exact session is no longer active; replies require the same captured session plus current generation.
+- Result persistence uses a bounded owned timeout rather than an unbounded Background call.
+- The blocked-diagnostic shutdown test now runs the real HTTP server with active SSE before shutdown, then asserts joined shutdown, listener release and database reopen.
+- Settings invalidation/recheck remains covered; the protocol fixture asserts all observed OBS request types are in the read-only allowlist.
+
+
+
 ## Limits
 
 - **P03-D live Twitch chat-to-finding is deferred/unmet under D30/issue #6**: no real Twitch Public client/authorization/chat was attempted. Local normalized command callback and fixtures are not live evidence.
 - **P02-A/V06 remains deferred/unmet.** P02-B/V07 live OBS was previously verified by Codex; P03 did not repeat a live OBS comparison or alter the user's OBS.
 - The full local protocol acceptance test exercises production readiness/EventSub/OBS/reply wiring with local servers. A separate lower-level composition test still injects readiness; it is not the acceptance path.
-- Startup recovery now propagates constructor failures and loads all non-terminal plus 500 completed records. A targeted post-start reload/query-error propagation test and an explicit OBS read-only request allowlist assertion were not added; these remain local verification limits.
-- A recoverable SQL-fault retry test for Manual Stop was not added because the store's database handle is intentionally unexported; the failure path is covered by the closed-store test, and retry semantics rely on the retained job record.
+- Runtime retained reload, recoverable manual-stop retry and close/late-start boundaries are now covered. Automatic OBS disconnect/replacement, queued-report-across-stop/start, stale-feedback-after-replacement and close-while-database-admission-is-blocked lack dedicated named tests.
 - No rendered-browser check was possible; actual-script Node VM fixtures are distinct. No OBS mutations.
 - The final WSL Linux race suite passed.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.

@@ -11,19 +11,19 @@ import (
 
 func TestReviewR02CanceledGateReturnsPromptly(t *testing.T) {
 	c, _, _ := coordinatorFixture(t)
-	c.opMu.Lock()
+	c.gate <- struct{}{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	done := make(chan error, 1)
 	go func() { _, err := c.Check(ctx, "audio", 1, ""); done <- err }()
 	select {
 	case err := <-done:
-		c.opMu.Unlock()
+		<-c.gate
 		if err == nil {
 			t.Fatal("canceled check succeeded")
 		}
 	case <-time.After(150 * time.Millisecond):
-		c.opMu.Unlock()
+		<-c.gate
 		<-done
 		t.Fatal("canceled command waited for the operation gate instead of returning")
 	}

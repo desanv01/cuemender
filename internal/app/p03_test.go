@@ -1,11 +1,13 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -163,7 +165,30 @@ func TestP03BlockedDiagnosticWholeAppShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runDone := make(chan error, 1)
+	go func() { runDone <- a.Run(ctx) }()
+	waitHealthy(t, a.BaseURL())
+	sseResp, err := http.Get(a.BaseURL() + "/public/v1/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sseInitial := make(chan struct{})
+	go func() {
+		scanner := bufio.NewScanner(sseResp.Body)
+		for scanner.Scan() {
+			if strings.HasPrefix(scanner.Text(), "data: ") {
+				close(sseInitial)
+				break
+			}
+		}
+	}()
+	select {
+	case <-sseInitial:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no active SSE snapshot")
+	}
 	track := 2
 	if _, err := a.SaveSettings(ctx, 0, domain.Expectations{Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid", Context: "Collection"}, StreamTrack: &track}); err != nil {
 		t.Fatal(err)
@@ -186,19 +211,21 @@ func TestP03BlockedDiagnosticWholeAppShutdown(t *testing.T) {
 		t.Fatal("diagnostic did not reach blocked observation")
 	}
 	closed := make(chan struct{})
-	go func() { a.Close(); close(closed) }()
+	cancel()
+	go func() { <-runDone; close(closed) }()
 	select {
 	case <-closed:
 	case <-time.After(3 * time.Second):
 		t.Fatal("whole-app shutdown blocked on diagnostic")
 	}
+	_ = sseResp.Body.Close()
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	ln, err = net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatalf("listener not released: %v", err)
 	}
 	_ = ln.Close()
-	db, err := store.Open(ctx, filepath.Join(dataDir, databaseFileName))
+	db, err := store.Open(context.Background(), filepath.Join(dataDir, databaseFileName))
 	if err != nil {
 		t.Fatalf("database not reopenable: %v", err)
 	}

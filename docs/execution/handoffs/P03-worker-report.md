@@ -211,3 +211,46 @@ Correction started/finished UTC: 2026-11-02T01:14Z / 2026-11-02T01:21Z. Parent P
 - Startup recovery/list errors now fail App.New; post-start reload still uses the capped helper in some paths.
 
 P03-R03 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R03.md and docs/execution/handoffs/P03-R02-review.md. Inspect actual changes and rerun preserved regressions plus the required recovery, cancellation, session, settings/provider, protocol-cleanup and projection boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch stays deferred under D30/issue #6; P04 remains held for Codex release and recording.
+
+## P03-R04 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-02T01:44Z / 2026-11-02T01:48Z. Preserved R03 improvements. Four supplied failures reproduced first, fixed; all five review tests promoted to ordinary coverage. No production fixes by Codex.
+
+### A–C matrix
+
+| Group/boundary | Evidence | Result |
+|---|---|---|
+| A retained reload after dismiss | `reload` now uses `ListRetainedIncidents` and swaps cache only on success; dismiss/stop surface reload errors. `TestReviewR03RetainedHistorySurvivesDismissReload` (502 retained) | pass |
+| A recoverable manual-stop retry | Failed interruption retained in `pending` after worker exit; retry re-reads current durable stage, avoids overwriting newer work, settles interrupted. `TestReviewR03ManualStopRetriesAfterRecoverableSQLFault` using second SQLite connection/trigger | pass |
+| A settled job publication | `finishJob` publishes after success and failure; `ActiveJobs` is zero in final publication. `TestReviewR03SuccessfulJobPublishesSettledCount` | pass |
+| A cleanup synchronization | `finishJob` re-reads durable incident, skips terminal/newer investigating state, retains failed saves as pending | implemented; concurrent dismiss/recheck-specific test not added |
+| B production gate cancellation | Context-aware gate; obsolete opMu removed and old occupied-gate test now holds real gate. `TestReviewR03CanceledProductionGateReturns`, adapted `TestReviewR02CanceledGateReturnsPromptly` | pass |
+| B Close admission | Close cancels admission, waits for gate holder, marks closed; no commit/publication after Close returns. `TestReviewR03ClosePreventsLateStartCommit` | pass |
+| B originating session | Command envelope captures monitoring session ID; queued report/feedback dropped if that exact session is inactive; replies recheck same session plus generation; idle help stays sessionless. Protocol test covers idle help/report. Dedicated stale-feedback/queue-across-restart test not added | implemented/partial evidence |
+| B bounded persistence | Result save uses 3s owned timeout; cleanup uses 2s bounded context; Close joins workers | implemented |
+| C active HTTP/SSE shutdown | `TestP03BlockedDiagnosticWholeAppShutdown` now runs App.Run, establishes active SSE snapshot, cancels with blocked diagnostic, asserts shutdown/listener release/DB reopen | pass |
+| C settings/recheck | `TestP03SaveSettingsInvalidatesBlockedDiagnosticAndRecheck` covers blocked result invalidation and explicit recheck; evidence revision assertion is implicit in findings, not separately asserted | pass/partial |
+| C OBS read-only allowlist | Protocol OBS fixture records every request; test fails any type outside the read-only allowlist | pass |
+| C protocol ownership | EventSub upgraded handler/socket joined; finding verified in SQLite; idle help and report replies. Failure-path upgraded-socket test not added | pass happy path |
+
+### Exact checks
+
+| Command/action | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=300s` | exit 0; all packages |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| `CGO_ENABLED=0 go build -trimpath -o dist/cuemender.exe ./cmd/app` | exit 0; 20,007,936 bytes; SHA256 `A35895C31D6A059CF2970EAAF428E27049BB4E9F1B68A0A92CF6C7236BCB396D`; `0.3.0-p03` |
+| Four Node fixtures | all exit 0; review failures=[]; p03 problems=[] |
+| R04/R03 protocol/lifecycle repeats ×3 | review tests, protocol, SSE shutdown and settings boundary pass |
+| WSL Linux `go test -race ./... -count=1 -timeout=360s` | exit 0; all packages race-clean |
+
+### Remaining named gaps
+
+- No dedicated automatic OBS disconnect/replacement test (manual Disconnect invalidation is covered).
+- No dedicated queued-report-across-stop/start, stale-feedback-after-replacement, or Close-while-database-admission-blocked test; session-ID capture/validation is implemented.
+- No dedicated concurrent cleanup/dismiss/recheck test; conditional durable-stage check is implemented.
+- No EventSub upgraded-socket failure-path cleanup test; happy-path join is covered.
+- SaveSettings test does not separately assert the evidence revision field.
+- No rendered-browser or fresh live OBS check. Live P02-A/V06 and P03-D remain deferred under D30/issue #6.
+
+P03-R04 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R04.md and docs/execution/handoffs/P03-R03-review.md. Inspect actual changes and rerun preserved regressions plus retained-state, recoverable-fault, close/session ownership, publication and required actual-app/protocol boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch remains deferred under D30/issue #6; P04 stays held for Codex release and recording.

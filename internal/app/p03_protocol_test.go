@@ -19,6 +19,17 @@ import (
 	gorilla "github.com/gorilla/websocket"
 )
 
+var (
+	p03ObsMu       sync.Mutex
+	p03ObsRequests []string
+)
+
+func recordOBSRequest(name string) {
+	p03ObsMu.Lock()
+	p03ObsRequests = append(p03ObsRequests, name)
+	p03ObsMu.Unlock()
+}
+
 func localOBSServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +56,7 @@ func localOBSServer(t *testing.T) *httptest.Server {
 				return
 			}
 			data := map[string]any{}
+			recordOBSRequest(request.D.Type)
 			switch request.D.Type {
 			case "GetVersion":
 				data = map[string]any{"obsVersion": "32.1.1", "obsWebSocketVersion": "5.7.3", "rpcVersion": 1}
@@ -169,6 +181,9 @@ func waitStatus(t *testing.T, f func() string, want string) {
 }
 
 func TestP03ActualAppProtocolReportAndReply(t *testing.T) {
+	p03ObsMu.Lock()
+	p03ObsRequests = nil
+	p03ObsMu.Unlock()
 	obsServer := localOBSServer(t)
 	chat := &protocolChat{welcome: make(chan string, 1), help: make(chan string, 1), chat: make(chan string, 1), replies: make(chan string, 1)}
 	twitchServer := localTwitchServer(t, chat)
@@ -269,6 +284,21 @@ func TestP03ActualAppProtocolReportAndReply(t *testing.T) {
 		t.Fatal("app did not stop")
 	}
 	a.Close()
+	p03ObsMu.Lock()
+	requests := append([]string(nil), p03ObsRequests...)
+	p03ObsMu.Unlock()
+	allowed := map[string]bool{
+		"GetVersion": true, "GetInputList": true, "GetSceneList": true,
+		"GetSceneItemList": true, "GetSceneCollectionList": true,
+		"GetCurrentProgramScene": true, "GetInputMute": true,
+		"GetInputAudioTracks": true, "GetSceneItemEnabled": true,
+		"GetStreamStatus": true,
+	}
+	for _, request := range requests {
+		if !allowed[request] {
+			t.Fatalf("unexpected OBS request outside read-only allowlist: %s", request)
+		}
+	}
 	handlersDone := make(chan struct{})
 	go func() { chat.handlerWG.Wait(); close(handlersDone) }()
 	select {

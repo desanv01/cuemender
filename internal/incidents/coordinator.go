@@ -55,8 +55,10 @@ type Coordinator struct {
 	now      func() time.Time
 
 	mu        sync.Mutex
-	opMu      sync.Mutex
 	gate      chan struct{}
+	opCtx     context.Context
+	opCancel  context.CancelFunc
+	pending   map[string]domain.Incident
 	session   *domain.MonitoringSessionInfo
 	jobs      map[string]*job
 	incidents map[string]domain.Incident
@@ -78,8 +80,10 @@ func NewChecked(opts Options) (*Coordinator, error) {
 		store: opts.Store, read: opts.Read, settings: opts.Settings, status: opts.Status,
 		reply: opts.Reply, onChange: opts.OnChange, now: opts.Now,
 		jobs: map[string]*job{}, incidents: map[string]domain.Incident{},
-		gate: make(chan struct{}, 1),
+		pending: map[string]domain.Incident{},
+		gate:    make(chan struct{}, 1),
 	}
+	c.opCtx, c.opCancel = context.WithCancel(context.Background())
 	if err := c.restart(); err != nil {
 		return nil, err
 	}
@@ -111,18 +115,21 @@ func (c *Coordinator) restart() error {
 	return nil
 }
 
-func (c *Coordinator) mustList(ctx context.Context) []domain.Incident {
-	list, err := c.store.ListIncidents(ctx, 500)
-	if err != nil {
-		return nil
-	}
-	return list
-}
-
 func (c *Coordinator) acquire(ctx context.Context) error {
+	var opDone <-chan struct{}
+	if c.opCtx != nil {
+		opDone = c.opCtx.Done()
+		select {
+		case <-opDone:
+			return context.Canceled
+		default:
+		}
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-opDone:
+		return context.Canceled
 	case c.gate <- struct{}{}:
 		return nil
 	}
@@ -184,40 +191,65 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 	}
 	defer c.release()
 	c.mu.Lock()
-	if c.session == nil || !c.session.Active {
-		jobs := make([]*job, 0, len(c.jobs))
-		for _, job := range c.jobs {
-			jobs = append(jobs, job)
+	pending := make(map[string]domain.Incident, len(c.pending))
+	for id, inc := range c.pending {
+		pending[id] = inc
+	}
+	active := c.session != nil && c.session.Active
+	sessionID := ""
+	if active {
+		sessionID = c.session.ID
+	}
+	jobs := make([]*job, 0, len(c.jobs))
+	for _, job := range c.jobs {
+		jobs = append(jobs, job)
+	}
+	c.mu.Unlock()
+	for id, inc := range pending {
+		if current, err := c.store.GetIncident(ctx, id); err == nil {
+			if current.Stage != domain.StageReported && current.Stage != domain.StageInvestigating {
+				c.mu.Lock()
+				delete(c.pending, id)
+				c.mu.Unlock()
+				continue
+			}
+			inc = current
 		}
+		inc.Stage = domain.StageInterrupted
+		inc.UpdatedAt = c.now().UTC()
+		if err := c.store.SaveIncident(ctx, inc); err != nil {
+			return err
+		}
+		c.mu.Lock()
+		delete(c.pending, id)
 		c.mu.Unlock()
+		c.setIncident(inc)
+	}
+	if !active {
 		if len(jobs) == 0 {
+			if len(pending) > 0 {
+				c.publish()
+			}
 			return nil
 		}
-		updated := make([]domain.Incident, 0, len(jobs))
 		for _, job := range jobs {
 			job.cancel()
 			inc := job.incident
 			inc.Stage = domain.StageInterrupted
 			inc.UpdatedAt = c.now().UTC()
 			if err := c.store.SaveIncident(ctx, inc); err != nil {
+				c.mu.Lock()
+				c.pending[inc.ID] = inc
+				c.mu.Unlock()
 				return err
 			}
-			updated = append(updated, inc)
-		}
-		for _, inc := range updated {
 			c.setIncident(inc)
 		}
 		c.publish()
 		return nil
 	}
-	id := c.session.ID
 	now := c.now().UTC()
-	jobs := make([]*job, 0, len(c.jobs))
-	for _, job := range c.jobs {
-		jobs = append(jobs, job)
-	}
-	c.mu.Unlock()
-	if err := c.store.StopMonitoringSession(ctx, id, now); err != nil {
+	if err := c.store.StopMonitoringSession(ctx, sessionID, now); err != nil {
 		return err
 	}
 	if err := c.store.InterruptOpenIncidents(ctx, now); err != nil {
@@ -225,7 +257,7 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 	}
 	_ = c.store.PurgeCompletedIncidents(ctx, now)
 	c.mu.Lock()
-	if c.session != nil && c.session.ID == id {
+	if c.session != nil && c.session.ID == sessionID {
 		c.session.Active = false
 		c.session.StoppedAt = &now
 	}
@@ -233,12 +265,25 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		job.cancel()
 	}
 	c.mu.Unlock()
-	c.reload()
+	if err := c.reload(); err != nil {
+		return err
+	}
 	c.publish()
 	return nil
 }
 
 func (c *Coordinator) Close() {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return
+	}
+	c.mu.Unlock()
+	if c.opCancel != nil {
+		c.opCancel()
+	}
+	c.gate <- struct{}{}
+	defer c.release()
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -294,19 +339,25 @@ func copyIncident(inc domain.Incident) domain.Incident {
 	return out
 }
 
-func (c *Coordinator) reload() {
+func (c *Coordinator) reload() error {
 	if c.store == nil {
-		return
+		return nil
 	}
-	list := c.mustList(context.Background())
-	c.mu.Lock()
-	c.incidents = map[string]domain.Incident{}
-	c.order = c.order[:0]
+	list, err := c.store.ListRetainedIncidents(context.Background())
+	if err != nil {
+		return err
+	}
+	incidents := make(map[string]domain.Incident, len(list))
+	order := make([]string, 0, len(list))
 	for _, inc := range list {
-		c.incidents[inc.ID] = inc
-		c.order = append(c.order, inc.ID)
+		incidents[inc.ID] = inc
+		order = append(order, inc.ID)
 	}
+	c.mu.Lock()
+	c.incidents = incidents
+	c.order = order
 	c.mu.Unlock()
+	return nil
 }
 
 func (c *Coordinator) publish() {
@@ -590,7 +641,9 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 	}
 	c.setIncident(out)
 	_ = c.store.PurgeCompletedIncidents(ctx, c.now().UTC())
-	c.reload()
+	if err := c.reload(); err != nil {
+		return out, err
+	}
 	c.publish()
 	return out, nil
 }
@@ -699,7 +752,10 @@ func (c *Coordinator) run(request *job) {
 		current.Streaming = observation.Streaming
 	}
 	current.RepairAvailable = false
-	if err := c.store.SaveIncident(context.Background(), current); err != nil {
+	saveCtx, saveCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	err := c.store.SaveIncident(saveCtx, current)
+	saveCancel()
+	if err != nil {
 		c.publish()
 		return
 	}
@@ -723,16 +779,27 @@ func (c *Coordinator) finishJob(request *job) {
 	}
 	c.mu.Unlock()
 	if interrupted != nil {
+		if current, err := c.store.GetIncident(context.Background(), interrupted.ID); err == nil {
+			if current.Stage != domain.StageReported && current.Stage != domain.StageInvestigating {
+				interrupted = nil
+			} else if current.Stage == domain.StageInvestigating && current.UpdatedAt.After(request.incident.UpdatedAt) {
+				interrupted = nil
+			}
+		}
+	}
+	if interrupted != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		err := c.store.SaveIncident(ctx, *interrupted)
 		cancel()
 		if err == nil {
 			c.setIncident(*interrupted)
+		} else {
+			c.mu.Lock()
+			c.pending[interrupted.ID] = *interrupted
+			c.mu.Unlock()
 		}
 	}
-	if !request.settled {
-		c.publish()
-	}
+	c.publish()
 }
 
 func (c *Coordinator) Invalidate(ctx context.Context, reason string) {

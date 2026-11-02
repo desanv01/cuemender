@@ -49,6 +49,11 @@ func (a *App) onIncidentUpdate() {
 }
 
 func (a *App) onTwitchCommand(event twitch.CommandEvent) {
+	if a.coordinator != nil && (event.Command.Kind == twitch.CommandIssueAudio || event.Command.Kind == twitch.CommandIssueVideo || event.Command.Kind == twitch.CommandFixed || event.Command.Kind == twitch.CommandStillBroken) {
+		if session := a.coordinator.ActiveSession(); session != nil && session.Active {
+			event.MonitoringSessionID = session.ID
+		}
+	}
 	select {
 	case a.intakeCh <- event:
 	default:
@@ -60,6 +65,12 @@ func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 	ctx := a.intakeCtx
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if event.MonitoringSessionID != "" {
+		session := a.coordinator.ActiveSession()
+		if session == nil || !session.Active || session.ID != event.MonitoringSessionID {
+			return
+		}
 	}
 	reply := ""
 	switch event.Command.Kind {
