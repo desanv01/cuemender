@@ -1,7 +1,7 @@
 # P04 — One approved correction
 
-Revision: 1.2 • PLANNED / HELD — RESERVED FOR CODEX
-Implementer: Codex in the current main chat; no DeepSeek implementation dispatch.
+Revision: 1.3 • RELEASED — CODEX, see STATUS for sole writer
+Implementer: Codex in this main chat with user-requested GPT-6.1 Sol high subagents; one production writer at a time, no DeepSeek dispatch.
 Dispatch requires: P03 accepted, exact goobs track-update method and serialization behavior verified, explicit STATUS release.
 This is the most correctness-sensitive packet. Narrow scope is intentional.
 
@@ -85,3 +85,11 @@ P04-D: Public/private text separates local verification, remaining findings and 
 P04-E: No alternate route or adapter call bypasses the approval boundary.
 
 Codex writes handoffs/P04-codex-build.md with implemented paths, tests, exact commands, live-vs-fixture evidence, actual session reference when available, and a small real-run reproduction. Codex then records acceptance evidence in handoffs/P04-review.md, checking every path capable of issuing OBS writes before releasing P05. This is verification of Codex's own implementation, not an independent code review. Required real checks remain required; absent evidence is not filled in for submission.
+
+## P04 release clarification — D32 (2026-11-02)
+
+Recording test is verified with FFmpeg Windows Graphics Capture, 1920x1034 at 15 fps, silent. Actual build recording begins before production edits. SDK SetInputAudioTracks accepts a nonnil map and preserves false values; convert track1..track6 to numeric wire keys 1..6. Require exact complete preflight maps and fresh identity/context. Use a narrow mutation capability, not a raw RPC route.
+
+Keep C06 active monitoring, mode/session, revision/generation and expiry checks. With live Twitch deferred, a complete real private-UI approval trial may remain blocked by readiness; do not weaken product gates to manufacture live evidence. Local protocol fixtures remain independent work. Record any real OBS adapter trial separately from full-product/live-Twitch acceptance.
+
+Implementation ordering: narrow OBS adapter and protocol checks first; then action persistence/engine/coordinator/app/UI integration; then focused independent peer inspection and root self-verification. Exactly one writer. Root owns contract decisions, Git and acceptance. Shared source mutations during diagnostics, dismissal, stop, settings and provider replacement must participate in a common authority boundary for reservation and final dispatch; never hold a coordinator/state mutex across provider network waits. Persist intent before dispatch; once dispatch is claimed, treat interruption conservatively as potentially sent and never automatically replay. An action remains auditable after monitoring stop.

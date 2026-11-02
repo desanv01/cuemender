@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/desanv01/cuemender/internal/actions"
 	"github.com/desanv01/cuemender/internal/diagnostics"
 	"github.com/desanv01/cuemender/internal/domain"
 	"github.com/desanv01/cuemender/internal/store"
@@ -18,6 +19,7 @@ const (
 )
 
 type Readiness struct {
+	OBSContext       string
 	TwitchConnected  bool
 	OBSConnected     bool
 	ResolutionReady  bool
@@ -26,13 +28,15 @@ type Readiness struct {
 }
 
 type Options struct {
-	Store    *store.Store
-	Read     func(context.Context, domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error)
-	Settings func() domain.Settings
-	Status   func() Readiness
-	Reply    func(string) bool
-	OnChange func()
-	Now      func() time.Time
+	Repair    func(context.Context, domain.TrackRepairRequest, func(domain.TrackRepairPreflight) error) domain.TrackRepairResult
+	ReadTrack func(context.Context, domain.TrackStateRequest) (domain.TrackState, error)
+	Store     *store.Store
+	Read      func(context.Context, domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error)
+	Settings  func() domain.Settings
+	Status    func() Readiness
+	Reply     func(string) bool
+	OnChange  func()
+	Now       func() time.Time
 }
 
 type job struct {
@@ -46,13 +50,19 @@ type job struct {
 }
 
 type Coordinator struct {
-	store    *store.Store
-	read     func(context.Context, domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error)
-	settings func() domain.Settings
-	status   func() Readiness
-	reply    func(string) bool
-	onChange func()
-	now      func() time.Time
+	repair        func(context.Context, domain.TrackRepairRequest, func(domain.TrackRepairPreflight) error) domain.TrackRepairResult
+	readTrack     func(context.Context, domain.TrackStateRequest) (domain.TrackState, error)
+	proposals     map[string]domain.Proposal
+	actions       map[string]domain.Action
+	actionRunning bool
+	reconcileCh   chan struct{}
+	store         *store.Store
+	read          func(context.Context, domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error)
+	settings      func() domain.Settings
+	status        func() Readiness
+	reply         func(string) bool
+	onChange      func()
+	now           func() time.Time
 
 	mu        sync.Mutex
 	gate      chan struct{}
@@ -78,6 +88,7 @@ func NewChecked(opts Options) (*Coordinator, error) {
 		opts.Now = time.Now
 	}
 	c := &Coordinator{
+		repair: opts.Repair, readTrack: opts.ReadTrack, proposals: map[string]domain.Proposal{}, actions: map[string]domain.Action{}, reconcileCh: make(chan struct{}, 1),
 		store: opts.Store, read: opts.Read, settings: opts.Settings, status: opts.Status,
 		reply: opts.Reply, onChange: opts.OnChange, now: opts.Now,
 		jobs: map[string]*job{}, incidents: map[string]domain.Incident{},
@@ -89,6 +100,10 @@ func NewChecked(opts Options) (*Coordinator, error) {
 		c.opCancel()
 		return nil, err
 	}
+	if c.readTrack != nil {
+		c.wg.Add(1)
+		go c.reconcileLoop()
+	}
 	return c, nil
 }
 
@@ -97,6 +112,9 @@ func (c *Coordinator) restart() error {
 		return nil
 	}
 	ctx := context.Background()
+	if err := c.store.RecoverRepairs(ctx, c.now()); err != nil {
+		return err
+	}
 	if err := c.store.StopAllMonitoringSessions(ctx, c.now()); err != nil {
 		return err
 	}
@@ -105,6 +123,16 @@ func (c *Coordinator) restart() error {
 	}
 	if err := c.store.InterruptOpenIncidents(ctx, c.now()); err != nil {
 		return err
+	}
+	ps, as, err := c.store.LoadRepairs(ctx)
+	if err != nil {
+		return err
+	}
+	for _, p := range ps {
+		c.proposals[p.ID] = p
+	}
+	for _, a := range as {
+		c.actions[a.ID] = a
 	}
 	list, err := c.store.ListRetainedIncidents(ctx)
 	if err != nil {
@@ -202,6 +230,11 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		return err
 	}
 	defer c.release()
+	c.mu.Lock()
+	c.mu.Unlock()
+	if err := c.invalidateProposals(ctx, "", domain.ProposalInvalidated); err != nil {
+		return err
+	}
 	c.mu.Lock()
 	pending := make(map[string]domain.Incident, len(c.pending))
 	for id, inc := range c.pending {
@@ -355,7 +388,36 @@ func (c *Coordinator) reload() error {
 		incidents[inc.ID] = inc
 		order = append(order, inc.ID)
 	}
+	ps, as, err := c.store.LoadRepairs(context.Background())
+	if err != nil {
+		return err
+	}
+	proposals := map[string]domain.Proposal{}
+	actionRecords := map[string]domain.Action{}
+	for _, p := range ps {
+		proposals[p.ID] = p
+	}
+	for _, a := range as {
+		actionRecords[a.ID] = a
+	}
 	c.mu.Lock()
+	// A failed outcome commit may leave durable intent while runtime knows
+	// the dispatch returned uncertain. Reload must not strand that recovery.
+	for id, durable := range actionRecords {
+		cached, ok := c.actions[id]
+		if ok && cached.Status == domain.TrackRepairUnknown &&
+			(durable.Status == domain.ActionIntent || durable.Status == "write_sent" || durable.Status == domain.ActionReserved) {
+			actionRecords[id] = cloneRepair(cached)
+			if inc, exists := incidents[durable.IncidentID]; exists {
+				inc.Stage = domain.StageActionUnknown
+				inc.LocalVerification = domain.LocalUnknown
+				inc.RepairAvailable = false
+				incidents[inc.ID] = inc
+			}
+		}
+	}
+	c.proposals = proposals
+	c.actions = actionRecords
 	c.incidents = incidents
 	c.order = order
 	c.mu.Unlock()
@@ -405,6 +467,10 @@ func (c *Coordinator) Check(ctx context.Context, category string, expectedRevisi
 			c.mu.Unlock()
 			return domain.Incident{}, domain.ErrIncidentNotFound
 		}
+		if c.incidentActionPendingLocked(inc.ID) {
+			c.mu.Unlock()
+			return domain.Incident{}, domain.ErrActionConflict
+		}
 		if inc.Category != category {
 			c.mu.Unlock()
 			return domain.Incident{}, domain.ErrInvalidInput
@@ -425,6 +491,11 @@ func (c *Coordinator) Check(ctx context.Context, category string, expectedRevisi
 			c.mu.Unlock()
 			return domain.Incident{}, domain.ErrJobLimit
 		}
+		c.mu.Unlock()
+		if err := c.invalidateProposals(ctx, inc.ID, domain.ProposalInvalidated); err != nil {
+			return domain.Incident{}, err
+		}
+		c.mu.Lock()
 		inc.Stage = domain.StageInvestigating
 		inc.UpdatedAt = c.now().UTC()
 		incCopy := copyIncident(inc)
@@ -441,10 +512,19 @@ func (c *Coordinator) Check(ctx context.Context, category string, expectedRevisi
 	if session != nil && session.Active {
 		active, ok := c.incidentsByCategoryLocked(session.ID, category)
 		if ok {
+			if c.incidentActionPendingLocked(active.ID) {
+				c.mu.Unlock()
+				return domain.Incident{}, domain.ErrActionConflict
+			}
 			if existing := c.jobs[category]; existing != nil {
 				c.mu.Unlock()
 				return active, nil
 			}
+			c.mu.Unlock()
+			if err := c.invalidateProposals(ctx, active.ID, domain.ProposalInvalidated); err != nil {
+				return domain.Incident{}, err
+			}
+			c.mu.Lock()
 			active.Stage = domain.StageInvestigating
 			active.UpdatedAt = c.now().UTC()
 			c.mu.Unlock()
@@ -653,10 +733,17 @@ func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.In
 		}
 		return domain.Incident{}, domain.ErrTerminalIncident
 	}
+	if c.incidentActionPendingLocked(incidentID) {
+		c.mu.Unlock()
+		return domain.Incident{}, domain.ErrActionConflict
+	}
 	if job := c.jobs[inc.Category]; job != nil && job.incident.ID == incidentID {
 		job.cancel()
 	}
 	c.mu.Unlock()
+	if err := c.invalidateProposals(ctx, incidentID, domain.ProposalInvalidated); err != nil {
+		return domain.Incident{}, err
+	}
 	out, err := c.store.DismissIncident(ctx, incidentID, c.now().UTC())
 	if err != nil {
 		return domain.Incident{}, err
@@ -775,11 +862,33 @@ func (c *Coordinator) run(request *job) {
 	}
 	current.RepairAvailable = false
 	saveCtx, saveCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	err := c.store.SaveIncident(saveCtx, current)
+	var proposal *domain.Proposal
+	c.mu.Lock()
+	eligible := c.repair != nil && c.session != nil && c.session.Active && c.session.ID == current.SessionID
+	c.mu.Unlock()
+	if eligible && current.Stage == domain.StageFindingAvailable {
+		if p, ok := actions.Proposal(store.NewSessionID(), current, request.settings, discovery, observation, now); ok {
+			p.TwitchGeneration = ready.TwitchGeneration
+			proposal = &p
+			current.Stage = domain.StageAwaitingApproval
+			current.RepairAvailable = true
+		}
+	}
+	var err error
+	if proposal != nil {
+		err = c.store.SaveRepair(saveCtx, proposal, nil, &current, false)
+	} else {
+		err = c.store.SaveIncident(saveCtx, current)
+	}
 	saveCancel()
 	if err != nil {
 		c.publish()
 		return
+	}
+	if proposal != nil {
+		c.mu.Lock()
+		c.proposals[proposal.ID] = *proposal
+		c.mu.Unlock()
 	}
 	c.setIncident(current)
 	request.settled = true
@@ -849,6 +958,11 @@ func (c *Coordinator) Invalidate(ctx context.Context, reason string) {
 		return
 	}
 	defer c.release()
+	c.invalidateLocked(ctx, reason)
+}
+
+func (c *Coordinator) invalidateLocked(ctx context.Context, reason string) {
+	_ = c.invalidateProposals(ctx, "", domain.ProposalInvalidated)
 	c.mu.Lock()
 	jobs := make([]*job, 0, len(c.jobs))
 	for _, job := range c.jobs {
@@ -933,6 +1047,12 @@ func publicMessage(inc domain.Incident) string {
 		return "more_information_needed"
 	case domain.StageFindingAvailable, domain.StageAwaitingApproval, domain.StageAwaitingFeedback:
 		return "finding_available"
+	case domain.StageApplying:
+		return "applying_approved_change"
+	case domain.StageActionUnknown:
+		return "local_action_unknown"
+	case domain.StageUnresolved:
+		return "unresolved"
 	case domain.StageInterrupted:
 		return "interrupted"
 	default:

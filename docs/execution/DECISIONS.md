@@ -59,3 +59,21 @@ Reasonable local function naming, CSS choices within a released design brief and
 ## D31 — P03 Codex takeover and local acceptance (2026-11-02)
 
 User authorized Codex to complete remaining P03 work after R06 with DeepSeek stopped. Codex finished settlement/cache/retry/Close corrections and missing concurrency/browser verification as sole writer. Own changes are self-verified, not independently reviewed. Accept the local P03 baseline and integrate via PR #9; close local P03 issues #7/#8 after merge. D30/#6 live Twitch gates remain deferred and required before final readiness. P04 remains held for separate explicit release and the actual implementation recording checkpoint. No contract, product scope or dependency change.
+
+## D32 — P04 release, recording and agent allocation (2026-11-02)
+
+User authorized P04 implementation and GPT-6.1 Sol high subagents after first setting up and testing actual main-chat recording. Capture test passed after restoring Codex: FFmpeg gfxcapture, 1920x1034, 15 fps, silent; actual build capture started before code edits. GDI black tests are rejected evidence. Root coordinates one production writer at a time and records genuine contributions. This supersedes the older no-subagent wording for this packet only. DeepSeek stays stopped, P05 held.
+
+P04 v1.3 is released on feature/p04-approved-repair. D30/#6 Twitch hold remains. Active-monitoring repair authorization is not waived; dependent full-product live OBS approval acceptance stays pending if Twitch readiness prevents it. No new scope, runtime framework, cloud component or generic mutation API.
+
+## D33 — P04 contract integration choices (2026-11-02)
+
+C10/contracts v1.4 resolves approval JSON, proposal-only expiry/invalidation, exact-desired-map no-op precedence, shared dispatch authority and action-safe restart against current P03 source. This avoids making a valid diagnostic incident terminal merely because its approval expired. Current-session monitoring is mandatory; no manual/offline repair bypass. Final dispatch admission follows durable intent and is the serialization point against stop/settings changes; subsequent uncertainty remains auditable and never replayed. Six numeric wire assignments preserve all other flags. No generic mutation API or SDK replacement.
+
+## D34 — P05 release with live acceptance deferred (2026-11-02)
+
+The user explicitly requested moving to P05 and keeping live Twitch and the real OBS approval trial pending until their phone/2FA issue is resolved. Conditionally accept P04's locally verified implementation as a development baseline and integrate PR #11; this is source integration, not full live P04 acceptance. Keep issue #6 (P02-A/V06 and P03-D Twitch) and issue #10 (P04-A/V11 real approved OBS correction) open. The dependent real end-to-end portion of P05-A/V14 and final V18/V19 remain unmet. P05 may implement and verify with isolated local protocol fixtures and clearly labeled rehearsal. Production monitoring/approval authorization is unchanged. No login, registration, credentials, real chat or real OBS mutation while the hold remains.
+
+Release P05 v1.1 to one DeepSeek worker after its packet, C11 and visual brief are prepared. Codex retains contracts, review and Git/GitHub; no P05 subagents or parallel writers are authorized by the earlier P04-only agent instruction. P06 stays held until explicit review/release.
+
+Codex inspected the actual P04 rendered screen and applied the available 12ui skill. Automatic approval review initially rejected screenshot export; the user then explicitly authorized it. The authorized retry and generic brief attempt both returned sponsored-budget-exhausted; no generated design or selected candidate exists. Release a written layout/interaction brief preserving the current visual language, and record this tool limitation. No CSS/application implementation was performed in this dispatch. Rendered visual acceptance still occurs at P05 review; do not claim a generated design checkpoint passed.

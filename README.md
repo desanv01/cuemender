@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-foundation_accepted-9146FF" alt="Foundation accepted; integrations under development" />
+  <img src="https://img.shields.io/badge/status-live_verification_pending-9146FF" alt="Local implementation; live verification pending" />
   <img src="https://img.shields.io/badge/Go-1.27.3-00ADD8?logo=go&logoColor=white" alt="Go 1.27.3" />
   <img src="https://img.shields.io/badge/platform-Windows_x64-65d2f4" alt="Windows x64" />
 </p>
@@ -24,7 +24,7 @@
   <a href="docs/DEVELOPMENT.md">Testing guide</a>
 </p>
 
-> **Development milestone:** the local foundation is implemented and reviewed. Twitch/OBS connections, diagnostics and approved repairs are the next implementation stages. This is not yet the complete hackathon demo.
+> **Development milestone:** connections, diagnostics and the private track-approval engine are implemented. Local tests and protocol fixtures are distinct from live evidence: Twitch verification and the real approved-repair trial remain pending. This is not yet the complete hackathon demo. See the [current verification record](docs/execution/handoffs/P04-review.md).
 
 ## Why CueMender
 
@@ -34,7 +34,7 @@ CueMender is being built around that interaction: receive a report through Twitc
 
 ## Features
 
-The following foundation features are available now.
+The foundation below supports connection setup, three diagnoses and private approval of one microphone-track addition.
 
 <table>
 <tr>
@@ -71,11 +71,11 @@ The foundation supports OS credential storage or an explicitly selected memory-o
 </tr>
 </table>
 
-**Next:** own-channel Twitch chat, OBS discovery, three diagnostic checks, one approved microphone-track correction, and viewer confirmation. See [current scope](#current-scope).
+**Implemented:** Twitch EventSub intake, OBS discovery, microphone mute/track and direct-item visibility diagnoses, durable incidents, viewer feedback, and an expiring private approval for one microphone-track addition. Unknown write outcomes are reconciled by reading, never by automatic replay. See [current scope](#current-scope) for verification limits.
 
 ## Demo
 
-The current development preview lets you open private controls, save expectations, reload the page and inspect the separate idle overlay. It does not connect to Twitch or OBS yet.
+The development preview includes connection setup, private evidence and approval controls, and a separate public overlay. The steps below exercise only the foundation. For connection prerequisites, see [setup](docs/implementation/P02-setup.md); real Twitch and full approved-repair evidence remain pending.
 
 1. Build and run the application below.
 2. Open the one-time private control link printed in the console.
@@ -123,9 +123,9 @@ For compatibility with the initial foundation, the default data directory remain
 
 ## Built with Codex
 
-Codex defined the architecture and execution contracts, identified foundation defects, independently verified DeepSeek's corrections, and prepared the repository identity and integration handoff.
+Codex defined the architecture and execution contracts, reviewed DeepSeek's work, implemented connection/diagnostic closure fixes, and implemented the P04 approval-and-repair engine with its tests.
 
-DeepSeek implemented the foundation and its corrections. Codex is assigned the upcoming approval-and-repair engine and its tests; that implementation is not claimed as completed yet.
+DeepSeek implemented P01–P03 and their worker corrections. Codex implemented P04 using the main chat and user-requested GPT-6.1 Sol high subagents with one writer at a time. Genuine main-chat build footage was recorded; final video editing and the live demonstration are still pending. Codex's tests of its own code are self-verification, with separately recorded peer inspection.
 
 [Actual contribution record →](docs/execution/CONTRIBUTIONS.md) · [Foundation acceptance →](docs/execution/handoffs/P01-R01-review.md)
 
@@ -133,7 +133,7 @@ The required application workflow has no runtime AI dependency or paid-model req
 
 ## Built with
 
-| Runtime | Interface | Persistence | Planned integrations |
+| Runtime | Interface | Persistence | Integrations |
 | --- | --- | --- | --- |
 | Go 1.27.3 · Windows x64 | Embedded HTML/CSS/vanilla JS · SSE | SQLite via modernc · OS keyring | Twitch EventSub/Helix · OBS WebSocket |
 
@@ -142,9 +142,10 @@ One local process, with no separate frontend server or cloud database.
 ## Current scope
 
 - **Accepted:** application lifecycle, validated persistence, local private sessions, CSRF protection, separate public/private state, embedded pages, and the corrected reload/concurrency/shutdown/error-redaction paths.
-- **Next implementation:** Twitch/OBS connections, microphone-muted and track-missing checks, direct scene-item visibility check, streamer-approved track assignment, viewer feedback and isolated rehearsal.
+- **Implemented locally:** Twitch/OBS connections, three diagnoses, persistent incidents/feedback, and the private track-approval engine with durable intent, one dispatch, read-back and read-only recovery.
+- **Next:** real Twitch/approved-repair verification, finished user experience, isolated rehearsal and release packaging. P05 remains held pending the P04 gate decision.
 - **Outside the MVP:** automatic unmute or source reveal, raw audio analysis, computer vision, OS-device repair, multiple channels and autonomous control.
-- **Verification limits:** browser-script behavior is tested in a Node VM, not a rendered-browser visual test. Race instrumentation remains pending a configured C toolchain. Worker-reported real Ctrl+C evidence and independently repeated in-process lifecycle tests are distinguished in the acceptance record.
+- **Verification limits:** local OAuth/EventSub/OBS protocol servers and headless rendered-browser checks do not prove live Twitch behavior. P02 live OBS read-only evidence is recorded separately; it is not a P04 live-write trial. Final commands, race results and remaining gates are recorded in [P04 verification](docs/execution/handoffs/P04-review.md). OBS has no atomic compare-and-set against other clients; local track read-back does not prove viewer audio recovery.
 
 ## Documentation
 

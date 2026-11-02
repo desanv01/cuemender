@@ -93,6 +93,7 @@ func localOBSServer(t *testing.T) *httptest.Server {
 }
 
 type protocolChat struct {
+	keepalive bool
 	welcome   chan string
 	help      chan string
 	chat      chan string
@@ -173,7 +174,22 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 				case <-time.After(5 * time.Second):
 					return
 				}
+				if chat.keepalive {
+					ticker := time.NewTicker(5 * time.Second)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-readDone:
+							return
+						case <-ticker.C:
+							if err := conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": fmt.Sprintf("keepalive-%d", time.Now().UnixNano()), "message_type": "session_keepalive", "message_timestamp": time.Now().UTC()}}); err != nil {
+								return
+							}
+						}
+					}
+				}
 				<-readDone
+				return
 			}
 			http.NotFound(w, r)
 		}

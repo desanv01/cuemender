@@ -24,6 +24,7 @@ type migration struct {
 }
 
 var migrations = []migration{
+
 	{
 		version: 1,
 		sql: `
@@ -101,6 +102,22 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 `,
 	},
+	{version: 3, sql: `
+CREATE TABLE proposals (
+ id TEXT PRIMARY KEY,
+ incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+ status TEXT NOT NULL,
+ proposal_json TEXT NOT NULL
+);
+CREATE TABLE actions (
+ id TEXT PRIMARY KEY,
+ proposal_id TEXT NOT NULL UNIQUE REFERENCES proposals(id) ON DELETE CASCADE,
+ incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+ status TEXT NOT NULL,
+ action_json TEXT NOT NULL
+);
+CREATE INDEX actions_status ON actions(status);
+`},
 }
 
 // Store owns the local SQLite database. SQL and schema details stay here.

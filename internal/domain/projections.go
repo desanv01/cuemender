@@ -42,6 +42,8 @@ type StartupInfo struct {
 // PrivateState is the projection served only to an authenticated control
 // session. It contains no credentials or bootstrap capability.
 type PrivateState struct {
+	Proposals         []Proposal             `json:"proposals"`
+	Actions           []Action               `json:"actions"`
 	Mode              string                 `json:"mode"`
 	StateRevision     uint64                 `json:"state_revision"`
 	MonitoringActive  bool                   `json:"monitoring_active"`

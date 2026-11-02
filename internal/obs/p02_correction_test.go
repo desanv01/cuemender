@@ -102,6 +102,10 @@ func TestOBSSnapshotBundleIsRevisionCoherent(t *testing.T) {
 	if !ready || observation == nil || observation.ConfigRevision != 1 {
 		t.Fatalf("revision 1 bundle not coherent: ready=%v obs=%+v", ready, observation)
 	}
+	// Hold poll admission so this checks invalidation before a legitimate
+	// revision-2 refresh can replace the old observation. Keep both assertions.
+	manager.operations <- struct{}{}
+	defer func() { <-manager.operations }()
 	manager.SetSettings(2, testSettings())
 	if _, _, _, ready := manager.SnapshotBundle(domain.Settings{Revision: 1, Expectations: testSettings()}); ready {
 		t.Fatal("old settings revision remained ready after save")

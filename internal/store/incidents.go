@@ -274,6 +274,13 @@ func (s *Store) SaveIncident(ctx context.Context, inc domain.Incident) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := saveIncidentTx(ctx, tx, inc); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func saveIncidentTx(ctx context.Context, tx *sql.Tx, inc domain.Incident) error {
 	// Report joins and feedback can advance indexed counters independently of a
 	// stale in-memory finding snapshot. Merge them before replacing JSON.
 	var reportCount, distinct, positive, negative int
@@ -298,7 +305,7 @@ func (s *Store) SaveIncident(ctx context.Context, inc domain.Incident) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func nullableTime(t *time.Time) any {
@@ -412,7 +419,7 @@ func (s *Store) InterruptIncident(ctx context.Context, id string, expectedUpdate
 // InterruptOpenIncidents closes prior-session work at startup. It never
 // auto-monitors or replays work.
 func (s *Store) InterruptOpenIncidents(ctx context.Context, now time.Time) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT incident_json FROM incidents WHERE stage NOT IN (?,?,?,?)`, domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated)
+	rows, err := s.db.QueryContext(ctx, `SELECT incident_json FROM incidents WHERE stage NOT IN (?,?,?,?) AND NOT EXISTS (SELECT 1 FROM actions a WHERE a.incident_id = incidents.id AND a.status IN ('reserved','intent_recorded','write_sent','unknown'))`, domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated)
 	if err != nil {
 		return err
 	}
@@ -438,11 +445,11 @@ func (s *Store) InterruptOpenIncidents(ctx context.Context, now time.Time) error
 
 func (s *Store) PurgeCompletedIncidents(ctx context.Context, now time.Time) error {
 	cutoff := formatTime(now.Add(-30 * 24 * time.Hour))
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE stage IN (?,?,?,?) AND julianday(updated_at) < julianday(?)`,
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE stage IN (?,?,?,?) AND NOT EXISTS (SELECT 1 FROM actions a WHERE a.incident_id = incidents.id AND a.status IN ('reserved','intent_recorded','write_sent','unknown')) AND julianday(updated_at) < julianday(?)`,
 		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated, cutoff); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE id IN (SELECT id FROM incidents WHERE stage IN (?,?,?,?) ORDER BY julianday(updated_at) DESC LIMIT -1 OFFSET 500)`,
+	_, err := s.db.ExecContext(ctx, `DELETE FROM incidents WHERE id IN (SELECT id FROM incidents WHERE stage IN (?,?,?,?) AND NOT EXISTS (SELECT 1 FROM actions a WHERE a.incident_id = incidents.id AND a.status IN ('reserved','intent_recorded','write_sent','unknown')) ORDER BY julianday(updated_at) DESC LIMIT -1 OFFSET 500)`,
 		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated)
 	return err
 }

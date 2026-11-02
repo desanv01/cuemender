@@ -29,7 +29,7 @@ Codex owns meaningful production implementation in P04: proposal/approval bindin
 
 After any DeepSeek handoff, Codex may directly fix a scoped integration defect or debug code when that avoids another relay. First take sole edit ownership in STATUS; record affected files, actual changes and verification afterward. Do not rewrite functioning code merely to manufacture Codex authorship. Larger worker corrections still receive one consolidated packet.
 
-P04 runs in this main chat without creating a worker chat or launching DeepSeek. Write handoffs/P04-codex-build.md with exact changes/tests and handoffs/P04-review.md with the acceptance evidence and limits. Call checks of Codex's own code self-verification; a role label does not create an independent reviewer. An additional review may be requested if unresolved risk warrants it, but is not fabricated or automatically delegated.
+P04 runs under this main chat without launching DeepSeek. D32 records the user's explicit authorization for GPT-6.1 Sol high subagents, with exactly one production writer at a time; root retains planning, acceptance and Git ownership. Write handoffs/P04-codex-build.md with exact changes/tests and handoffs/P04-review.md with the acceptance evidence and limits. Call checks of Codex's own code self-verification; a role label does not create an independent reviewer. An additional review may be requested if unresolved risk warrants it, but is not fabricated or automatically delegated.
 
 ## Worker permissions
 

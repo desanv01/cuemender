@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 2.4
-Last update: 2026-11-02T02:49Z
-Current packet: P03
-Current state: accepted local development baseline under D30/D31; live Twitch deferred
+Revision: 2.6
+Last update: 2026-11-02T03:49Z
+Current packet: P04
+Current state: locally_verified / live_gate_pending — P04 implementation, recording and local validation complete; not fully accepted
 Current owner: Codex
-Released packet revision: none — P03 v1.2/R06 completed; P04 held
-Code writer active: none — Codex closure complete; DeepSeek stopped
+Released packet revision: P04 v1.3 under D32; live Twitch and dependent real approval trial remain pending
+Code writer active: none — Codex/root and all implementation agents stopped; DeepSeek remains stopped
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -28,12 +28,12 @@ P02-R03 started at (UTC): 2026-11-01T13:33Z
 DeepSeek P02-R03 handoff at (UTC): 2026-11-01T13:39Z
 Codex closure verification finished at (UTC): 2026-11-01T14:40Z
 Worker/harness: DeepSeek (deepseek-flash via DeepSeek Harness)
-Implementation begun: yes — P03 local implementation accepted after R06 and Codex closure
+Implementation begun: yes — P04 local engine complete and verified; P03 remains accepted local baseline
 Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
 P02 tracking: https://github.com/desanv01/cuemender/issues/2
-Worker branch: feature/p03-diagnostics (read actual HEAD at dispatch; no worker Git mutation)
+Worker branch: feature/p04-approved-repair; starting baseline 01a6e3d68cd919b5e90e80bc96e5d61e8c0204e4
 P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
 P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
 P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
@@ -43,23 +43,28 @@ P03 worker checkpoint: 2a9dcf9a74289e327f4d5567ee2cf634873c49c0 (P03-R06)
 P03 closure checkpoint: separate Codex implementation/self-verification commit following 2a9dcf9; consult PR #9 history
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
-Closure record: docs/implementation/P03-codex-closure.md
-Implementation: docs/implementation/P03-diagnostics.md
+Closure record: docs/execution/handoffs/P04-codex-build.md
+Implementation: P04 v1.3, contracts v1.4/C10; guarded track write, durable approval and read-only recovery
 Environment note: docs/implementation/P01-environment.md
-Review: docs/execution/handoffs/P03-codex-closure-review.md
+Review: docs/execution/handoffs/P04-review.md — self-verification plus separately recorded peer source inspection
 Correction: P03-R06 complete; no active correction dispatch
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
-Unmet live gates: P02-A/V06 and P03-D live Twitch, both deferred under D30/issue #6; P02-B/V07 live OBS remains passed from closure.
-Next action: finish PR #9 integration and close local P03 issues #7/#8; retain live Twitch issue #6. P04 remains held pending explicit Codex release and recording checkpoint.
+Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
+Next action: retain draft P04 branch/PR and live gate issues. Resume real Twitch setup only when user releases the hold; complete real private-UI approval before full P04 acceptance, or record an explicit subsequent sequencing decision. P05 remains held.
+P04 tracking: https://github.com/desanv01/cuemender/issues/10
+P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
+P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — draft, not merged; live acceptance pending
+P04 recording: .tools/p04-recording/p04-build-01.mkv — 37:29.867, silent, verified and stopped
+P04 final checks: Windows full suite/vet/format/CGo-free build, five Node fixtures, rendered local-protocol approval and full WSL race passed. See P04-review.md for commands, failures corrected and exact limits.
 P02 setup: docs/implementation/P02-setup.md
 
 | Packet | State | Review | Dispatch condition |
 |---|---|---|---|
 | P01 | accepted | P01-R01-review.md | Accepted baseline published |
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
-| P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 held for release/recording |
-| P04 | planned / held — Codex implementation | Not started | P03 accepted; Codex takes sole code ownership |
+| P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 subsequently released under D32 |
+| P04 | locally verified / real approval gate pending | P04-review.md + P04-codex-build.md | Not fully accepted; no live Twitch or gate bypass |
 | P05 | planned / held | Not started | Codex acceptance of P04 and release |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
 | Submission | planned | Not started | Release review and user-controlled external steps |

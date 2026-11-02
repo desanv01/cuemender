@@ -2,6 +2,7 @@ package obs
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"net/url"
@@ -201,15 +202,44 @@ func (b *goobsBackend) InputAudioTracks(ctx context.Context, ref domain.InputRef
 	if response.InputAudioTracks == nil {
 		return nil, nil
 	}
-	out := make(map[string]bool, len(*response.InputAudioTracks))
-	for key, value := range *response.InputAudioTracks {
+	// Typed map decoding turns JSON null into false. Inspect the raw shape
+	// so incomplete/malformed wire evidence cannot authorize a repair.
+	var raw struct {
+		Tracks map[string]*bool `json:"inputAudioTracks"`
+	}
+	if err := json.Unmarshal(response.GetRaw(), &raw); err != nil {
+		return nil, nil
+	}
+	out := make(map[string]bool, len(raw.Tracks))
+	for key, value := range raw.Tracks {
 		domainKey := normalizeWireTrackKey(key)
-		if domainKey == "" {
+		if domainKey == "" || value == nil {
 			return nil, nil
 		}
-		out[domainKey] = value
+		if _, duplicate := out[domainKey]; duplicate {
+			return nil, nil
+		}
+		out[domainKey] = *value
 	}
 	return out, nil
+}
+
+func (b *goobsBackend) setInputAudioTracks(ctx context.Context, ref domain.InputRef, tracks map[string]bool) error {
+	if !exactTracks(tracks) || ref.Name == "" || ref.Context == "" {
+		return ErrRepairPrecondition
+	}
+	wire := make(typedefs.InputAudioTracks, 6)
+	for key, value := range tracks {
+		wire[WireTrackKey(key)] = value
+	}
+	params := inputs.NewSetInputAudioTracksParams().WithInputAudioTracks(&wire)
+	if ref.UUID != "" {
+		params.WithInputUuid(ref.UUID)
+	} else {
+		params.WithInputName(ref.Name)
+	}
+	_, err := b.callRead(ctx, func() (any, error) { return b.client.Inputs.SetInputAudioTracks(params) })
+	return err
 }
 
 // normalizeWireTrackKey converts OBS's numeric "1".."6" keys into the stable

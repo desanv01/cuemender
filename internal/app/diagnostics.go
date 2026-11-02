@@ -26,6 +26,7 @@ func (a *App) monitoringReadiness() incidents.Readiness {
 	tw := a.twitchMgr.Snapshot()
 	obs, _, _, resolution := a.obsMgr.SnapshotBundle(settings)
 	return incidents.Readiness{
+		OBSContext:       obs.SceneCollection,
 		TwitchConnected:  tw.Status == domain.ConnectionConnected,
 		OBSConnected:     obs.Status == domain.ConnectionConnected && !obs.Stale,
 		ResolutionReady:  resolution,
@@ -134,4 +135,11 @@ func (a *App) DismissIncident(ctx context.Context, incidentID string) (domain.In
 		return domain.Incident{}, domain.ErrUnavailable
 	}
 	return a.coordinator.Dismiss(ctx, incidentID)
+}
+
+func (a *App) ApproveProposal(ctx context.Context, id string, revision int64) (domain.Action, error) {
+	if a.coordinator == nil {
+		return domain.Action{}, domain.ErrUnavailable
+	}
+	return a.coordinator.Approve(ctx, id, revision)
 }

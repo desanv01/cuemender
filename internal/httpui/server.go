@@ -194,6 +194,7 @@ func (s *Server) buildHandler() http.Handler {
 	mux.HandleFunc("/api/v1/monitoring/start", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleMonitoringStart)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/monitoring/stop", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleMonitoringStop)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/incidents/check", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentCheck)))).ServeHTTP)
+	mux.Handle("POST /api/v1/proposals/{id}/approve", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleApprove))))
 	mux.Handle("POST /api/v1/incidents/{id}/dismiss", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentDismiss))))
 
 	mux.HandleFunc("/public/v1/state", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicState)).ServeHTTP)
@@ -597,8 +598,45 @@ func (s *Server) handleIncidentDismiss(w http.ResponseWriter, r *http.Request) {
 	writeData(w, r, map[string]any{"incident_id": inc.ID, "stage": inc.Stage})
 }
 
+func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		ExpectedRevision *int64 `json:"expected_revision"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if body.ExpectedRevision == nil || *body.ExpectedRevision < 0 {
+		writeError(w, r, 400, "invalid_revision", "expected_revision is required and must be non-negative.")
+		return
+	}
+	backend, ok := s.backend.(interface {
+		ApproveProposal(context.Context, string, int64) (domain.Action, error)
+	})
+	if !ok {
+		writeError(w, r, 503, "unavailable", "Approved repair is unavailable.")
+		return
+	}
+	action, err := backend.ApproveProposal(r.Context(), r.PathValue("id"), *body.ExpectedRevision)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeDataStatus(w, r, http.StatusAccepted, action)
+}
+
 func writeIncidentError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case errors.Is(err, domain.ErrProposalNotFound):
+		writeError(w, r, 404, "proposal_not_found", "Proposal was not found.")
+	case errors.Is(err, domain.ErrProposalExpired):
+		writeError(w, r, 410, "proposal_expired", "The proposal expired. Run a fresh check.")
+	case errors.Is(err, domain.ErrActionConflict):
+		writeError(w, r, 409, "action_conflict", "The proposal or action is no longer eligible. Run a fresh check when the pending action settles.")
 	case errors.Is(err, domain.ErrRevisionConflict):
 		writeError(w, r, http.StatusConflict, "revision_conflict", "Settings changed since they were loaded.")
 	case errors.Is(err, domain.ErrNotReady):
