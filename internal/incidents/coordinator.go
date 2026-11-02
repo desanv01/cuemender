@@ -776,6 +776,63 @@ func (c *Coordinator) CloseIncident(ctx context.Context, incidentID, outcome str
 	return closed, nil
 }
 
+func (c *Coordinator) ClearHistory(ctx context.Context) (int, error) {
+	if err := c.acquire(ctx); err != nil {
+		return 0, err
+	}
+	defer c.release()
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return 0, domain.ErrUnavailable
+	}
+	if len(c.jobs) > 0 || len(c.pending) > 0 || c.actionRunning {
+		c.mu.Unlock()
+		return 0, domain.ErrClosureIneligible
+	}
+	for _, action := range c.actions {
+		if domain.ActionPending(action.Status) {
+			c.mu.Unlock()
+			return 0, domain.ErrClosureIneligible
+		}
+	}
+	c.mu.Unlock()
+	ids, err := c.store.ClearHistoryIDs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	deleted := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		deleted[id] = true
+	}
+	// The operation gate excludes new work. Install only the committed deletion;
+	// there are no cancellable/fallible post-commit reads or partial cache swaps.
+	c.mu.Lock()
+	for id := range deleted {
+		delete(c.incidents, id)
+	}
+	order := c.order[:0]
+	for _, id := range c.order {
+		if !deleted[id] {
+			order = append(order, id)
+		}
+	}
+	c.order = order
+	for id, p := range c.proposals {
+		if deleted[p.IncidentID] {
+			delete(c.proposals, id)
+		}
+	}
+	for id, a := range c.actions {
+		if deleted[a.IncidentID] {
+			delete(c.actions, id)
+		}
+	}
+	c.mu.Unlock()
+	c.publish()
+	return len(ids), nil
+}
+
 func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.Incident, error) {
 	if err := c.acquire(ctx); err != nil {
 		return domain.Incident{}, err

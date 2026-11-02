@@ -17,6 +17,8 @@ func (b *testBackend) CloseIncident(_ context.Context, id, outcome string) (doma
 	return domain.Incident{ID: id, PublicID: "CM-CLOSE", Stage: domain.StageClosed, ClosureOutcome: outcome}, nil
 }
 
+func (b *testBackend) ClearHistory(context.Context) (int, error) { return 2, nil }
+
 func TestP05ClosureAndRehearsalRouteBoundaries(t *testing.T) {
 	ts, ui, _ := newTestServer(t, nil)
 	defer ts.Close()
@@ -60,6 +62,16 @@ func TestP05ClosureAndRehearsalRouteBoundaries(t *testing.T) {
 	resp = post("/api/v1/rehearsal/report", map[string]any{"category": "audio"}, csrf)
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("live rehearsal report status=%d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	resp = post("/api/v1/history/clear", map[string]any{}, csrf)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("history clear status=%d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	resp = post("/api/v1/history/clear", map[string]any{}, "")
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("history clear without CSRF status=%d", resp.StatusCode)
 	}
 	resp.Body.Close()
 }

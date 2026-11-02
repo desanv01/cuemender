@@ -198,6 +198,7 @@ func (s *Server) buildHandler() http.Handler {
 	mux.Handle("POST /api/v1/proposals/{id}/approve", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleApprove))))
 	mux.Handle("POST /api/v1/incidents/{id}/dismiss", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentDismiss))))
 	mux.Handle("POST /api/v1/incidents/{id}/close", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentClose))))
+	mux.Handle("POST /api/v1/history/clear", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleHistoryClear))))
 	mux.Handle("POST /api/v1/rehearsal/scenario", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleRehearsalScenario))))
 	mux.Handle("POST /api/v1/rehearsal/report", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleRehearsalReport))))
 	mux.Handle("POST /api/v1/rehearsal/feedback", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleRehearsalFeedback))))
@@ -637,6 +638,31 @@ func (s *Server) handleIncidentClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, r, inc)
+}
+
+func (s *Server) handleHistoryClear(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct{}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	backend, ok := s.backend.(interface {
+		ClearHistory(context.Context) (int, error)
+	})
+	if !ok {
+		writeError(w, r, http.StatusServiceUnavailable, "unavailable", "History clearing is unavailable.")
+		return
+	}
+	n, err := backend.ClearHistory(r.Context())
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeData(w, r, map[string]int{"cleared": n})
 }
 
 func (s *Server) handleRehearsalScenario(w http.ResponseWriter, r *http.Request) {

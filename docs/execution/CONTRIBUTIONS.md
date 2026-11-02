@@ -83,3 +83,7 @@ User authorized takeover after DeepSeek P05-R02 (checkpoint 8008ced). Codex impl
 ## D37 receive-only fallback — 2026-11-02
 
 Codex directly implemented the anonymous IRC lifecycle/parser, immutable channel-scoped composition, private confirmation API, structural repair/reply isolation, UI labels and focused tests. Root ran actual two-account Twitch probes and a real Twitch report-to-local-OBS read through the rendered private UI; the user sent the messages. OBS remained offline and unchanged. Verification of this Codex code is self-verification. No DeepSeek or subagent implementation contributed to this packet. Original EventSub and approved-OBS gates remain deferred.
+
+## P06 local release acceptance — 2026-11-02
+
+DeepSeek implemented directory locks, the initial history-clear path, packaging and notices. Codex reviewed the actual code/archive, replaced fallible post-commit history reloads with committed-ID cache removal, hardened packaging provenance/working-directory behavior, added omitted upstream bundled notices and ordinary SQL rollback/cache regressions, and corrected release docs. Windows full suite/vet/format/six Node fixtures, WSL full race and actual extracted-binary rehearsal/locking/history/receive-only checks passed. Codex changes are self-verified. See handoffs/P06-review.md. No live service activity, recording, clean-VM or code-signing claim.

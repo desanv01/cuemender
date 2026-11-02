@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/desanv01/cuemender/internal/datalock"
 	"github.com/desanv01/cuemender/internal/domain"
 	"github.com/desanv01/cuemender/internal/httpui"
 	"github.com/desanv01/cuemender/internal/incidents"
@@ -62,6 +63,7 @@ type App struct {
 	now                func() time.Time
 
 	listener                 net.Listener
+	dirLock                  *datalock.Lock
 	store                    *store.Store
 	secrets                  secrets.Store
 	secretsState             domain.SecretsStatus
@@ -142,6 +144,16 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 			return nil, err
 		}
 	}
+	dirLock, err := datalock.Acquire(dataDir)
+	if err != nil {
+		return nil, err
+	}
+	lockHeld := true
+	defer func() {
+		if lockHeld {
+			_ = dirLock.Close()
+		}
+	}()
 	cfg, err := LoadConfig(dataDir)
 	if err != nil {
 		return nil, err
@@ -224,6 +236,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		mode:               mode,
 		now:                opts.Now,
 		listener:           ln,
+		dirLock:            dirLock,
 		store:              st,
 		secrets:            secretStore,
 		secretsState:       secretsStatus,
@@ -359,6 +372,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		},
 		ConnState: a.trackConnState,
 	}
+	lockHeld = false
 	return a, nil
 }
 
@@ -451,6 +465,9 @@ func (a *App) Close() {
 		a.closeNewOrIdleConnections()
 		if a.store != nil {
 			_ = a.store.Close()
+		}
+		if a.dirLock != nil {
+			_ = a.dirLock.Close()
 		}
 	})
 }

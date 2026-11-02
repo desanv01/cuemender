@@ -7,7 +7,7 @@ import (
 
 // These values can be replaced with -ldflags at release time.
 var (
-	Version   = "0.5.1-receive-only"
+	Version   = "1.0.0"
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )

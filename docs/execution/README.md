@@ -6,7 +6,7 @@ Revision: 3.0 • Updated 2026-11-02 (Malaysia) • P05 accepted locally; live c
 
 D37/C12: Codex completed and accepted the [receive-only fallback](ANONYMOUS-CHAT.md), verified with real offline-channel Twitch messages and read-only local OBS. Original EventSub/repair gates remain deferred. [P06 v1.1](packages/P06-release-readiness.md) now packages this path alongside EventSub and rehearsal; check STATUS for release. No DeepSeek writer is active.
 
-**Current: P06 v1.1 is ready for one DeepSeek worker after D37 acceptance.** P05 atomic scenario replacement, typed intake, simulated-provider guards and rendered controls remain verified in the [closure record](handoffs/P05-codex-closure.md). Read STATUS and the P06 launch prompt; no worker is active yet. The user's retained [live-verification plan](LIVE-VERIFICATION.md) stays pending until the 2FA hold is released. Original release summary below is historical context.
+**Current: P06 v1.1 is accepted for local release scope after Codex fixes and verification.** See [P06 review](handoffs/P06-review.md) and STATUS. No DeepSeek worker is active. Git release coordination and the post-P06 recording/submission plan follow; authenticated Twitch/approved real OBS gates remain pending. Earlier dispatch/hold summaries below are historical context.
 
 **Historical P05 dispatch: v1.1 was released to DeepSeek under D34/D35 and contracts v1.5/C11.** P04 is conditionally accepted for development and merged via PR #11; genuine build footage is saved. Read [STATUS](STATUS.md), [P05 packet](packages/P05-user-experience.md), [written visual brief](P05-VISUAL-BRIEF.md) and [PROMPTS](PROMPTS.md). P06 stays held. No P05 application code was written during dispatch preparation.
 
@@ -33,7 +33,7 @@ Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [init
 | [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Accepted local baseline under D30/D31 |
 | [P04 — Approved repair](packages/P04-approved-repair.md) | Codex approval, correction, reconciliation and tests | Conditional development acceptance D34; required real approval pending |
 | [P05 — User experience](packages/P05-user-experience.md) | Setup, controls, overlay, closure, isolated rehearsal | Accepted locally after Codex closure; dependent real journey deferred |
-| [P06 — Release readiness](packages/P06-release-readiness.md) | Tested Windows ZIP and reproducible instructions | v1.1 ready under D37; check STATUS |
+| [P06 — Release readiness](packages/P06-release-readiness.md) | Tested Windows ZIP and repeatable build instructions | v1.1 accepted locally under D37; see P06-review |
 | [Final integration/submission](SUBMISSION.md) | Codex review, actual demonstration, accurate entry | Codex/user stage |
 
 Later packets contain tasks, failure cases and acceptance gates now. Their exact file impact and verified SDK details are finalized before dispatch. This avoids treating untested API assumptions as facts.
