@@ -57,6 +57,8 @@ P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
 P04 merge: 6c09f11178f8bed8230d000cfd2652b74ea68265
 P05 tracking: https://github.com/desanv01/cuemender/issues/12
+P05 integration PR: https://github.com/desanv01/cuemender/pull/13 — draft; corrections required, not merged
+P05 checkpoints: worker 3ebf6be; Codex review/tests e6308fd
 P05 started at (UTC): 2026-11-02T04:19Z
 P05 finished at (UTC): 2026-11-02T04:42Z
 P05 expected report: docs/execution/handoffs/P05-worker-report.md
