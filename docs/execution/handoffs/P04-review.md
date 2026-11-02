@@ -4,6 +4,8 @@ Date: 2026-11-02 (Malaysia). Packet P04 v1.3, contracts v1.4/C10, D32/D33. Codex
 
 ## Outcome
 
+**Subsequent decision D34:** the user authorized P05 development while live Twitch and the real OBS approval trial remain pending. P04 is conditionally accepted as the local development baseline and PR #11 may be integrated. This supersedes the P05-hold/draft sequencing below, but none of the recorded live gates becomes passed. Preserve this original verification record; consult STATUS for current ownership and release.
+
 Published source checkpoint: `6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6`, following adapter `44295ec` and release documentation `74c45bd`. [PR #11](https://github.com/desanv01/cuemender/pull/11) is draft and unmerged. Issue #10 remains open for the unmet live gate; #6 remains the deferred Twitch prerequisite. Raw recordings, screenshots, synthetic browser storage, runtime databases, binary and tools are excluded from Git. Owned test/browser/recorder processes have stopped.
 
 Local implementation and rendered approval are complete. P04-A/V11 still requires the real OBS/private-UI approved correction; it is **unmet**, because the required active-monitoring Twitch connection remains deferred under D30/#6. No real Twitch account/authorization/chat or P04 OBS mutation was attempted. P02's earlier live read-only OBS check does not satisfy this write gate. P05 remains held and P04 is not fully accepted.
