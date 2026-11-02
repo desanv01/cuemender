@@ -53,6 +53,8 @@ P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
 Next action: retain draft P04 branch/PR and live gate issues. Resume real Twitch setup only when user releases the hold; complete real private-UI approval before full P04 acceptance, or record an explicit subsequent sequencing decision. P05 remains held.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
+P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
+P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — draft, not merged; live acceptance pending
 P04 recording: .tools/p04-recording/p04-build-01.mkv — 37:29.867, silent, verified and stopped
 P04 final checks: Windows full suite/vet/format/CGo-free build, five Node fixtures, rendered local-protocol approval and full WSL race passed. See P04-review.md for commands, failures corrected and exact limits.
 P02 setup: docs/implementation/P02-setup.md
