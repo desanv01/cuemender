@@ -4,7 +4,7 @@ Revision: 2.8 • Updated 2026-11-02 (Malaysia) • P05 released; live checks de
 
 ## Immediate next action
 
-**Current: P05 needs corrections.** See [P05 review](handoffs/P05-review.md), [P05-R01](corrections/P05-R01.md) and active correction in PROMPTS. Eight review regressions fail; P06 held. The user's retained [live-verification plan](LIVE-VERIFICATION.md) stays pending until the 2FA hold is released. Original release summary below is historical context.
+**Current: P05-R01 reviewed; corrections remain.** The original eight regressions pass, but three new tests and actual browser flows reproduce unfinished behavior. See [latest review](handoffs/P05-R01-review.md), [P05-R02](corrections/P05-R02.md) and active correction in PROMPTS. P06 held. The user's retained [live-verification plan](LIVE-VERIFICATION.md) stays pending until the 2FA hold is released. Original release summary below is historical context.
 
 **P05 v1.1 is released to one DeepSeek worker under D34/D35 and contracts v1.5/C11.** P04 is conditionally accepted for development and merged via PR #11; genuine build footage is saved. Read [STATUS](STATUS.md), [P05 packet](packages/P05-user-experience.md), [written visual brief](P05-VISUAL-BRIEF.md) and [PROMPTS](PROMPTS.md). P06 stays held. No P05 application code was written during dispatch preparation.
 
