@@ -124,12 +124,23 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 
 
 
+## P03-R05 corrections
+
+- Event intake captures the monitoring session ID; reports/feedback with empty or stale captured identity are rejected before mutation. Captured identity is revalidated inside coordinator admission and against the target incident session; replies require the same captured session plus current generation.
+- Store gains `InterruptIncident`, a conditional transaction tied to the observed stage/update version. Cleanup cannot overwrite a newer recheck or terminal dismissal; failed settlement remains pending for retry.
+- Automatic OBS/provider generation replacement invalidates a blocked diagnostic and prevents its result becoming current.
+- Settings recheck asserts the finding’s expectation revision. Stale feedback after provider replacement is dropped without a vote or acknowledgment.
+- Idle help remains sessionless and functional. The app queue-boundary tests (idle event into later session; old session after stop/start) are promoted.
+- Existing active HTTP/SSE shutdown, local protocol, SQLite finding and OBS allowlist evidence remains unchanged.
+
+
+
 ## Limits
 
 - **P03-D live Twitch chat-to-finding is deferred/unmet under D30/issue #6**: no real Twitch Public client/authorization/chat was attempted. Local normalized command callback and fixtures are not live evidence.
 - **P02-A/V06 remains deferred/unmet.** P02-B/V07 live OBS was previously verified by Codex; P03 did not repeat a live OBS comparison or alter the user's OBS.
 - The full local protocol acceptance test exercises production readiness/EventSub/OBS/reply wiring with local servers. A separate lower-level composition test still injects readiness; it is not the acceptance path.
-- Runtime retained reload, recoverable manual-stop retry and close/late-start boundaries are now covered. Automatic OBS disconnect/replacement, queued-report-across-stop/start, stale-feedback-after-replacement and close-while-database-admission-is-blocked lack dedicated named tests.
+- Automatic provider replacement is covered through the coordinator readiness-generation seam, not an actual socket-drop/reconnect scenario. No dedicated Close-while-database-admission-blocked or EventSub upgraded-socket failure-path cleanup test was added. Concurrent cleanup/dismiss/recheck is protected by a conditional store transaction but lacks a dedicated deterministic ordering test.
 - No rendered-browser check was possible; actual-script Node VM fixtures are distinct. No OBS mutations.
 - The final WSL Linux race suite passed.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.

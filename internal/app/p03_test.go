@@ -137,6 +137,9 @@ func TestP03SaveSettingsInvalidatesBlockedDiagnosticAndRecheck(t *testing.T) {
 	for time.Now().Before(deadline) {
 		got, _ := a.coordinator.Find(list[0].ID)
 		if len(got.Findings) > 0 {
+			if got.Findings[0].ExpectationRevision != updated.Revision {
+				t.Fatalf("recheck evidence revision=%d want %d", got.Findings[0].ExpectationRevision, updated.Revision)
+			}
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

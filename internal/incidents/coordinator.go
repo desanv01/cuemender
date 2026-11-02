@@ -501,6 +501,14 @@ func (c *Coordinator) HandleIssue(ctx context.Context, category, deliveryID, mes
 }
 
 func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time) string {
+	return c.handleIssue(ctx, category, deliveryID, messageID, actorID, generation, receivedAt, "*")
+}
+
+func (c *Coordinator) HandleIssueInSessionAt(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time, sessionID string) string {
+	return c.handleIssue(ctx, category, deliveryID, messageID, actorID, generation, receivedAt, sessionID)
+}
+
+func (c *Coordinator) handleIssue(ctx context.Context, category, deliveryID, messageID, actorID string, generation uint64, receivedAt time.Time, expectedSession string) string {
 	if err := c.acquire(ctx); err != nil {
 		return ""
 	}
@@ -517,6 +525,10 @@ func (c *Coordinator) HandleIssueAt(ctx context.Context, category, deliveryID, m
 	if session == nil || !session.Active || session.ID == "" {
 		c.mu.Unlock()
 		return "CueMender monitoring is not active. Help: !streamhelp"
+	}
+	if expectedSession != "*" && (expectedSession == "" || expectedSession != session.ID) {
+		c.mu.Unlock()
+		return ""
 	}
 	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
 		c.mu.Unlock()
@@ -557,6 +569,14 @@ func (c *Coordinator) HandleFeedback(ctx context.Context, command, code, actorID
 }
 
 func (c *Coordinator) HandleFeedbackAt(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time) string {
+	return c.handleFeedback(ctx, command, code, actorID, generation, receivedAt, "*")
+}
+
+func (c *Coordinator) HandleFeedbackInSessionAt(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time, sessionID string) string {
+	return c.handleFeedback(ctx, command, code, actorID, generation, receivedAt, sessionID)
+}
+
+func (c *Coordinator) handleFeedback(ctx context.Context, command, code, actorID string, generation uint64, receivedAt time.Time, expectedSession string) string {
 	if err := c.acquire(ctx); err != nil {
 		return ""
 	}
@@ -583,12 +603,12 @@ func (c *Coordinator) HandleFeedbackAt(ctx context.Context, command, code, actor
 		}
 	}
 	c.mu.Unlock()
-	if !found || target.SessionID != session.ID || domain.StageTerminal(target.Stage) {
+	if !found || target.SessionID != session.ID || (expectedSession != "*" && expectedSession != session.ID) || domain.StageTerminal(target.Stage) {
 		return "CueMender ignored unknown or stale feedback."
 	}
 	ready := c.status()
 	if !ready.TwitchConnected || ready.TwitchGeneration == 0 || generation != ready.TwitchGeneration {
-		return "CueMender ignored feedback from a replaced Twitch connection."
+		return ""
 	}
 	if !receivedAt.IsZero() && receivedAt.Before(session.StartedAt) {
 		return "CueMender ignored feedback from before this monitoring session."
@@ -779,24 +799,15 @@ func (c *Coordinator) finishJob(request *job) {
 	}
 	c.mu.Unlock()
 	if interrupted != nil {
-		if current, err := c.store.GetIncident(context.Background(), interrupted.ID); err == nil {
-			if current.Stage != domain.StageReported && current.Stage != domain.StageInvestigating {
-				interrupted = nil
-			} else if current.Stage == domain.StageInvestigating && current.UpdatedAt.After(request.incident.UpdatedAt) {
-				interrupted = nil
-			}
-		}
-	}
-	if interrupted != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		err := c.store.SaveIncident(ctx, *interrupted)
+		updated, ok, err := c.store.InterruptIncident(ctx, interrupted.ID, interrupted.UpdatedAt, c.now().UTC())
 		cancel()
-		if err == nil {
-			c.setIncident(*interrupted)
-		} else {
+		if err != nil {
 			c.mu.Lock()
 			c.pending[interrupted.ID] = *interrupted
 			c.mu.Unlock()
+		} else if ok {
+			c.setIncident(updated)
 		}
 	}
 	c.publish()

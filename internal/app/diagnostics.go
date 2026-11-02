@@ -66,7 +66,12 @@ func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if event.MonitoringSessionID != "" {
+	if event.MonitoringSessionID == "" {
+		if event.Command.Kind == twitch.CommandIssueAudio || event.Command.Kind == twitch.CommandIssueVideo ||
+			event.Command.Kind == twitch.CommandFixed || event.Command.Kind == twitch.CommandStillBroken {
+			return
+		}
+	} else {
 		session := a.coordinator.ActiveSession()
 		if session == nil || !session.Active || session.ID != event.MonitoringSessionID {
 			return
@@ -78,13 +83,13 @@ func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 		reply = p03Help
 	case twitch.CommandIssueAudio, twitch.CommandIssueVideo:
 		if a.coordinator != nil {
-			reply = a.coordinator.HandleIssueAt(ctx, event.Command.Category, event.DeliveryID, event.MessageID, event.ActorID, event.ConnectionGeneration, event.ReceivedAt)
+			reply = a.coordinator.HandleIssueInSessionAt(ctx, event.Command.Category, event.DeliveryID, event.MessageID, event.ActorID, event.ConnectionGeneration, event.ReceivedAt, event.MonitoringSessionID)
 		} else {
 			reply = p03Help
 		}
 	case twitch.CommandFixed, twitch.CommandStillBroken:
 		if a.coordinator != nil {
-			reply = a.coordinator.HandleFeedbackAt(ctx, string(event.Command.Kind), event.Command.IncidentCode, event.ActorID, event.ConnectionGeneration, event.ReceivedAt)
+			reply = a.coordinator.HandleFeedbackInSessionAt(ctx, string(event.Command.Kind), event.Command.IncidentCode, event.ActorID, event.ConnectionGeneration, event.ReceivedAt, event.MonitoringSessionID)
 		}
 	}
 	if strings.TrimSpace(reply) != "" {
@@ -97,7 +102,7 @@ func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 			return
 		}
 		session := a.coordinator.ActiveSession()
-		if session != nil && session.Active && !event.ReceivedAt.Before(session.StartedAt) {
+		if session != nil && session.Active && session.ID == event.MonitoringSessionID && !event.ReceivedAt.Before(session.StartedAt) {
 			_ = a.twitchMgr.EnqueueReplyFor(event.ConnectionGeneration, reply)
 		}
 	}

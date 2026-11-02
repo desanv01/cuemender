@@ -375,6 +375,40 @@ func (s *Store) AddFeedback(ctx context.Context, incidentID, actorID, vote strin
 	return inc, nil
 }
 
+// InterruptIncident atomically transitions only the observed investigating
+// version. A newer recheck/dismiss wins and is returned unchanged.
+func (s *Store) InterruptIncident(ctx context.Context, id string, expectedUpdatedAt, now time.Time) (domain.Incident, bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Incident{}, false, err
+	}
+	defer tx.Rollback()
+	inc, err := incidentFromRow(func(dest ...any) error {
+		return tx.QueryRowContext(ctx, incidentSelect+` WHERE id = ?`, id).Scan(dest...)
+	})
+	if err != nil {
+		return domain.Incident{}, false, err
+	}
+	if (inc.Stage != domain.StageReported && inc.Stage != domain.StageInvestigating) || !inc.UpdatedAt.Equal(expectedUpdatedAt) {
+		return inc, false, nil
+	}
+	inc.Stage = domain.StageInterrupted
+	inc.UpdatedAt = now
+	raw, _ := json.Marshal(inc)
+	res, err := tx.ExecContext(ctx, `UPDATE incidents SET stage = ?, updated_at = ?, incident_json = ? WHERE id = ? AND stage IN (?,?) AND updated_at = ?`,
+		inc.Stage, formatTime(now), string(raw), id, domain.StageReported, domain.StageInvestigating, formatTime(expectedUpdatedAt))
+	if err != nil {
+		return domain.Incident{}, false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return inc, false, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Incident{}, false, err
+	}
+	return inc, true, nil
+}
+
 // InterruptOpenIncidents closes prior-session work at startup. It never
 // auto-monitors or replays work.
 func (s *Store) InterruptOpenIncidents(ctx context.Context, now time.Time) error {

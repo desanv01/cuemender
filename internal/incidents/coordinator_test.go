@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -252,6 +253,66 @@ func TestCoordinatorLoadsRetainedRecordBeyondCompletedPage(t *testing.T) {
 	defer c.Close()
 	if got, ok := c.Find(open.ID); !ok || got.ID != open.ID {
 		t.Fatal("retained open record outside the completed-history page was not loaded")
+	}
+}
+
+func TestCoordinatorStaleFeedbackAfterProviderReplacementIsDropped(t *testing.T) {
+	c, _, st := coordinatorFixture(t)
+	ctx := context.Background()
+	session, err := c.Start(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.HandleIssue(ctx, "audio", "stale-fb-d", "stale-fb-m", "viewer", 1)
+	c.wg.Wait()
+	_, list := c.Snapshot()
+	if len(list) == 0 {
+		t.Fatal("no incident")
+	}
+	inc := list[0]
+	inc.Stage = domain.StageAwaitingFeedback
+	if err := st.SaveIncident(ctx, inc); err != nil {
+		t.Fatal(err)
+	}
+	c.setIncident(inc)
+	c.status = func() Readiness {
+		return Readiness{TwitchConnected: true, TwitchGeneration: 2, OBSConnected: true, OBSGeneration: 1, ResolutionReady: true}
+	}
+	if reply := c.HandleFeedbackInSessionAt(ctx, "still_broken", inc.PublicID, "viewer", 1, time.Now(), session.ID); reply != "" {
+		t.Fatal("stale-generation feedback was acknowledged")
+	}
+	got, _ := c.Find(inc.ID)
+	if got.Feedback.Negative != 0 {
+		t.Fatal("stale feedback changed durable vote")
+	}
+}
+
+func TestCoordinatorAutomaticProviderReplacementInvalidatesJob(t *testing.T) {
+	c, _, _ := coordinatorFixture(t)
+	var generation atomic.Uint64
+	generation.Store(1)
+	c.status = func() Readiness {
+		return Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, OBSGeneration: generation.Load()}
+	}
+	entered, release := make(chan struct{}), make(chan struct{})
+	original := c.read
+	c.read = func(ctx context.Context, s domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+		d, o, err := original(ctx, s)
+		close(entered)
+		<-release
+		return d, o, err
+	}
+	inc, err := c.Check(context.Background(), "audio", 1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-entered
+	generation.Store(2)
+	close(release)
+	c.wg.Wait()
+	got, _ := c.Find(inc.ID)
+	if len(got.Findings) != 0 || got.Stage == domain.StageFindingAvailable || got.Stage == domain.StageAwaitingFeedback {
+		t.Fatalf("replaced provider result became current: %+v", got)
 	}
 }
 

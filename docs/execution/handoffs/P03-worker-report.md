@@ -254,3 +254,43 @@ Correction started/finished UTC: 2026-11-02T01:44Z / 2026-11-02T01:48Z. Preserve
 - No rendered-browser or fresh live OBS check. Live P02-A/V06 and P03-D remain deferred under D30/issue #6.
 
 P03-R04 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R04.md and docs/execution/handoffs/P03-R03-review.md. Inspect actual changes and rerun preserved regressions plus retained-state, recoverable-fault, close/session ownership, publication and required actual-app/protocol boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch remains deferred under D30/issue #6; P04 stays held for Codex release and recording.
+
+## P03-R05 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-02T01:59Z / 2026-11-02T02:01Z. Preserved R04 improvements. One supplied failure reproduced first (`TestReviewR04IdleQueuedReportCannotEnterLaterSession`), fixed; both queue tests promoted. No production fixes by Codex.
+
+### A–C matrix
+
+| Group/boundary | Evidence | Result |
+|---|---|---|
+| A empty captured session rejected | Reports/feedback with empty MonitoringSessionID are dropped; idle help remains eligible. Promoted `TestReviewR04IdleQueuedReportCannotEnterLaterSession` | pass |
+| A old captured session rejected | Captured old session is revalidated at process and coordinator durable admission; same identity required for reply. Promoted `TestReviewR04QueuedOldSessionReportIsDropped` | pass |
+| A stale feedback/provider replacement | `TestCoordinatorStaleFeedbackAfterProviderReplacementIsDropped`; no vote/ack | pass |
+| A idle help no incident | Existing active-protocol idle help; promoted queue tests show no incident creation | pass |
+| B atomic cleanup | New `Store.InterruptIncident` conditional transaction tied to observed stage/update version; cleanup cannot overwrite newer recheck/terminal. `finishJob` uses it | implemented; dedicated concurrent dismiss/recheck test not added |
+| B bounded close/DB | Existing Close admission/join, active HTTP/SSE diagnostic shutdown, listener release, DB reopen preserved | pass; Close-while-DB-admission-blocked test still absent |
+| C automatic provider replacement | `TestCoordinatorAutomaticProviderReplacementInvalidatesJob` (OBS generation changes during blocked read; no finding becomes current) | pass at coordinator seam |
+| C settings evidence revision | `TestP03SaveSettingsInvalidatesBlockedDiagnosticAndRecheck` now asserts finding ExpectationRevision equals new revision | pass |
+| C protocol failure cleanup | Happy-path EventSub handler/socket join, SQLite finding and OBS read-only allowlist preserved | pass; dedicated failure/cancellation socket test not added |
+| C prior evidence | Active HTTP/SSE shutdown, local protocol, Node, exact-bound and earlier regressions preserved | pass |
+
+### Exact checks
+
+| Command/action | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=360s` | exit 0; all packages |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| `CGO_ENABLED=0 go build -trimpath -o dist/cuemender.exe ./cmd/app` | exit 0; 20,014,080 bytes; SHA256 `57383E52A17EA6FFA7D1E0FF4678044E9A10C4A7E89987095DE26D132D2204E5`; `0.3.0-p03` |
+| Four Node fixtures | all exit 0; review failures=[]; p03 problems=[] |
+| Queue/session/settings/provider/protocol repeats ×3 | all focused tests pass |
+| WSL Linux `go test -race ./... -count=1 -timeout=360s` | exit 0; all packages race-clean |
+
+### Remaining named gaps
+
+- No dedicated Close-while-database/admission-blocked test; bounded contexts and Close joining are implemented.
+- No dedicated EventSub upgraded-socket failure/cancellation cleanup test.
+- No dedicated deterministic concurrent cleanup/dismiss/recheck test; conditional transactional write protects the path.
+- Automatic provider replacement is exercised at the readiness-generation seam, not a real socket drop/reconnect.
+- No rendered-browser or fresh live OBS check. Live P02-A/V06 and P03-D remain deferred under D30/issue #6.
+
+P03-R05 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R05.md and docs/execution/handoffs/P03-R04-review.md. Inspect actual changes and verify captured-session mutation/replies, atomic cleanup and the named provider/database/settings/protocol failure boundaries, preserving all prior regressions. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch stays deferred under D30/issue #6; P04 remains held for Codex release and recording.
