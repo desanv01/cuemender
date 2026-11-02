@@ -1,6 +1,6 @@
 # Shared contracts
 
-Revision: 1.4 • Changes require Codex decision and affected-packet review.
+Revision: 1.5 • Changes require Codex decision and affected-packet review.
 
 This specifies observable behavior and data semantics, not mandatory function names. Introduce structures as consumed; P01 does not implement the full future state machine.
 
@@ -273,3 +273,27 @@ These details resolve C06 against the accepted P03 implementation; no generic mu
 - One action may be reserved/in flight at a time. Bounded work joins during close. Preserve all other assignments and remaining findings, especially mute. Verified write read-back means local OBS configuration only; after unknown outcome, matching configuration is reported without attributing its cause.
 
 Implementation clarification: proposals also bind the originating Twitch generation. Both approval and final dispatch require that current connection, current OBS generation and resolved evidence. A temporary discovery-refresh gap suspends approval without consuming an otherwise unchanged proposal; a known context change, disconnect, generation change or other binding change invalidates it. A failed outcome commit remains unknown and eligible for read-only recovery across monitoring Stop/reload; reloading durable unfinished intent must not erase that runtime recovery ownership.
+
+## C11 — P05 interface, closure and rehearsal (D34/D35)
+
+### Immutable mode and isolation
+
+- Add `--mode live|rehearsal`, default live. Reject unknown values before state/listeners. App Options carries trusted constructor mode, default live for existing callers. HTTP, saved preferences and browser storage cannot change it. Every projection/incident/proposal/report carries actual mode; public rehearsal adds `demo_label: "REHEARSAL — simulated data"`.
+- Live paths remain unchanged. Rehearsal uses `<resolved --data-dir base>/rehearsal`, or `<default LiveCheck directory>/rehearsal`. Document that --data-dir is the base in rehearsal. Never read the base live config/DB/credentials. Use rehearsal-local config/DB and isolated memory secrets; zero OS-keyring construction or calls. Reserve CueMender-Rehearsal as its distinct namespace identifier if needed. Rehearsal needs no authorization/password.
+- Persist/validate DB mode ownership before domain-state loading/recovery. Existing unmarked P01–P04 databases are live only; new empty rehearsal DBs are marked rehearsal. Reject conflicting marked mode (including live pointed at a rehearsal directory) without rewriting it. Migration 4 may add mode ownership and closure data; preserve old live names/settings/records. Do not copy live data to rehearsal.
+- Branch composition before secret/provider construction. Rehearsal cannot construct real Twitch managers/HTTP senders, OBS dialers/writers or OS-keyring stores, even with live-looking config. Use in-process fixtures and a bounded simulated reply sink. Live credential/connect/disconnect routes return 409 in rehearsal before processing secrets or invoking providers. Normal private session/CSRF/Host/Origin/SSE boundaries remain.
+- Reuse diagnostics/coordinator/store/approval with narrow consumer-owned adapter seams, not a second state engine or DOM-only fake success. Trusted constructor mode must match proposal/incident/session provenance. Preserve the live-only validator/default for existing callers; a generalized validator must take trusted owner mode. Simply allowing either mode in existing live guards is forbidden. Live generation/session/TTL/map/intent/no-replay checks are unchanged.
+
+### Broadcaster closure and feedback
+
+- Private `POST /api/v1/incidents/{id}/close` accepts strict JSON `{"outcome":"viewer_confirmed"|"local_only"|"unresolved"}`. Same auth/CSRF/Host/Origin/body bounds as existing routes. Return 200 with persisted incident; unknown ID 404; malformed/unknown outcome 400; ineligible state/conflicting repeat/pending or unknown action 409. Same outcome on already closed incident is idempotent. Existing dismissal stays separate.
+- Eligible stages: finding_available, awaiting_approval with unused proposal, awaiting_feedback, unresolved, no_supported_finding, insufficient_information, interrupted. Reject while diagnostic job, pending retry settlement or pending/unknown repair owns the incident. Never discard uncertain-action audit.
+- viewer_confirmed requires originating current active session, positive count >0 and negative count =0, checked transactionally with closure. local_only requires LocalVerified; unresolved records explicit unresolved closure, never fabricates verification/feedback. Persist closure_outcome/closed_at, invalidate unused proposals atomically, reject future terminal feedback/recheck/approval. Serialize through existing coordinator authority and feedback transaction. Publish only committed state; DB failure leaves cache/UI unchanged.
+- Existing !fixed/!stillbroken intake is already implemented. Preserve latest-vote replacement, dedup/bounds, session/generation, own-account exclusion and bounded replies. Do not add a second bot/store. Show positive/negative separately. Public projection may add only the allowlisted closure_outcome enum, no private facts/actors. Counts mean viewer reports, not measured playback truth.
+
+### Rehearsal controls
+
+- Private `POST /api/v1/rehearsal/scenario`: only `{"scenario":"track_missing"|"mic_muted"|"wrong_scene"|"unknown_write"}`. Rehearsal-only; live returns 409. Reject while diagnostics/actions/recovery own work. No arbitrary source/map payload. Stop/invalidate prior simulated session/proposals and configure fictional expectations through normal revision authority. Scenario selection never auto-starts monitoring or approves. Simulated provider readiness is clearly labeled.
+- Private `POST /api/v1/rehearsal/report`: only `{"category":"audio"|"video"}`. Private `POST /api/v1/rehearsal/feedback`: only `{"public_id":"CODE","vote":"fixed"|"stillbroken"}`. Generate bounded synthetic actor/delivery IDs internally and use shared coordinator/intake/dedup/feedback ownership. One documented simulated viewer changes its previous vote. Idle/stale/terminal/cross-mode work is rejected. Accepted simulated intake is 202; bounded busy/conflict follows existing rules. All routes use normal private security and reject in live before doing work.
+- track_missing: six complete flags, one missing confirmed track, explicit private approval, one simulated write/readback. mic_muted: manual-only guidance. wrong_scene: limitation/insufficient evidence, no hidden-item assertion. unknown_write: exactly one simulated mutation may occur; report unknown, then read-only reconcile with honest attribution; never retry writer automatically. Rehearsal cannot reach real OBS.
+- Tests prove zero live constructors/keyring/dial/send calls, not only mode labels. Cover forged/cross-mode IDs, setup/approval routes, restart/DB marker conflicts, scenario ownership, invalid CLI mode and default-live compatibility. Rehearsal is never live acceptance evidence.

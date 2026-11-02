@@ -2,6 +2,8 @@
 
 Revision: 1.2
 
+Current release exception D34/D35: user authorized P05 on conditionally accepted P04 local baseline, merged via PR #11. Live Twitch #6, real approved OBS trial #10, dependent real P05 journey and final readiness remain unmet. P05 v1.1/C11/written brief is released to one DeepSeek worker; P06 stays held. This supersedes earlier P05-hold wording, not production guards or evidence requirements.
+
 Current exception: D30 explicitly permits P03 development on the conditionally accepted P02 baseline while live Twitch gates remain deferred/unmet in issue #6. This changes phase sequencing only, not live-evidence requirements or final readiness. Earlier P02/P03 hold wording in historical reports is superseded by this recorded decision; consult STATUS for the current release. No automatic P04 release follows.
 
 ## Ownership sequence
@@ -25,7 +27,7 @@ After handoff, DeepSeek stops all edits. Codex reviews actual files and required
 | P05 user experience | DeepSeek | Codex reviews working UI and rehearsal isolation |
 | P06 release readiness | DeepSeek | Codex verifies artifact and complete workflow |
 
-Codex owns meaningful production implementation in P04: proposal/approval binding, fresh preconditions, durable action intent, narrow OBS write, read-back, timeout/restart reconciliation and their tests. This is planned work, not an already completed contribution.
+Codex completed P04's local proposal/approval engine, guarded OBS write, persistence/recovery and tests. See P04-codex-build.md for actual contribution/recording and P04-review.md for self-verification/peer inspection and unmet live gate. DeepSeek owns the newly released P05 only.
 
 After any DeepSeek handoff, Codex may directly fix a scoped integration defect or debug code when that avoids another relay. First take sole edit ownership in STATUS; record affected files, actual changes and verification afterward. Do not rewrite functioning code merely to manufacture Codex authorship. Larger worker corrections still receive one consolidated packet.
 

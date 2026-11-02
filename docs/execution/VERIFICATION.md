@@ -4,7 +4,7 @@ Revision: 1.1 • Initial status of every row: NOT RUN.
 
 Current sequencing exception (D30): V06 and P03-D real-chat integration are deferred/unmet in issue #6 while the user's Twitch 2FA is blocked. P03 local implementation may proceed; neither these gates nor V18's full live workflow are waived. See STATUS and actual reports for current evidence rather than the original initial-status label.
 
-P04 local implementation evidence is in [P04-review.md](handoffs/P04-review.md). V12/V13 and local V11 protocol/browser coverage are recorded separately from **unmet real V11**. The active-monitoring connection gate is retained; no live Twitch or real approved OBS write was performed in P04. P05 remains held.
+P04 local evidence is in [P04-review.md](handoffs/P04-review.md). V12/V13 and local V11 coverage remain separate from **unmet real V11**. Under user decision D34, P05 may proceed with local protocols/rehearsal; real V06, P03-D, V11, dependent real P05-A/V14 and final V18/V19 stay deferred/unmet. No production guard is weakened. P06 remains held; rehearsal isolation V15 still requires actual composition tests.
 
 For DeepSeek packets, the worker fills its report and Codex reviews the implementation. For Codex-owned P04 and direct Codex fixes, record build evidence and self-verification explicitly; do not call it independent review. Mocked tests, local browser checks and actual Twitch/OBS checks are separate evidence classes.
 

@@ -31,6 +31,8 @@ DeepSeek remains a code/test worker and must not mutate repository state. No for
 
 ## Current state
 
+2026-11-02 D34 update: PR #11 merged as conditional P04 development baseline at 6c09f11178f8bed8230d000cfd2652b74ea68265. Keep #6 and #10 open for deferred real verification. P05 uses feature/p05-user-experience and issue #12; Codex checkpoints dispatch docs before worker editing. No full live acceptance or release artifact follows from this source merge.
+
 P01-R01 baseline a07b3df3c33f0284c1da450a323fbba3e9ed1771 is published. P02 source checkpoint 1b068843e38bee905ff6ea80c44f612e88ed32d4 is integrated through PR #5 under D30's conditional development acceptance. Close completed implementation/correction issues #2/#4 with explicit links to the deferred live Twitch gate in issue #6; do not close #6 before actual verification. P03 is tracked in issue #7 on feature/p03-diagnostics, prepared by Codex before dispatch. Verify actual remote state for final PR/merge hashes rather than treating this planning note as merge evidence. Source integration does not imply a release artifact or full live acceptance.
 
 This authorization covers Git/GitHub work. It does not itself authorize unrelated email, YouTube publication or Devpost submission.

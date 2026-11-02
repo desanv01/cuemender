@@ -143,7 +143,7 @@ One local process, with no separate frontend server or cloud database.
 
 - **Accepted:** application lifecycle, validated persistence, local private sessions, CSRF protection, separate public/private state, embedded pages, and the corrected reload/concurrency/shutdown/error-redaction paths.
 - **Implemented locally:** Twitch/OBS connections, three diagnoses, persistent incidents/feedback, and the private track-approval engine with durable intent, one dispatch, read-back and read-only recovery.
-- **Next:** real Twitch/approved-repair verification, finished user experience, isolated rehearsal and release packaging. P05 remains held pending the P04 gate decision.
+- **Next:** P05 user experience and isolated rehearsal are released for implementation under D34. Real Twitch/approved-repair verification stays pending; P06 release packaging remains held.
 - **Outside the MVP:** automatic unmute or source reveal, raw audio analysis, computer vision, OS-device repair, multiple channels and autonomous control.
 - **Verification limits:** local OAuth/EventSub/OBS protocol servers and headless rendered-browser checks do not prove live Twitch behavior. P02 live OBS read-only evidence is recorded separately; it is not a P04 live-write trial. Final commands, race results and remaining gates are recorded in [P04 verification](docs/execution/handoffs/P04-review.md). OBS has no atomic compare-and-set against other clients; local track read-back does not prove viewer audio recovery.
 

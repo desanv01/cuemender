@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 2.6
-Last update: 2026-11-02T03:49Z
-Current packet: P04
-Current state: locally_verified / live_gate_pending — P04 implementation, recording and local validation complete; not fully accepted
+Revision: 2.7
+Last update: 2026-11-02T04:15Z
+Current packet: P05
+Current state: ready — P05 released under D34/D35; awaiting sole DeepSeek claim
 Current owner: Codex
-Released packet revision: P04 v1.3 under D32; live Twitch and dependent real approval trial remain pending
-Code writer active: none — Codex/root and all implementation agents stopped; DeepSeek remains stopped
+Released packet revision: P05 v1.1, CONTRACTS v1.5/C11, P05-VISUAL-BRIEF v1.0; live gates deferred, not passed
+Code writer active: none — DeepSeek may claim P05 only after checking this release
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -33,7 +33,7 @@ Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
 P02 tracking: https://github.com/desanv01/cuemender/issues/2
-Worker branch: feature/p04-approved-repair; starting baseline 01a6e3d68cd919b5e90e80bc96e5d61e8c0204e4
+Worker branch: feature/p05-user-experience; source baseline 6c09f11178f8bed8230d000cfd2652b74ea68265; dispatch documentation committed on this branch
 P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
 P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
 P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
@@ -44,17 +44,22 @@ P03 closure checkpoint: separate Codex implementation/self-verification commit f
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
 Closure record: docs/execution/handoffs/P04-codex-build.md
-Implementation: P04 v1.3, contracts v1.4/C10; guarded track write, durable approval and read-only recovery
+Implementation: P04 local engine conditionally accepted for development under D34; P05 has not started
 Environment note: docs/implementation/P01-environment.md
 Review: docs/execution/handoffs/P04-review.md — self-verification plus separately recorded peer source inspection
 Correction: P03-R06 complete; no active correction dispatch
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: retain draft P04 branch/PR and live gate issues. Resume real Twitch setup only when user releases the hold; complete real private-UI approval before full P04 acceptance, or record an explicit subsequent sequencing decision. P05 remains held.
+Next action: dispatch P05 v1.1 to one DeepSeek worker using PROMPTS.md. Preserve live hold under D34; no production readiness bypass. P06 stays held.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
-P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — draft, not merged; live acceptance pending
+P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
+P04 merge: 6c09f11178f8bed8230d000cfd2652b74ea68265
+P05 tracking: https://github.com/desanv01/cuemender/issues/12
+P05 expected report: docs/execution/handoffs/P05-worker-report.md
+P05 design brief: docs/execution/P05-VISUAL-BRIEF.md; 12ui retry authorized but service budget exhausted, no generated design claim
+Additional deferred evidence: real P05-A/V14 end-to-end journey and final V18/V19; local protocol/rehearsal work proceeds
 P04 recording: .tools/p04-recording/p04-build-01.mkv — 37:29.867, silent, verified and stopped
 P04 final checks: Windows full suite/vet/format/CGo-free build, five Node fixtures, rendered local-protocol approval and full WSL race passed. See P04-review.md for commands, failures corrected and exact limits.
 P02 setup: docs/implementation/P02-setup.md
@@ -64,8 +69,8 @@ P02 setup: docs/implementation/P02-setup.md
 | P01 | accepted | P01-R01-review.md | Accepted baseline published |
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
 | P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 subsequently released under D32 |
-| P04 | locally verified / real approval gate pending | P04-review.md + P04-codex-build.md | Not fully accepted; no live Twitch or gate bypass |
-| P05 | planned / held | Not started | Codex acceptance of P04 and release |
+| P04 | conditionally accepted local development baseline; real approval pending | P04-review.md + D34 | Integrated via PR #11; issue #10 stays open |
+| P05 | released v1.1 / ready | Not started | D34/D35 + C11 + written visual brief; one DeepSeek worker |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
 | Submission | planned | Not started | Release review and user-controlled external steps |
 
@@ -77,11 +82,11 @@ P02 setup: docs/implementation/P02-setup.md
 - No credentials are needed to complete P01 foundation tests.
 - User explicitly put live Twitch login/registration/authorization work on hold because of phone-number/2FA errors. No client ID or live authorization is available. Under D30, complete P03 independently with local fixtures/manual checks; retain live Twitch gates in issue #6 before final readiness.
 - User selected CueMender and authorized public repository cuemender plus routine commits/issues/PRs/merges/closure. See GIT_WORKFLOW.md. Go module, executable and visible branding use CueMender; legacy storage identifiers intentionally remain.
-- P04 recording checkpoint: before implementation, test capture of this main Codex chat, record actual build/test moments, then stop and verify the saved footage. See P04.0 in packet revision 1.2. No recording starts now.
+- P04 recording is completed/stopped/verified. No P05 recording requested. Preserve ignored raw footage.
 
 ## Ownership changes
 
-When dispatched, worker records started_at, worker/harness identity, state=in_progress, owner=DeepSeek:P03.
+When dispatched, worker records P05 started_at, worker/harness identity, state=in_progress, owner=DeepSeek:P05, active writer yes. Preserve older packet timestamps as history.
 At handoff, record state=ready_for_review or blocked, owner=Codex, code_writer_active=none, report path and exact unmet prerequisites.
 Only Codex updates acceptance, contract revisions, dispatch release or Git checkpoints.
 

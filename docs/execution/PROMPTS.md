@@ -1,8 +1,41 @@
 # Copy-paste prompts
 
-Revision: 2.4
+Revision: 2.5
 
-Current dispatch: **P04 is Codex-owned, not a DeepSeek prompt.** Local implementation and genuine build recording are complete; see STATUS and handoffs/P04-review.md for verification and remaining gates. Contracts v1.4/C10 and P04 v1.3 apply. Live Twitch remains pending and the dependent real approval trial is not claimed passed. P05 remains held. Historical worker prompts below are not active dispatches.
+Current dispatch: **P05 v1.1 to one DeepSeek worker**, contracts v1.5/C11, D34/D35. P04 local baseline is integrated; live Twitch and real approved OBS trial stay pending. P06 held. Historical prompts below are not active dispatches.
+
+## P05 v1.1 — active launch prompt
+
+~~~text
+You are the sole DeepSeek implementation worker for CueMender in:
+C:\Users\Dv\Desktop\Twitch Hackathon
+
+Execute P05 v1.1 only, on the existing feature/p05-user-experience branch. Codex owns planning, contracts, acceptance and all Git/GitHub actions. No additional agents or parallel editing chats.
+
+Before editing, read AGENTS.md and these files under docs/execution:
+README.md, STATUS.md, WORKFLOW.md, PROJECT_SPEC.md, ARCHITECTURE.md,
+CONTRACTS.md v1.5 (especially C09–C11), DECISIONS.md D34/D35,
+packages/P05-user-experience.md, P05-VISUAL-BRIEF.md,
+REPOSITORY_PRESENTATION.md, handoffs/P04-review.md,
+and templates/WORKER_REPORT.md.
+
+Confirm STATUS releases P05 and no other writer is active, inspect branch/HEAD/diff without Git mutations, preserve existing files, and claim sole ownership. Source baseline is P04 merge 6c09f11178f8bed8230d000cfd2652b74ea68265 plus Codex's P05 dispatch docs. If branch/ownership differs, report the conflict instead of switching or overwriting.
+
+Implement all P05-A through P05-F end to end: setup/readiness and accessible private controls, evidence/approval/feedback/transactional closure, quiet sanitized overlay, immutable --mode rehearsal with isolated data and in-process adapters, tests and user docs. Reuse the existing diagnostics, feedback, coordinator and P04 approval/recovery engine. Follow C11's exact routes, closure rules, mode provenance and isolation. Preserve every P01–P04 behavioral regression and all live security/approval/session/generation/TTL/no-replay guards. Go-only backend, embedded vanilla HTML/CSS/JS, no new dependencies/frameworks/services or SDK changes.
+
+Use the written visual brief. Codex inspected the current rendered screen; 12ui was attempted and the screenshot retry explicitly authorized, but the service reported sponsored budget exhausted. No generated design/HTML exists. Do not claim a missing skill ran. Rendered visual verification remains required or must be explicitly reported unavailable.
+
+Live Twitch login, app registration, authorization, credentials and real chat are on hold. The real OBS approval trial is also on hold. Do not modify real OBS or weaken readiness to bypass these gates. D34 permits local fixtures and clearly labeled isolated rehearsal only. Keep issue #6, issue #10, dependent real P05-A/V14 and final live readiness explicitly unmet. Computer access stays background-only; use headless local browser checks if available. No recording or publication.
+
+Run required focused checks, full Go suite, vet, gofmt, CGo-free build, all five existing Node fixtures plus new meaningful coverage, configured WSL race and rendered local browser flows if available. Prove actual rehearsal composition makes zero live adapter/keyring calls, not just that labels change. Test migration/mode conflicts, closure/feedback races, unknown actions, cross-mode IDs, public GET/SSE redaction and shutdown. Never delete assertions to make changed markup pass. Record exact failures, fixes, skipped checks and evidence classes.
+
+Do not commit, push, change branches, stash/reset/clean, create PRs/issues, merge or submit. Do not edit authoritative specs/contracts/packet/brief; report necessary changes to Codex and finish independent in-scope work.
+
+Write docs/implementation/P05-user-experience.md and docs/execution/handoffs/P05-worker-report.md. Map P05-A through F and acceptance gates to files/commands/results; include tools, changed paths, migration, limits and stopped processes. No secrets, bootstrap links or raw chat. When finished or blocked, update only P05 operational STATUS fields, transfer owner to Codex, set no active writer, stop owned processes and stop editing. Do not start P06.
+
+End with this exact handoff:
+"P05 v1.1 implementation is ready for review. Read docs/execution/handoffs/P05-worker-report.md and docs/implementation/P05-user-experience.md; inspect actual changes against P05 v1.1, CONTRACTS v1.5/C11 and P05-VISUAL-BRIEF.md. Reproduce the setup/approval/feedback/closure, rehearsal isolation, persistence, lifecycle, public projection and rendered-browser boundaries while preserving prior regressions. DeepSeek has stopped editing. Record acceptance, consolidated corrections or specific blockers. Live Twitch and the real OBS approval trial remain deferred under D34/issues #6 and #10; do not count fixtures or rehearsal as live evidence. P06 remains held."
+~~~
 
 ## Historical: P03-R06 v1.0 — completed
 
