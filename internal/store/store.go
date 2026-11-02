@@ -168,31 +168,40 @@ func OpenMode(ctx context.Context, path, mode string) (*Store, error) {
 		return nil, fmt.Errorf("configure foreign keys: %w", err)
 	}
 
-	var existing int
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='incidents'`).Scan(&existing)
+	var schemaVersion int
+	_ = db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&schemaVersion)
+	var priorMode string
+	if schemaVersion > 0 {
+		_ = db.QueryRowContext(ctx, `SELECT value FROM db_meta WHERE key = 'mode'`).Scan(&priorMode)
+		if priorMode != "" && priorMode != mode {
+			db.Close()
+			return nil, fmt.Errorf("%w: database is %s, requested %s", domain.ErrModeConflict, priorMode, mode)
+		}
+		if priorMode == "" && mode == domain.ModeRehearsal {
+			db.Close()
+			return nil, fmt.Errorf("%w: existing unmarked database is live-only", domain.ErrModeConflict)
+		}
+	}
 	s := &Store{db: db, path: abs}
 	if err := s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, err
 	}
-	var marked string
-	err = db.QueryRowContext(ctx, `SELECT value FROM db_meta WHERE key = 'mode'`).Scan(&marked)
-	switch {
-	case err == nil && marked != mode:
-		db.Close()
-		return nil, fmt.Errorf("%w: database is %s, requested %s", domain.ErrModeConflict, marked, mode)
-	case err == sql.ErrNoRows:
-		if existing > 0 && mode == domain.ModeRehearsal {
+	if priorMode == "" {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
 			db.Close()
-			return nil, fmt.Errorf("%w: existing unmarked database is live-only", domain.ErrModeConflict)
+			return nil, err
 		}
-		if _, err := db.ExecContext(ctx, `INSERT INTO db_meta(key, value) VALUES('mode', ?)`, mode); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO db_meta(key, value) VALUES('mode', ?)`, mode); err != nil {
+			tx.Rollback()
 			db.Close()
 			return nil, fmt.Errorf("mark database mode: %w", err)
 		}
-	case err != nil:
-		db.Close()
-		return nil, fmt.Errorf("read database mode: %w", err)
+		if err := tx.Commit(); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("commit database mode: %w", err)
+		}
 	}
 	s.mode = mode
 	return s, nil

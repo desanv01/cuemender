@@ -14,7 +14,10 @@
       case 'reported': return 'Checking a viewer report';
       case 'finding_available': return incident.category === 'video' ? 'Visual item needs manual attention' : 'Microphone needs manual attention';
       case 'awaiting_approval': return 'Awaiting private approval';
-      case 'awaiting_feedback': return 'Verification needs viewer feedback';
+      case 'applying': return 'Applying approved local change';
+      case 'action_unknown': return 'Action outcome unknown; read-only reconciliation';
+      case 'awaiting_feedback':
+        return incident.local_verification === 'verified' ? 'Local configuration verified; manual findings remain' : 'Verification needs viewer feedback';
       case 'no_supported_finding': return 'No supported conflict found';
       case 'insufficient_information':
       case 'interrupted': return 'Evidence is incomplete';
@@ -40,7 +43,7 @@
   function render(state) {
     const view = describe(state);
     const count = Array.isArray(state.incidents) ? state.incidents.length : 0;
-    panelNode.hidden = count === 0 && state.mode !== 'rehearsal';
+    panelNode.hidden = count === 0 && state.mode !== 'rehearsal' && state.service_status !== 'disconnected';
     statusNode.textContent = view.status;
     detailNode.textContent = view.detail;
     incidentsNode.replaceChildren();

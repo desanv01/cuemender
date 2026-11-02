@@ -3,7 +3,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const queryAll = (selector) => typeof document.querySelectorAll === 'function' ? Array.from(document.querySelectorAll(selector)) : [];
-  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor' };
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor', sectionChosen: false, closeOutcomes: {} };
   let events = null;
 
   class ApiError extends Error {
@@ -118,7 +118,8 @@
       setText('obs-broadcast', 'Broadcasting state unknown.');
     }
     setText('obs-stale', value.stale ? 'Observation data is stale.' : '');
-    setText('obs-readiness', setup && setup.live_obs_resolution_ready ? 'Live resolution ready.' : 'Live resolution not ready.');
+    const readiness = setup && setup.live_obs_resolution_ready ? 'Live resolution ready.' : 'Live resolution not ready.';
+    setText('obs-readiness', state.mode === 'rehearsal' ? 'Simulated provider resolution ready.' : readiness);
     setText('obs-observed', value.observed_at ? 'Observed at ' + value.observed_at : 'Observation time unknown.');
     if (startup && startup.obs_address && !$('obs-address').value) {
       $('obs-address').value = startup.obs_address;
@@ -255,6 +256,10 @@
     state.actionRecords = Array.isArray(privateState.actions) ? privateState.actions : [];
     state.incidents = Array.isArray(privateState.incidents) ? privateState.incidents : [];
     setText('monitor-status', active ? 'Monitoring active' + (session && session.id ? ' (session ' + session.id.slice(0, 8) + '…)' : '') : 'Monitoring is stopped.');
+    const tw = privateState.twitch ? privateState.twitch.status : 'not connected';
+    const obs = privateState.obs ? privateState.obs.status : 'not connected';
+    const broadcast = privateState.obs && typeof privateState.obs.broadcasting === 'boolean' ? String(privateState.obs.broadcasting) : 'unknown';
+    setText('monitor-context', (state.mode === 'rehearsal' ? 'Simulated providers' : 'Local providers') + ' · Twitch: ' + tw + ' · OBS: ' + obs + ' · broadcast: ' + broadcast + ' · monitoring: ' + (active ? 'active' : 'stopped'));
     renderIncidents(state.incidents);
   }
 
@@ -264,6 +269,7 @@
       return;
     }
     list.replaceChildren();
+    const focusedID = document.activeElement && document.activeElement.id ? document.activeElement.id : '';
     if (!incidents.length) {
       list.replaceChildren();
       list.textContent = 'No incidents in this session.';
@@ -331,10 +337,17 @@
       }
       const terminal = ['dismissed', 'closed', 'expired', 'invalidated'].includes(incident.stage);
       const currentSession = state.monitoringSessionId && incident.session_id === state.monitoringSessionId;
+      if (incident.stage === 'closed') {
+        const closure = document.createElement('p');
+        closure.className = 'muted';
+        closure.textContent = 'Persisted closure: ' + (incident.closure_outcome || 'unknown') + '. Further feedback, recheck and approval are rejected.';
+        card.appendChild(closure);
+      }
       if (!terminal && currentSession && !pendingAction) {
         const recheck = document.createElement('button');
         recheck.type = 'button';
         recheck.className = 'secondary';
+        recheck.id = 'recheck-' + incident.id;
         recheck.textContent = 'Recheck';
         recheck.addEventListener('click', () => recheckIncident(incident.id));
         actions.appendChild(recheck);
@@ -343,20 +356,28 @@
         const dismiss = document.createElement('button');
         dismiss.type = 'button';
         dismiss.className = 'secondary';
+        dismiss.id = 'dismiss-' + incident.id;
         dismiss.textContent = 'Dismiss';
         dismiss.addEventListener('click', () => dismissIncident(incident.id));
         actions.appendChild(dismiss);
         const closeLabel = document.createElement('label');
         closeLabel.textContent = 'Close outcome';
+        closeLabel.htmlFor = 'close-' + incident.id;
         const closeSelect = document.createElement('select');
         closeSelect.id = 'close-' + incident.id;
+        const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Choose outcome'; closeSelect.appendChild(blank);
         for (const [value, label] of [['viewer_confirmed', 'Viewer confirmed'], ['local_only', 'Local only'], ['unresolved', 'Unresolved']]) {
           const option = document.createElement('option'); option.value = value; option.textContent = label; closeSelect.appendChild(option);
         }
+        closeSelect.value = state.closeOutcomes[incident.id] || '';
+        closeSelect.addEventListener('change', () => { state.closeOutcomes[incident.id] = closeSelect.value; });
         const closeButton = document.createElement('button');
         closeButton.type = 'button';
         closeButton.className = 'secondary';
+        closeButton.id = 'close-button-' + incident.id;
         closeButton.textContent = 'Close incident';
+        closeButton.disabled = !closeSelect.value;
+        closeSelect.addEventListener('change', () => { closeButton.disabled = !closeSelect.value; });
         closeButton.addEventListener('click', () => closeIncident(incident.id, closeSelect.value));
         actions.appendChild(closeLabel);
         actions.appendChild(closeSelect);
@@ -364,6 +385,10 @@
       }
       card.appendChild(actions);
       list.appendChild(card);
+    }
+    if (focusedID && typeof document.getElementById === 'function') {
+      const restored = document.getElementById(focusedID);
+      if (restored && typeof restored.focus === 'function') restored.focus();
     }
   }
 
@@ -447,7 +472,8 @@
     }
   }
 
-  function applySection(section) {
+  function applySection(section, chosen) {
+    if (chosen) state.sectionChosen = true;
     state.section = section;
     for (const panel of Array.from(document.querySelectorAll ? document.querySelectorAll('#app > section.panel') : [])) {
       if (panel.id === 'rehearsal-panel') {
@@ -490,6 +516,12 @@
     state.currentRevision = privateState.settings ? privateState.settings.revision : 0;
     renderMonitoring(privateState);
     renderMode(privateState.mode || 'live');
+    if (!state.sectionChosen) {
+      const settings = privateState.settings;
+      const unconfigured = !settings || (!settings.microphone && !settings.visual && !settings.stream_track);
+      state.section = unconfigured ? 'setup' : 'monitor';
+      applySection(state.section);
+    }
     setText('mode', privateState.mode || 'live');
     setText('revision', String(privateState.settings ? privateState.settings.revision : 0));
     setText('state-revision', String(privateState.state_revision || 0));
@@ -501,6 +533,12 @@
     setText('obs', privateState.obs ? privateState.obs.status : 'not connected');
     renderTwitch(privateState.twitch);
     renderOBS(privateState.obs, privateState.startup, privateState.obs_discovery, privateState.obs_observation, privateState.setup);
+    if (state.mode === 'rehearsal') {
+      setText('twitch', 'connected (simulated)');
+      setText('obs', 'connected (simulated)');
+      setText('twitch-status', 'Simulated connected — no real Twitch session.');
+      setText('obs-status', 'Simulated connected — no real OBS socket.');
+    }
     if (privateState.settings) {
       if (privateState.settings.revision !== state.revision) {
         state.revision = privateState.settings.revision;
@@ -806,7 +844,7 @@
   });
 
   for (const button of queryAll('#section-tabs button')) {
-    button.addEventListener('click', () => applySection(button.dataset.section));
+    button.addEventListener('click', () => applySection(button.dataset.section, true));
   }
   if ($('overlay-url')) {
     $('overlay-url').value = (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/overlay/';

@@ -466,9 +466,36 @@ func (s *Store) CloseIncident(ctx context.Context, id, outcome, sessionID string
 	default:
 		return domain.Incident{}, domain.ErrInvalidInput
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE proposals SET status = ? WHERE incident_id = ? AND status = ?`,
-		domain.ProposalInvalidated, id, domain.ProposalProposed); err != nil {
+	rows, err := tx.QueryContext(ctx, `SELECT id, proposal_json FROM proposals WHERE incident_id = ? AND status = ?`, id, domain.ProposalProposed)
+	if err != nil {
 		return domain.Incident{}, err
+	}
+	type proposalRow struct{ id, raw string }
+	var proposalRows []proposalRow
+	for rows.Next() {
+		var row proposalRow
+		if err := rows.Scan(&row.id, &row.raw); err != nil {
+			rows.Close()
+			return domain.Incident{}, err
+		}
+		proposalRows = append(proposalRows, row)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return domain.Incident{}, err
+	}
+	rows.Close()
+	for _, row := range proposalRows {
+		var proposal domain.Proposal
+		if err := json.Unmarshal([]byte(row.raw), &proposal); err != nil {
+			return domain.Incident{}, err
+		}
+		proposal.Status = domain.ProposalInvalidated
+		raw, _ := json.Marshal(proposal)
+		if _, err := tx.ExecContext(ctx, `UPDATE proposals SET status = ?, proposal_json = ? WHERE id = ?`,
+			domain.ProposalInvalidated, string(raw), row.id); err != nil {
+			return domain.Incident{}, err
+		}
 	}
 	inc.Stage = domain.StageClosed
 	inc.ClosureOutcome = outcome

@@ -60,3 +60,42 @@ No new dependencies, SDK changes, OBS writes, Git mutations, account work or rec
 - No feedback/closure concurrency stress beyond transactional store and existing coordinator tests.
 
 DeepSeek stopped editing for Codex review. P06 remains held.
+
+## P05-R01 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-02T04:55Z / 2026-11-02T05:05Z. Base worker checkpoint 3ebf6be plus Codex review tests/docs. Eight supplied `TestReviewP05*` regressions reproduced and fixed; all promoted to ordinary coverage.
+
+### A — Mode ownership and transactional closure
+
+- `OpenMode` now reads `schema_migrations`/`db_meta` before migration. Existing unmarked schema 1/3 DBs are rejected for rehearsal without any schema change; marked rehearsal restart and normal live upgrade remain supported. Tests: `TestReviewP05LegacyModeRejectedBeforeMigration` (1/3), existing `TestModeOwnershipRejectsCrossMode`.
+- Closure updates both proposal status and serialized `proposal_json` in the same transaction; coordinator caches are marked invalidated from the committed outcome without a second correctness transaction. `TestReviewP05ClosureInvalidatesSerializedProposalAtomically` passes; prior closure/feedback/store tests remain.
+
+### B — Simulated repair/scenario ownership
+
+- Simulated repair validates source identity, full six-track map and selected track, compares expected to actual fixture state, admits exactly the desired map, honors cancellation before admission/write, mutates only the selected track and returns observed readback. Unknown-write returns unknown/possibly-transmitted without replay.
+- Failed scenario persistence no longer changes provider scenario; active diagnostics/pending actions guard transitions. Tests: `TestReviewP05RehearsalSelectedTrackAndReadback`, `PreflightUsesActualMap`, `CanceledRepairCannotWrite`, `FailedScenarioDoesNotMutateProvider`; `TestP05RehearsalAllScenarios` covers all four scenarios end to end through the actual App composition (track-missing approval/verified, mic_muted manual-only, wrong_scene insufficient, unknown_write unknown).
+
+### C — Typed simulated intake/feedback
+
+- Rehearsal report returns the exact current-session/category incident rather than snapshot position; feedback normalizes `stillbroken` to `still_broken`, replaces the single simulated viewer's vote and rejects terminal incidents. Tests: `TestReviewP05ReportResponseMatchesCategory`, `TestReviewP05RehearsalFeedbackRejectsClosedAndRecordsNegative`, plus the all-scenarios test.
+
+### D — Functional visual corrections
+
+- Unconfigured app opens Setup; user section choice is remembered. Simulated providers are labeled simulated. Monitor shows a compact Twitch/OBS/broadcast/monitoring strip. Advanced identity fields collapsed. Closure selects have associated labels, blank default, persisted outcomes and stable IDs; focused control IDs are restored after SSE rebuild.
+- Overlay covers applying, unknown/reconciled, local-verified/manual-remaining, closed outcomes and disconnected; idle live remains quiet, rehearsal watermark persists.
+- Rendered actual rehearsal binary: `.tools/p05-r01-setup-1280.png` (Setup, 1280×800) and `.tools/p05-r01-overlay.png` (rehearsal overlay). Actual 390×844 capture `.tools/p05-r01-390.png` still clips at the right edge after removing overflow hiding; mobile/no-overflow is **not** claimed.
+
+### E — Verification
+
+| Check | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=360s` | pass all packages, including promoted eight |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| CGo-free build | pass; version `0.5.0-p05`; size 20,270,592; SHA256 `93AFACB1FD2F449BC0263D673382C67841CA3A6B1AB706F1C615A117FB7825CA` |
+| Node scripts | six prior/new control/overlay fixtures pass; Node is not rendered evidence |
+| WSL `go test -race ./... -count=1 -timeout=480s` | pass all packages |
+| Rendered Chrome | Setup 1280 and overlay inspected; 390 clipped/unverified; no 200% zoom/keyboard/contrast audit |
+
+Remaining limits: no full private-HTTP rehearsal 202/error test, no complete production-protocol separate-viewer feedback/closure journey, no deterministic blocked scenario/approval/reconciliation interleaving, no mobile/zoom/keyboard/contrast acceptance. Live Twitch/real OBS gates remain unmet under D34/#6/#10. No Git, real services, dependencies, recording or owned processes.
+
+P05-R01 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P05-R01.md and docs/execution/handoffs/P05-review.md. Rerun the eight preserved regressions and required mode/migration, closure/feedback, simulated adapter/scenario, actual-app protocol and rendered UI boundaries. DeepSeek has stopped editing. Record acceptance or consolidated remaining corrections; live Twitch and real OBS approval remain deferred under D34/#6/#10, and P06 stays held.

@@ -115,10 +115,13 @@
             <legend>Microphone</legend>
             <label for="mic-name">OBS input name</label>
             <input id="mic-name" name="mic-name" type="text" maxlength="256" autocomplete="off" placeholder="e.g. Mic/Aux">
-            <label for="mic-uuid">Stable input UUID <span class="optional">(optional)</span></label>
-            <input id="mic-uuid" name="mic-uuid" type="text" maxlength="256" autocomplete="off">
-            <label for="mic-context">Context <span class="optional">(optional)</span></label>
-            <input id="mic-context" name="mic-context" type="text" maxlength="256" autocomplete="off">
+            <details class="advanced">
+              <summary>Advanced microphone identity</summary>
+              <label for="mic-uuid">Stable input UUID <span class="optional">(optional)</span></label>
+              <input id="mic-uuid" name="mic-uuid" type="text" maxlength="256" autocomplete="off">
+              <label for="mic-context">Context <span class="optional">(optional)</span></label>
+              <input id="mic-context" name="mic-context" type="text" maxlength="256" autocomplete="off">
+            </details>
           </fieldset>
 
           <fieldset>
@@ -145,16 +148,19 @@
             <fieldset id="visual-fields" class="nested" disabled>
               <label for="visual-scene">Scene name</label>
               <input id="visual-scene" type="text" maxlength="256" autocomplete="off">
-              <label for="visual-scene-uuid">Stable scene UUID <span class="optional">(optional)</span></label>
-              <input id="visual-scene-uuid" type="text" maxlength="256" autocomplete="off">
               <label for="visual-item">Scene item ID</label>
               <input id="visual-item" type="text" maxlength="256" autocomplete="off">
               <label for="visual-source">Source name</label>
               <input id="visual-source" type="text" maxlength="256" autocomplete="off">
-              <label for="visual-source-uuid">Stable source UUID <span class="optional">(optional)</span></label>
-              <input id="visual-source-uuid" type="text" maxlength="256" autocomplete="off">
-              <label for="visual-context">Context <span class="optional">(optional)</span></label>
-              <input id="visual-context" type="text" maxlength="256" autocomplete="off">
+              <details class="advanced">
+                <summary>Advanced scene/source identity</summary>
+                <label for="visual-scene-uuid">Stable scene UUID <span class="optional">(optional)</span></label>
+                <input id="visual-scene-uuid" type="text" maxlength="256" autocomplete="off">
+                <label for="visual-source-uuid">Stable source UUID <span class="optional">(optional)</span></label>
+                <input id="visual-source-uuid" type="text" maxlength="256" autocomplete="off">
+                <label for="visual-context">Context <span class="optional">(optional)</span></label>
+                <input id="visual-context" type="text" maxlength="256" autocomplete="off">
+              </details>
             </fieldset>
           </fieldset>
 
@@ -167,6 +173,7 @@
 
       <section class="panel" data-section="monitor" aria-labelledby="monitoring-heading">
         <h2 id="monitoring-heading">Monitoring and incidents</h2>
+        <p id="monitor-context" class="muted">Connection and readiness status appears here.</p>
         <p class="muted">Reports create bounded incidents. Manual checks use a fresh read-only OBS observation. An eligible microphone track finding can offer one expiring private approval.</p>
         <div class="actions">
           <button id="monitor-start" type="button">Start monitoring</button>

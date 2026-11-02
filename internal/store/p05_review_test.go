@@ -1,5 +1,4 @@
-//go:build reviewrepro
-
+// Promoted from Codex's P05-R01 review set; assertions preserved.
 package store
 
 import (

@@ -175,7 +175,7 @@ footer {
 .tabs button { flex: 0 1 auto; min-width: 0; }
 .actions { flex-wrap: wrap; }
 .panel, .actions, input, select, textarea { min-width: 0; max-width: 100%; }
-html, body { max-width: 100%; overflow-x: hidden; }
+html, body { max-width: 100%; }
 .tabs button { background: #1b2226; color: #e8ecee; border: 1px solid #3b464c; }
 .tabs button.active { background: #2dd4bf; color: #071013; border-color: #2dd4bf; }
 .badge.rehearsal, .rehearsal-watermark { background: #7c3aed; color: #fff; }

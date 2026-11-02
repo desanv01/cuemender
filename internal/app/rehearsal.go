@@ -87,27 +87,63 @@ func (r *rehearsalState) ReadTrack(_ context.Context, req domain.TrackStateReque
 	return domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(r.tracks), Generation: req.Generation, ConfigRevision: req.ConfigRevision, ObservedAt: time.Now().UTC()}, nil
 }
 
-func (r *rehearsalState) Repair(_ context.Context, req domain.TrackRepairRequest, admit func(domain.TrackRepairPreflight) error) domain.TrackRepairResult {
+func (r *rehearsalState) Repair(ctx context.Context, req domain.TrackRepairRequest, admit func(domain.TrackRepairPreflight) error) domain.TrackRepairResult {
+	if ctx.Err() != nil {
+		return domain.TrackRepairResult{ActionID: req.ActionID, Status: domain.TrackRepairInvalidated, DetailCode: "canceled_before_admission"}
+	}
 	r.mu.Lock()
 	scenario := r.scenario
+	actual := cloneTrackMap(r.tracks)
 	r.mu.Unlock()
+	invalid := func(code string) domain.TrackRepairResult {
+		return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairInvalidated, DetailCode: code}
+	}
+	if req.Input.Name != "Rehearsal Mic" || req.Input.UUID != "rehearsal-mic" || req.Input.Context != "Rehearsal" {
+		return invalid("input_identity_mismatch")
+	}
+	if req.SelectedTrack < 1 || req.SelectedTrack > 6 {
+		return invalid("selected_track_invalid")
+	}
+	if len(actual) != 6 {
+		return invalid("track_map_incomplete")
+	}
+	for key, value := range actual {
+		if req.ExpectedTracks[key] != value {
+			return invalid("track_map_changed")
+		}
+	}
+	if len(req.ExpectedTracks) != 6 {
+		return invalid("track_map_changed")
+	}
+	key := "track" + strconv.Itoa(req.SelectedTrack)
+	desired := cloneTrackMap(actual)
+	desired[key] = true
 	preflight := domain.TrackRepairPreflight{
 		ActionID: req.ActionID, SelectedTrack: req.SelectedTrack,
-		State:         domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(req.ExpectedTracks), Generation: req.Generation, ConfigRevision: req.ConfigRevision, ObservedAt: time.Now().UTC()},
-		DesiredTracks: cloneTrackMap(req.ExpectedTracks),
+		State:         domain.TrackState{Input: req.Input, Tracks: actual, Generation: req.Generation, ConfigRevision: req.ConfigRevision, ObservedAt: time.Now().UTC()},
+		DesiredTracks: desired,
 	}
-	preflight.DesiredTracks["track"+strconv.Itoa(req.SelectedTrack)] = true
+	if actual[key] {
+		return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairNoOp, DetailCode: "already_assigned", Preflight: &preflight, Observed: &preflight.State}
+	}
+	if ctx.Err() != nil {
+		return invalid("canceled_before_admission")
+	}
 	if admit != nil {
 		if err := admit(preflight); err != nil {
 			return domain.TrackRepairResult{ActionID: req.ActionID, Status: domain.TrackRepairInvalidated, DetailCode: "admission_rejected", Preflight: &preflight}
 		}
 	}
+	if ctx.Err() != nil {
+		return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairInvalidated, DetailCode: "canceled_before_write", Preflight: &preflight}
+	}
 	if scenario == "unknown_write" {
 		return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairUnknown, DetailCode: "simulated_unknown", DispatchAdmitted: true, PossiblyTransmitted: true, Preflight: &preflight}
 	}
 	r.mu.Lock()
-	r.tracks["track2"] = true
+	r.tracks[key] = true
 	r.written = true
+	observed := domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(r.tracks), Generation: req.Generation, ConfigRevision: req.ConfigRevision, ObservedAt: time.Now().UTC()}
 	r.mu.Unlock()
-	return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairVerified, DetailCode: "simulated_verified", DispatchAdmitted: true, Preflight: &preflight}
+	return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairVerified, DetailCode: "simulated_verified", DispatchAdmitted: true, PossiblyTransmitted: true, Preflight: &preflight, Observed: &observed}
 }

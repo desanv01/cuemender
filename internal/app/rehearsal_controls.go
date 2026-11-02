@@ -17,11 +17,19 @@ func (a *App) RehearsalScenario(ctx context.Context, scenario string) (domain.Se
 	default:
 		return domain.Settings{}, domain.ErrInvalidInput
 	}
+	if a.coordinator.ActiveJobs() > 0 {
+		return domain.Settings{}, domain.ErrBusy
+	}
+	_, actionRecords := a.coordinator.RepairSnapshot()
+	for _, action := range actionRecords {
+		if domain.ActionPending(action.Status) {
+			return domain.Settings{}, domain.ErrBusy
+		}
+	}
 	if err := a.coordinator.Stop(ctx); err != nil {
 		return domain.Settings{}, err
 	}
 	a.coordinator.Invalidate(ctx, "scenario_change")
-	a.rehearsal.setScenario(scenario)
 	track := 2
 	expectations := domain.Expectations{
 		Microphone:  &domain.InputRef{Name: "Rehearsal Mic", UUID: "rehearsal-mic", Context: "Rehearsal"},
@@ -34,7 +42,12 @@ func (a *App) RehearsalScenario(ctx context.Context, scenario string) (domain.Se
 		}
 	}
 	current := a.currentSettings()
-	return a.SaveSettings(ctx, current.Revision, expectations)
+	updated, err := a.SaveSettings(ctx, current.Revision, expectations)
+	if err != nil {
+		return domain.Settings{}, err
+	}
+	a.rehearsal.setScenario(scenario)
+	return updated, nil
 }
 
 func (a *App) RehearsalReport(ctx context.Context, category string) (domain.Incident, error) {
@@ -54,10 +67,18 @@ func (a *App) RehearsalReport(ctx context.Context, category string) (domain.Inci
 		return domain.Incident{}, domain.ErrInvalidInput
 	}
 	_, list := a.coordinator.Snapshot()
-	if len(list) == 0 {
+	var found domain.Incident
+	for _, inc := range list {
+		if inc.SessionID == session.ID && inc.Category == category {
+			if found.ID == "" || inc.UpdatedAt.After(found.UpdatedAt) {
+				found = inc
+			}
+		}
+	}
+	if found.ID == "" {
 		return domain.Incident{}, domain.ErrUnavailable
 	}
-	return list[0], nil
+	return found, nil
 }
 
 func (a *App) RehearsalFeedback(ctx context.Context, publicID, vote string) (domain.Incident, error) {
@@ -76,7 +97,14 @@ func (a *App) RehearsalFeedback(ctx context.Context, publicID, vote string) (dom
 		if inc.PublicID != publicID {
 			continue
 		}
-		reply := a.coordinator.HandleFeedbackInSessionAt(ctx, vote, publicID, "rehearsal-viewer", 1, time.Now().UTC(), session.ID)
+		if domain.StageTerminal(inc.Stage) {
+			return domain.Incident{}, domain.ErrTerminalIncident
+		}
+		command := vote
+		if vote == "stillbroken" {
+			command = "still_broken"
+		}
+		reply := a.coordinator.HandleFeedbackInSessionAt(ctx, command, publicID, "rehearsal-viewer", 1, time.Now().UTC(), session.ID)
 		if reply == "" {
 			return domain.Incident{}, domain.ErrTerminalIncident
 		}

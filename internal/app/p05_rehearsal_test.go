@@ -110,6 +110,92 @@ func TestP05RehearsalIsolationAndScenario(t *testing.T) {
 	}
 }
 
+func TestP05RehearsalAllScenarios(t *testing.T) {
+	for _, scenario := range []string{"track_missing", "mic_muted", "wrong_scene", "unknown_write"} {
+		t.Run(scenario, func(t *testing.T) {
+			a := p05ReviewApp(t)
+			ctx := context.Background()
+			settings, err := a.RehearsalScenario(ctx, scenario)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := a.StartMonitoring(ctx, settings.Revision); err != nil {
+				t.Fatal(err)
+			}
+			a.RehearsalFeedback(ctx, "unknown", "fixed")
+			category := "audio"
+			if scenario == "wrong_scene" {
+				category = "video"
+			}
+			inc, err := a.RehearsalReport(ctx, category)
+			if err != nil {
+				t.Fatal(err)
+			}
+			deadline := time.Now().Add(3 * time.Second)
+			for time.Now().Before(deadline) {
+				got, _ := a.coordinator.Find(inc.ID)
+				if got.Stage != domain.StageReported && got.Stage != domain.StageInvestigating {
+					inc = got
+					break
+				}
+				time.Sleep(time.Millisecond)
+			}
+			if inc.Category != category {
+				t.Fatalf("report category=%s want %s", inc.Category, category)
+			}
+			switch scenario {
+			case "track_missing":
+				if inc.Stage != domain.StageAwaitingApproval || len(inc.Findings) == 0 {
+					t.Fatalf("track_missing stage=%s findings=%d", inc.Stage, len(inc.Findings))
+				}
+				proposals, _ := a.coordinator.RepairSnapshot()
+				if len(proposals) == 0 {
+					t.Fatal("no proposal")
+				}
+				if _, err := a.ApproveProposal(ctx, proposals[0].ID, proposals[0].ConfigRevision); err != nil {
+					t.Fatal(err)
+				}
+				wait := time.Now().Add(3 * time.Second)
+				for time.Now().Before(wait) {
+					_, actions := a.coordinator.RepairSnapshot()
+					if len(actions) > 0 && actions[0].Status == domain.TrackRepairVerified {
+						break
+					}
+					time.Sleep(time.Millisecond)
+				}
+			case "mic_muted":
+				if inc.Stage != domain.StageAwaitingFeedback {
+					t.Fatalf("mic_muted stage=%s", inc.Stage)
+				}
+			case "wrong_scene":
+				if inc.Stage != domain.StageInsufficientInfo {
+					t.Fatalf("wrong_scene stage=%s", inc.Stage)
+				}
+			case "unknown_write":
+				if inc.Stage != domain.StageAwaitingApproval {
+					t.Fatalf("unknown_write stage=%s", inc.Stage)
+				}
+				proposals, _ := a.coordinator.RepairSnapshot()
+				if len(proposals) == 0 {
+					t.Fatal("no proposal")
+				}
+				if _, err := a.ApproveProposal(ctx, proposals[0].ID, proposals[0].ConfigRevision); err != nil {
+					t.Fatal(err)
+				}
+				wait := time.Now().Add(3 * time.Second)
+				for time.Now().Before(wait) {
+					_, actions := a.coordinator.RepairSnapshot()
+					if len(actions) > 0 && actions[0].Status == domain.TrackRepairUnknown {
+						return
+					}
+					time.Sleep(time.Millisecond)
+				}
+				t.Fatal("unknown_write did not settle unknown")
+			}
+		})
+	}
+}
+
 func TestP05InvalidModeRejected(t *testing.T) {
 	if a, err := New(context.Background(), Options{Mode: "prod", DataDir: t.TempDir(), NoBrowser: true, SessionOnlySecrets: true, Stdout: io.Discard, Stderr: io.Discard}); a != nil || err == nil {
 		t.Fatal("unknown mode constructed an app")

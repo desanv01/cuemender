@@ -750,7 +750,14 @@ func (c *Coordinator) CloseIncident(ctx context.Context, incidentID, outcome str
 		return domain.Incident{}, err
 	}
 	c.setIncident(closed)
-	_ = c.invalidateProposals(ctx, incidentID, domain.ProposalInvalidated)
+	c.mu.Lock()
+	for id, proposal := range c.proposals {
+		if proposal.IncidentID == incidentID && (proposal.Status == domain.ProposalProposed || proposal.Status == domain.ProposalReserved) {
+			proposal.Status = domain.ProposalInvalidated
+			c.proposals[id] = proposal
+		}
+	}
+	c.mu.Unlock()
 	c.publish()
 	return closed, nil
 }

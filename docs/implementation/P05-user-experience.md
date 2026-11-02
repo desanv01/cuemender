@@ -29,9 +29,22 @@ Private strict routes: `/api/v1/rehearsal/scenario`, `/report`, `/feedback`, all
 - Rendered local Chrome evidence: `.tools/p05-rehearsal-1280.png` and `.tools/p05-rehearsal-390.png` from the actual rehearsal binary (desktop/mobile monitor state). The 390px capture initially exposed horizontal overflow; CSS was corrected and the screenshot recaptured.
 - WSL race suite.
 
+## P05-R01 corrections
+
+- Mode ownership is inspected from `schema_migrations`/`db_meta` before migration. Any existing unmarked schema-1/3 database is rejected for rehearsal without changing its schema; marked rehearsal restart and normal live upgrade remain supported.
+- Closure now invalidates proposals' serialized JSON and status in the same transaction, and coordinator caches are updated from the committed outcome without a second correctness transaction.
+- Simulated repair validates the actual fixture map and selected track, computes the exact desired change, honors cancellation before admission/write, performs only the requested mutation and returns observed readback. The unknown-write path reports uncertain transmission without replay. Failed scenario persistence no longer mutates the provider; scenario transitions guard active diagnostics/actions.
+- Rehearsal report returns the exact current-session/category incident; feedback normalizes `stillbroken` to `still_broken`, replaces the single viewer's prior vote, and rejects terminal incidents.
+- Private UI opens Setup when unconfigured, remembers the user's section, preserves stored close selections and restored focus IDs, labels closure selects, requires an explicit closure outcome, shows persisted closure outcomes, marks simulated providers as simulated, and adds a persistent Monitor status strip. Advanced identity fields are collapsed.
+- Overlay adds applying, unknown/reconciled, local-verified/manual-remaining and disconnected behavior while retaining the watermark and public allowlist.
+
+Known P05-R01 limits: no full private HTTP rehearsal 202/error flow test, no complete production-protocol separate-viewer feedback/closure journey, no deterministic blocked-scenario/approval/reconciliation interleaving test, and no completed 390px/200%-zoom/keyboard/contrast rendered audit. The actual 390px Chrome capture still clips at the right edge and is not claimed as passing.
+
+
+
 ## Limits
 
 - Live Twitch, real private-UI OBS approval trial, V14 real journey and final V18/V19 remain unmet under D34/issues #6/#10.
 - Rehearsal HTTP routes are covered by app-level isolation tests and live-mode 409 route tests; full rehearsal 202 route/UI flow has not been rendered end to end.
-- No full keyboard/screen-reader/200%-zoom audit or measured contrast; screenshots cover desktop/mobile monitor state only.
+- No full keyboard/screen-reader/200%-zoom audit or measured contrast. The actual 390px Chrome capture still clips at the right edge; desktop Setup/Monitor and overlay captures exist, but mobile no-overflow is not verified.
 - No new dependency/SDK/credential changes. No real OBS contact, login, authorization, chat or recording.
