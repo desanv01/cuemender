@@ -14,6 +14,9 @@ import (
 // onIntegrationUpdate serializes a provider state change through the accepted
 // revision/publication boundary. Managers have already released their locks.
 func (a *App) onIntegrationUpdate() {
+	if a.coordinator != nil {
+		a.coordinator.SignalIntegrationChange()
+	}
 	a.stateMu.Lock()
 	a.stateRevision++
 	privateJSON, errPrivate := json.Marshal(a.privateLocked())

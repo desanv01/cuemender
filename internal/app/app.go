@@ -256,7 +256,8 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
 	a.monitoringStatusOverride = deps.monitoringStatus
 	coordinator, err := incidents.NewChecked(incidents.Options{
-		Store: st,
+		Store:  st,
+		Repair: a.obsMgr.RepairTrack, ReadTrack: a.obsMgr.ReadTrackState,
 		Read: func(ctx context.Context, snapshot domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
 			return a.obsMgr.DiagnosticRead(ctx, snapshot)
 		},
@@ -445,31 +446,44 @@ func (a *App) SaveSettings(ctx context.Context, expectedRevision int64, exp doma
 	a.saveMu.Lock()
 	defer a.saveMu.Unlock()
 
-	settings, err := a.store.SaveSettings(ctx, expectedRevision, exp)
+	var settings domain.Settings
+	commit := func() error {
+		var err error
+		settings, err = a.store.SaveSettings(ctx, expectedRevision, exp)
+		if err != nil {
+			return err
+		}
+		a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+
+		return nil
+	}
+	install := func() {
+		a.stateMu.Lock()
+		defer a.stateMu.Unlock()
+		a.settings = settings
+		a.stateRevision++
+		privateJSON, errPrivate := json.Marshal(a.privateLocked())
+		publicJSON, errPublic := json.Marshal(a.publicLocked())
+		if errPrivate == nil {
+			a.privateHub.publish(privateJSON)
+		}
+		if errPublic == nil {
+			a.publicHub.publish(publicJSON)
+		}
+	}
+
+	var err error
+	if a.coordinator != nil {
+		err = a.coordinator.WithSettingsChange(ctx, commit, install)
+	} else {
+		err = commit()
+		if err == nil {
+			install()
+		}
+	}
 	if err != nil {
 		return domain.Settings{}, err
 	}
-	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
-	if a.coordinator != nil {
-		a.coordinator.Invalidate(ctx, "settings_changed")
-	}
-
-	// stateMu is the publication ordering lock: cache update, revision
-	// increment, both projections and both hub publications happen while a
-	// subscriber cannot observe an intermediate combination. Hub sends are
-	// bounded and non-blocking, so no network operation is held under stateMu.
-	a.stateMu.Lock()
-	a.settings = settings
-	a.stateRevision++
-	privateJSON, errPrivate := json.Marshal(a.privateLocked())
-	publicJSON, errPublic := json.Marshal(a.publicLocked())
-	if errPrivate == nil {
-		a.privateHub.publish(privateJSON)
-	}
-	if errPublic == nil {
-		a.publicHub.publish(publicJSON)
-	}
-	a.stateMu.Unlock()
 	return settings, nil
 }
 
@@ -498,11 +512,15 @@ func (a *App) privateLocked() domain.PrivateState {
 	obsState, discovery, observation, resolutionReady := a.obsMgr.SnapshotBundle(a.settings)
 	var session *domain.MonitoringSessionInfo
 	var incidentsList []domain.Incident
+	var proposals []domain.Proposal
+	var actionRecords []domain.Action
 	if a.coordinator != nil {
 		session, incidentsList = a.coordinator.Snapshot()
+		proposals, actionRecords = a.coordinator.RepairSnapshot()
 	}
 	monitoringActive := session != nil && session.Active
 	return domain.PrivateState{
+		Proposals: proposals, Actions: actionRecords,
 		Mode:              domain.ModeLive,
 		StateRevision:     a.stateRevision,
 		MonitoringActive:  monitoringActive,

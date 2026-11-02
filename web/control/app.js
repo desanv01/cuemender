@@ -250,6 +250,8 @@
     const active = Boolean(privateState.monitoring_active);
     const session = privateState.monitoring_session;
     state.monitoringSessionId = active && session ? session.id : '';
+    state.proposals = Array.isArray(privateState.proposals) ? privateState.proposals : [];
+    state.actionRecords = Array.isArray(privateState.actions) ? privateState.actions : [];
     state.incidents = Array.isArray(privateState.incidents) ? privateState.incidents : [];
     setText('monitor-status', active ? 'Monitoring active' + (session && session.id ? ' (session ' + session.id.slice(0, 8) + '…)' : '') : 'Monitoring is stopped.');
     renderIncidents(state.incidents);
@@ -289,7 +291,7 @@
       const limitations = (incident.checks || []).map((check) => check.unavailable_reason).filter(Boolean).join(' ');
       let evidenceText;
       if (findings) {
-        evidenceText = 'Findings: ' + findings + (guidance ? '. ' + guidance : '');
+        evidenceText = 'Recorded diagnosis: ' + findings + (guidance ? '. ' + guidance : '');
       } else if (incident.stage === 'no_supported_finding') {
         evidenceText = 'No supported conflict was found in a completed sufficient check.';
       } else if (incident.stage === 'insufficient_information' || incident.stage === 'interrupted') {
@@ -300,7 +302,7 @@
       if (limitations) {
         evidenceText += ' Limitations: ' + limitations;
       }
-      evidence.textContent = evidenceText + ' Local verification: ' + incident.local_verification + '. Repair is not yet available.';
+      evidence.textContent = evidenceText + ' Local verification: ' + incident.local_verification + '. Track repair requires an exact private approval while monitoring.';
       card.appendChild(evidence);
       if (incident.manual_guidance) {
         const guidance = document.createElement('p');
@@ -310,9 +312,25 @@
       }
       const actions = document.createElement('div');
       actions.className = 'actions';
+      const pendingAction = (state.actionRecords || []).find((entry) => entry.incident_id === incident.id && ['reserved', 'intent_recorded', 'write_sent', 'unknown'].includes(entry.status));
+      const proposal = (state.proposals || []).find((entry) => entry.incident_id === incident.id && entry.status === 'proposed');
+      if (proposal) {
+        const detail = document.createElement('p'); detail.className = 'muted';
+        detail.textContent = 'Add ' + proposal.input.name + ' to confirmed track ' + proposal.selected_track + '. Preserve assignments: ' + Object.entries(proposal.expected_tracks).map(([key, value]) => key + '=' + value).join(', ') + '. Expires ' + new Date(proposal.expires_at).toISOString() + '. Other findings remain. Another OBS client may change assignments between the read and write.';
+        card.appendChild(detail);
+        const approve = document.createElement('button'); approve.type = 'button'; approve.textContent = 'Approve track addition';
+        approve.disabled = !state.monitoringSessionId || proposal.session_id !== state.monitoringSessionId || Date.now() >= Date.parse(proposal.expires_at) || Boolean(pendingAction);
+        approve.addEventListener('click', async () => { approve.disabled = true; try { await postPrivate('/api/v1/proposals/' + encodeURIComponent(proposal.id) + '/approve', { expected_revision: proposal.config_revision }); await loadState(); } catch (error) { showNotice(error.message || 'Approval could not be accepted.', 'error'); await loadState(); } });
+        actions.appendChild(approve);
+      }
+      const lastAction = (state.actionRecords || []).filter((entry) => entry.incident_id === incident.id).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+      if (lastAction) {
+        const result = document.createElement('p'); result.className = 'muted';
+        result.textContent = lastAction.reconciled ? 'Current OBS configuration ' + (lastAction.status === 'verified' ? 'matches' : 'differs from') + ' the approved map. This does not establish who changed it or viewer recovery.' : lastAction.status === 'verified' ? 'Approved track addition verified in local OBS configuration. Remaining findings and viewer feedback are separate.' : lastAction.status === 'no_op' ? 'The track was already assigned. CueMender sent no change.' : 'Local action: ' + lastAction.status + ' (' + lastAction.detail_code + '). No automatic retry or rollback.'; card.appendChild(result);
+      }
       const terminal = ['dismissed', 'closed', 'expired', 'invalidated'].includes(incident.stage);
       const currentSession = state.monitoringSessionId && incident.session_id === state.monitoringSessionId;
-      if (!terminal && currentSession) {
+      if (!terminal && currentSession && !pendingAction) {
         const recheck = document.createElement('button');
         recheck.type = 'button';
         recheck.className = 'secondary';
@@ -320,7 +338,7 @@
         recheck.addEventListener('click', () => recheckIncident(incident.id));
         actions.appendChild(recheck);
       }
-      if (!terminal) {
+      if (!terminal && !pendingAction) {
         const dismiss = document.createElement('button');
         dismiss.type = 'button';
         dismiss.className = 'secondary';

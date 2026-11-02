@@ -265,7 +265,7 @@ func findingFor(check domain.DiagnosticCheck, ev Evidence) domain.Finding {
 	case "microphone_missing_from_track":
 		finding.Code = domain.FindingMICTrackMissing
 		finding.SupportedActionKind = domain.ActionAddMicToTrack
-		finding.ManualGuidance = "The microphone is absent from the confirmed stream track. Repair is not available until the approved repair phase."
+		finding.ManualGuidance = "The microphone is absent from the confirmed stream track. Only an eligible current-session proposal can approve a track addition; other findings remain."
 	case "visual_item_hidden":
 		finding.Code = domain.FindingVisualHidden
 		finding.ManualGuidance = "The configured scene item is hidden. Reveal it manually in OBS; CueMender does not change visibility."

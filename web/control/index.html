@@ -12,7 +12,7 @@
       <h1>CueMender</h1>
       <p class="subtitle">Community-assisted stream diagnostics · connection setup</p>
     </div>
-    <span class="badge">Read-only diagnostics</span>
+    <span class="badge">Diagnostics and approved track repair</span>
   </header>
 
   <main>
@@ -36,7 +36,7 @@
           <div><dt>Twitch</dt><dd id="twitch">not connected</dd></div>
           <div><dt>OBS</dt><dd id="obs">not connected</dd></div>
         </dl>
-        <p class="note">Run manual checks, or connect Twitch and OBS to monitor community reports. Repairs are not available yet.</p>
+        <p class="note">Run manual checks, or connect Twitch and OBS to monitor community reports. Only adding the selected microphone to its confirmed track can be privately approved while monitoring. Mute and visibility changes remain manual.</p>
       </section>
 
       <section class="panel" aria-labelledby="twitch-heading">
@@ -60,7 +60,7 @@
 
       <section class="panel" aria-labelledby="obs-heading">
         <h2 id="obs-heading">OBS connection</h2>
-        <p class="muted">Read-only local discovery and diagnostics. CueMender does not change OBS scenes, sources or tracks.</p>
+        <p class="muted">Local discovery and diagnostics. An exact private approval can add the selected mic to its confirmed track. Mute and visibility remain manual.</p>
         <label for="obs-address">WebSocket address</label>
         <input id="obs-address" type="text" maxlength="256" autocomplete="off" spellcheck="false">
         <label for="obs-password">WebSocket password <span class="optional">(leave blank if none)</span></label>
@@ -157,7 +157,7 @@
 
       <section class="panel" aria-labelledby="monitoring-heading">
         <h2 id="monitoring-heading">Monitoring and incidents</h2>
-        <p class="muted">Reports create bounded incidents. Manual checks use a fresh read-only OBS observation. No repair action exists yet.</p>
+        <p class="muted">Reports create bounded incidents. Manual checks use a fresh read-only OBS observation. An eligible microphone track finding can offer one expiring private approval.</p>
         <div class="actions">
           <button id="monitor-start" type="button">Start monitoring</button>
           <button id="monitor-stop" type="button" class="secondary">Stop monitoring</button>
@@ -173,7 +173,7 @@
   </main>
 
   <footer>
-    <p>Local only · loopback HTTP · evidence and incident lifecycle; no OBS mutating repair actions</p>
+    <p>Local only · loopback HTTP · evidence, private track approval and local verification</p>
   </footer>
   <noscript>JavaScript is required for the private control surface.</noscript>
   <script src="app.js"></script>

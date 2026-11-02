@@ -6,6 +6,8 @@ Maintain this from real work and reports. Codex updates the central record; Deep
 
 ## Current evidence
 
+P04 implementation (2026-11-02 Malaysia): Codex root and user-requested GPT-6.1 Sol high subagents implemented the complete local private approval/repair path with one production writer at a time. OBS adapter checkpoint is `44295ec`; integration, root recovery/refresh fixes and deterministic race fixtures follow in the P04 branch history. DeepSeek wrote no P04 code. Root recorded genuine main-chat work before/during implementation: 37:29.867 silent footage, verified by decode and sampled frames. See [P04 build record](handoffs/P04-codex-build.md) and [verification](handoffs/P04-review.md) for exact roles, checks and limits. Verification of Codex-authored code is self-verification; separate peer source inspection is identified explicitly. Real Twitch and real P04 approval remain pending; P05 held.
+
 P03-R05 re-review (2026-11-02 Malaysia): Codex independently passed ordinary Go suite, vet/format/CGo-free build and four Node fixtures; hash matches worker. Added internal/incidents/p03_r05_review_test.go and internal/app/p03_r05_review_test.go: blocked-SQLite Close join and stale conditional store update protection pass; canceled-job durable settlement and prompt fixture cancellation fail. No production fixes. Worker checkpoint 9d754a8, review P03-R05-review.md and corrections P03-R06.md. Worker race remains separate evidence; no rendered/live recheck or P04 work.
 
 P03-R04 re-review (2026-11-02 Malaysia): Codex independently ran the full ordinary Go suite, vet/format/CGo-free build and four Node fixtures; all pass, binary hash matches worker. Added internal/app/p03_r04_review_test.go with one failing idle-to-later-session queue test and one passing old-session-after-stop/start test. These are local composition tests with controlled intake/readiness/clock, not live or full protocol evidence. No production fixes by Codex. Worker checkpoint e980d08; review/remaining scope in P03-R04-review.md and P03-R05.md. Live Twitch deferred, P04 held; no fresh rendered-browser/live OBS check.
@@ -24,12 +26,12 @@ P03 review, 2026-11-02 (Malaysia): DeepSeek implemented P03 v1.2. Codex independ
 | Workflow update reserving substantive P04 implementation for Codex | Current Codex chat | Completed documentation | WORKFLOW, DECISIONS, P04 packet, PROMPTS |
 | P01 foundation implementation/tests and P01-R01 corrections | DeepSeek | Implemented and accepted | P01-worker-report.md and source files |
 | P02 implementation | DeepSeek, followed by Codex closure below | Local/live OBS complete; conditionally accepted for P03 under D30; Twitch deferred | P02-worker-report.md, P02-codex-closure-review.md |
-| P03/P05/P06 implementation | DeepSeek | Planned | Future worker reports and actual source changes |
-| P04 approval/repair engine and tests | Current Codex chat | Planned; not implemented | Future P04-codex-build.md and source changes |
+| P03 implementation / P05–P06 future work | DeepSeek; Codex closure for P03 | P03 local baseline accepted; P05–P06 held | P03-worker-report.md and closure record; future packets undispatched |
+| P04 approval/repair engine and tests | Current Codex chat and requested Sol 6.1 high subagents | Implemented locally; real approval gate pending | P04-codex-build.md, P04-review.md and branch commits |
 | P01 debugging and acceptance review | Current Codex chat | Completed review; no production fixes authored | P01-review.md, JS reload reproduction, shutdown repetitions, P01-R01 |
 | P01-R01 independent acceptance | Current Codex chat | Source inspected; full suite, five shutdown repetitions, vet and JS regression passed | P01-R01-review.md |
 | Codex P02 closure implementation | Current Codex chat and user-requested GPT-6.1 Sol high subagents | Completed local fixes/full tests/race/browser/live OBS; live Twitch deferred | P02-codex-closure-review.md; docs/implementation/P02-codex-closure.md; Twitch/OBS/app source and closure tests |
-| Actual Codex build session ID / footage | Codex app / user recording | Not yet recorded here | Retrieve genuine ID and recordings; never invent them |
+| Actual Codex build session ID / footage | Codex app / background FFmpeg capture | P04 footage verified; genuine session ID still to collect | P04-codex-build.md; ignored local recording, never invent ID |
 
 ## Entry format for implementation
 

@@ -7,7 +7,7 @@ import (
 
 // These values can be replaced with -ldflags at release time.
 var (
-	Version   = "0.3.0-p03"
+	Version   = "0.4.0-p04"
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )

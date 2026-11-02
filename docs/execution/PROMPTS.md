@@ -2,7 +2,7 @@
 
 Revision: 2.4
 
-Current dispatch: **P04 is Codex-owned, not a DeepSeek prompt.** User requested Sol 6.1 high subagents; consult STATUS for the single implementation writer. Recording is verified/running; contracts v1.4/C10 and P04 v1.3 apply. P05 remains held. Historical worker prompts below are not active dispatches.
+Current dispatch: **P04 is Codex-owned, not a DeepSeek prompt.** Local implementation and genuine build recording are complete; see STATUS and handoffs/P04-review.md for verification and remaining gates. Contracts v1.4/C10 and P04 v1.3 apply. Live Twitch remains pending and the dependent real approval trial is not claimed passed. P05 remains held. Historical worker prompts below are not active dispatches.
 
 ## Historical: P03-R06 v1.0 — completed
 
