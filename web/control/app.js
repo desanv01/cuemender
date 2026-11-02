@@ -2,7 +2,8 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '' };
+  const queryAll = (selector) => typeof document.querySelectorAll === 'function' ? Array.from(document.querySelectorAll(selector)) : [];
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor' };
   let events = null;
 
   class ApiError extends Error {
@@ -345,6 +346,21 @@
         dismiss.textContent = 'Dismiss';
         dismiss.addEventListener('click', () => dismissIncident(incident.id));
         actions.appendChild(dismiss);
+        const closeLabel = document.createElement('label');
+        closeLabel.textContent = 'Close outcome';
+        const closeSelect = document.createElement('select');
+        closeSelect.id = 'close-' + incident.id;
+        for (const [value, label] of [['viewer_confirmed', 'Viewer confirmed'], ['local_only', 'Local only'], ['unresolved', 'Unresolved']]) {
+          const option = document.createElement('option'); option.value = value; option.textContent = label; closeSelect.appendChild(option);
+        }
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'secondary';
+        closeButton.textContent = 'Close incident';
+        closeButton.addEventListener('click', () => closeIncident(incident.id, closeSelect.value));
+        actions.appendChild(closeLabel);
+        actions.appendChild(closeSelect);
+        actions.appendChild(closeButton);
       }
       card.appendChild(actions);
       list.appendChild(card);
@@ -365,8 +381,17 @@
     }
   }
 
-  async function stopMonitoring() {
+  async function closeIncident(id, outcome) {
     try {
+      await postPrivate('/api/v1/incidents/' + encodeURIComponent(id) + '/close', { outcome });
+      showNotice('Incident closed with ' + outcome + '.', 'ok');
+    } catch (error) {
+      showNotice(error.message || 'Closure was not accepted. Reloading truthful state.', 'error');
+    }
+    await loadState();
+  }
+
+  async function stopMonitoring() {    try {
       await request('/api/v1/monitoring/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
@@ -422,6 +447,41 @@
     }
   }
 
+  function applySection(section) {
+    state.section = section;
+    for (const panel of Array.from(document.querySelectorAll ? document.querySelectorAll('#app > section.panel') : [])) {
+      if (panel.id === 'rehearsal-panel') {
+        panel.hidden = state.mode !== 'rehearsal' || section !== 'rehearsal';
+        continue;
+      }
+      panel.hidden = section === 'setup' ? panel.dataset.section !== 'setup' : panel.dataset.section !== 'monitor';
+    }
+    for (const button of queryAll('#section-tabs button')) {
+      if (button.classList) button.classList.toggle('active', button.dataset.section === section);
+    }
+  }
+
+  function renderMode(mode) {
+    state.mode = mode === 'rehearsal' ? 'rehearsal' : 'live';
+    const badge = $('mode-badge');
+    if (badge) {
+      badge.textContent = state.mode === 'rehearsal' ? 'REHEARSAL' : 'LIVE';
+      if (badge.classList) badge.classList.toggle('rehearsal', state.mode === 'rehearsal');
+    }
+    const tab = $('rehearsal-tab');
+    if (tab) {
+      tab.hidden = state.mode !== 'rehearsal';
+    }
+    const watermark = $('mode-watermark');
+    if (watermark) {
+      watermark.hidden = state.mode !== 'rehearsal';
+    }
+    if (state.mode !== 'rehearsal' && state.section === 'rehearsal') {
+      state.section = 'monitor';
+    }
+    applySection(state.section);
+  }
+
   function render(privateState) {
     showApp();
     if (typeof privateState.csrf_token === 'string' && privateState.csrf_token) {
@@ -429,6 +489,7 @@
     }
     state.currentRevision = privateState.settings ? privateState.settings.revision : 0;
     renderMonitoring(privateState);
+    renderMode(privateState.mode || 'live');
     setText('mode', privateState.mode || 'live');
     setText('revision', String(privateState.settings ? privateState.settings.revision : 0));
     setText('state-revision', String(privateState.state_revision || 0));
@@ -663,6 +724,41 @@
     }
   }
 
+  async function applyRehearsalScenario() {
+    try {
+      await postPrivate('/api/v1/rehearsal/scenario', { scenario: $('rehearsal-scenario').value });
+      $('rehearsal-status').textContent = 'Scenario applied. Start monitoring, then simulate a report.';
+      await loadState();
+    } catch (error) {
+      $('rehearsal-status').textContent = error.message || 'Scenario was not applied.';
+    }
+  }
+
+  async function simulateRehearsalReport() {
+    try {
+      await postPrivate('/api/v1/rehearsal/report', { category: 'audio' });
+      $('rehearsal-status').textContent = 'Simulated viewer report accepted.';
+      await loadState();
+    } catch (error) {
+      $('rehearsal-status').textContent = error.message || 'Simulated report was rejected.';
+    }
+  }
+
+  async function simulateRehearsalFeedback(vote) {
+    const incident = (state.incidents || [])[0];
+    if (!incident) {
+      $('rehearsal-status').textContent = 'Run a simulated report first.';
+      return;
+    }
+    try {
+      await postPrivate('/api/v1/rehearsal/feedback', { public_id: incident.public_id, vote });
+      $('rehearsal-status').textContent = 'Simulated vote recorded with the single rehearsal viewer.';
+      await loadState();
+    } catch (error) {
+      $('rehearsal-status').textContent = error.message || 'Simulated feedback was rejected.';
+    }
+  }
+
   $('refresh').addEventListener('click', loadState);
   $('settings-form').addEventListener('submit', save);
   $('monitor-start').addEventListener('click', startMonitoring);
@@ -708,6 +804,30 @@
     $('visual-source-uuid').value = option.dataset.uuid || '';
     $('visual-context').value = option.dataset.context || '';
   });
+
+  for (const button of queryAll('#section-tabs button')) {
+    button.addEventListener('click', () => applySection(button.dataset.section));
+  }
+  if ($('overlay-url')) {
+    $('overlay-url').value = (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/overlay/';
+    if ($('overlay-copy')) {
+      $('overlay-copy').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText($('overlay-url').value);
+          $('overlay-copy-status').textContent = 'Copied';
+        } catch {
+          $('overlay-url').select();
+          $('overlay-copy-status').textContent = 'Select and copy';
+        }
+      });
+    }
+  }
+  if ($('rehearsal-apply')) {
+    $('rehearsal-apply').addEventListener('click', applyRehearsalScenario);
+    $('rehearsal-report').addEventListener('click', simulateRehearsalReport);
+    $('rehearsal-feedback-fixed').addEventListener('click', () => simulateRehearsalFeedback('fixed'));
+    $('rehearsal-feedback-broken').addEventListener('click', () => simulateRehearsalFeedback('stillbroken'));
+  }
 
   (async () => {
     await bootstrapFromFragment();

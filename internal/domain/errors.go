@@ -12,4 +12,8 @@ var (
 	ErrTerminalIncident  = errors.New("incident is terminal")
 	ErrTooManyReports    = errors.New("report detail bound reached")
 	ErrJobLimit          = errors.New("diagnostic job limit reached")
+	ErrModeConflict      = errors.New("database mode conflict")
+	ErrClosureIneligible = errors.New("incident is not eligible for closure")
+	ErrClosureConflict   = errors.New("conflicting closure outcome")
+	ErrClosureFeedback   = errors.New("closure feedback eligibility failed")
 )

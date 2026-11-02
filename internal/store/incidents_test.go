@@ -29,8 +29,8 @@ INSERT INTO app_settings VALUES (1, 4, '{"microphone":{"name":"Old mic"},"stream
 	}
 	defer st.Close()
 	version, _ := st.SchemaVersion(context.Background())
-	if version != 3 {
-		t.Fatalf("version = %d, want 3", version)
+	if version != 4 {
+		t.Fatalf("version = %d, want 4", version)
 	}
 	settings, err := st.LoadSettings(context.Background())
 	if err != nil {

@@ -69,13 +69,17 @@ setImmediate(async () => {
   if (list.children.length !== 1) problems.push('incident card not rendered');
   const card = list.children[0];
   const buttonNodes = card.children.filter((child) => child.className === 'actions')[0];
-  if (!buttonNodes || buttonNodes.children.length !== 2) problems.push('recheck/dismiss controls missing');
+  const actionButtons = buttonNodes ? buttonNodes.children.filter((child) => child.handlers && child.handlers.click) : [];
+  const recheckButton = actionButtons.find((child) => child.textContent === 'Recheck');
+  const dismissButton = actionButtons.find((child) => child.textContent === 'Dismiss');
+  const closeButton = actionButtons.find((child) => child.textContent === 'Close incident');
+  if (!buttonNodes || !recheckButton || !dismissButton || !closeButton) problems.push('recheck/dismiss/close controls missing');
   await node('monitor-stop').handlers.click();
   await node('monitor-start').handlers.click();
   await node('manual-audio').handlers.click();
-  if (buttonNodes && buttonNodes.children.length === 2) {
-    await buttonNodes.children[0].handlers.click();
-    await buttonNodes.children[1].handlers.click();
+  if (recheckButton && dismissButton) {
+    await recheckButton.handlers.click();
+    await dismissButton.handlers.click();
   }
   const paths = requests.map((request) => request.method + ' ' + request.url);
   const expected = [

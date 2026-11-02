@@ -101,6 +101,7 @@ type Incident struct {
 	ClosedAt          *time.Time        `json:"closed_at,omitempty"`
 	EvidenceAt        *time.Time        `json:"evidence_at,omitempty"`
 	Streaming         *bool             `json:"streaming,omitempty"`
+	ClosureOutcome    string            `json:"closure_outcome,omitempty"`
 	RepairAvailable   bool              `json:"repair_available"`
 }
 

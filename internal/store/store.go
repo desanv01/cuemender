@@ -118,15 +118,29 @@ CREATE TABLE actions (
 );
 CREATE INDEX actions_status ON actions(status);
 `},
+	{version: 4, sql: `
+CREATE TABLE IF NOT EXISTS db_meta (
+ key TEXT PRIMARY KEY,
+ value TEXT NOT NULL
+);
+`},
 }
 
 // Store owns the local SQLite database. SQL and schema details stay here.
 type Store struct {
 	db   *sql.DB
 	path string
+	mode string
 }
 
 func Open(ctx context.Context, path string) (*Store, error) {
+	return OpenMode(ctx, path, domain.ModeLive)
+}
+
+func OpenMode(ctx context.Context, path, mode string) (*Store, error) {
+	if mode != domain.ModeLive && mode != domain.ModeRehearsal {
+		return nil, domain.ErrModeConflict
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolve database path: %w", err)
@@ -154,11 +168,33 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("configure foreign keys: %w", err)
 	}
 
+	var existing int
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='incidents'`).Scan(&existing)
 	s := &Store{db: db, path: abs}
 	if err := s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, err
 	}
+	var marked string
+	err = db.QueryRowContext(ctx, `SELECT value FROM db_meta WHERE key = 'mode'`).Scan(&marked)
+	switch {
+	case err == nil && marked != mode:
+		db.Close()
+		return nil, fmt.Errorf("%w: database is %s, requested %s", domain.ErrModeConflict, marked, mode)
+	case err == sql.ErrNoRows:
+		if existing > 0 && mode == domain.ModeRehearsal {
+			db.Close()
+			return nil, fmt.Errorf("%w: existing unmarked database is live-only", domain.ErrModeConflict)
+		}
+		if _, err := db.ExecContext(ctx, `INSERT INTO db_meta(key, value) VALUES('mode', ?)`, mode); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("mark database mode: %w", err)
+		}
+	case err != nil:
+		db.Close()
+		return nil, fmt.Errorf("read database mode: %w", err)
+	}
+	s.mode = mode
 	return s, nil
 }
 
@@ -170,6 +206,7 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) Path() string { return s.path }
+func (s *Store) Mode() string { return s.mode }
 
 func (s *Store) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `

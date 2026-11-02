@@ -37,6 +37,7 @@ type Options struct {
 	Reply     func(string) bool
 	OnChange  func()
 	Now       func() time.Time
+	Mode      string
 }
 
 type job struct {
@@ -74,6 +75,7 @@ type Coordinator struct {
 	incidents map[string]domain.Incident
 	order     []string
 	closed    bool
+	mode      string
 	closeOnce sync.Once
 	wg        sync.WaitGroup
 }
@@ -87,10 +89,13 @@ func NewChecked(opts Options) (*Coordinator, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
+	if opts.Mode == "" {
+		opts.Mode = domain.ModeLive
+	}
 	c := &Coordinator{
 		repair: opts.Repair, readTrack: opts.ReadTrack, proposals: map[string]domain.Proposal{}, actions: map[string]domain.Action{}, reconcileCh: make(chan struct{}, 1),
 		store: opts.Store, read: opts.Read, settings: opts.Settings, status: opts.Status,
-		reply: opts.Reply, onChange: opts.OnChange, now: opts.Now,
+		reply: opts.Reply, onChange: opts.OnChange, now: opts.Now, mode: opts.Mode,
 		jobs: map[string]*job{}, incidents: map[string]domain.Incident{},
 		pending: map[string]domain.Incident{},
 		gate:    make(chan struct{}, 1),
@@ -711,6 +716,45 @@ func (c *Coordinator) handleFeedback(ctx context.Context, command, code, actorID
 	return "CueMender recorded your feedback."
 }
 
+// CloseIncident is the broadcaster closure authority. Feedback/recheck and
+// approval remain terminal-rejected once closed.
+func (c *Coordinator) CloseIncident(ctx context.Context, incidentID, outcome string) (domain.Incident, error) {
+	if outcome != "viewer_confirmed" && outcome != "local_only" && outcome != "unresolved" {
+		return domain.Incident{}, domain.ErrInvalidInput
+	}
+	if err := c.acquire(ctx); err != nil {
+		return domain.Incident{}, err
+	}
+	defer c.release()
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return domain.Incident{}, domain.ErrUnavailable
+	}
+	inc, ok := c.incidents[incidentID]
+	if !ok {
+		c.mu.Unlock()
+		return domain.Incident{}, domain.ErrIncidentNotFound
+	}
+	if c.jobs[inc.Category] != nil || c.incidentActionPendingLocked(incidentID) || c.pending[incidentID].ID != "" {
+		c.mu.Unlock()
+		return domain.Incident{}, domain.ErrClosureIneligible
+	}
+	sessionID := ""
+	if c.session != nil && c.session.Active {
+		sessionID = c.session.ID
+	}
+	c.mu.Unlock()
+	closed, err := c.store.CloseIncident(ctx, incidentID, outcome, sessionID, c.now().UTC())
+	if err != nil {
+		return domain.Incident{}, err
+	}
+	c.setIncident(closed)
+	_ = c.invalidateProposals(ctx, incidentID, domain.ProposalInvalidated)
+	c.publish()
+	return closed, nil
+}
+
 func (c *Coordinator) Dismiss(ctx context.Context, incidentID string) (domain.Incident, error) {
 	if err := c.acquire(ctx); err != nil {
 		return domain.Incident{}, err
@@ -1012,6 +1056,7 @@ func (c *Coordinator) PublicSnapshot() (active bool, incidents []domain.PublicIn
 			PublicID: inc.PublicID, Category: inc.Category, Stage: inc.Stage,
 			MessageCode: publicMessage(inc), LocalVerification: inc.LocalVerification,
 			FeedbackSummary: fmt.Sprintf("%d positive / %d negative", inc.Feedback.Positive, inc.Feedback.Negative),
+			ClosureOutcome:  inc.ClosureOutcome,
 		})
 	}
 	return true, out, len(c.jobs)
@@ -1034,6 +1079,7 @@ func (c *Coordinator) PublicIncidents() []domain.PublicIncident {
 			PublicID: inc.PublicID, Category: inc.Category, Stage: inc.Stage,
 			MessageCode: publicMessage(inc), LocalVerification: inc.LocalVerification,
 			FeedbackSummary: fmt.Sprintf("%d positive / %d negative", inc.Feedback.Positive, inc.Feedback.Negative),
+			ClosureOutcome:  inc.ClosureOutcome,
 		})
 	}
 	return out

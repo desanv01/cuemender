@@ -48,7 +48,7 @@ h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
   font-size: 0.8rem;
 }
 
-main { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 2rem; }
+main { max-width: 1120px; margin: 0 auto; padding: 0 24px 2rem; }
 
 .panel {
   background: var(--panel);
@@ -169,4 +169,24 @@ footer {
 @media (max-width: 520px) {
   .masthead { padding-top: 1.4rem; }
   .panel { padding: 1rem; }
+}
+
+.tabs { display: flex; gap: 8px; margin: 0 0 18px; flex-wrap: wrap; max-width: 100%; }
+.tabs button { flex: 0 1 auto; min-width: 0; }
+.actions { flex-wrap: wrap; }
+.panel, .actions, input, select, textarea { min-width: 0; max-width: 100%; }
+html, body { max-width: 100%; overflow-x: hidden; }
+.tabs button { background: #1b2226; color: #e8ecee; border: 1px solid #3b464c; }
+.tabs button.active { background: #2dd4bf; color: #071013; border-color: #2dd4bf; }
+.badge.rehearsal, .rehearsal-watermark { background: #7c3aed; color: #fff; }
+.rehearsal-watermark { padding: 8px 12px; border-radius: 8px; font-weight: 700; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #5eead4; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+@media (max-width: 600px) {
+  main { padding: 0 16px; }
+  .tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+  .tabs button { flex: 0 0 auto; }
+  .actions button { flex: 1 1 100%; }
 }

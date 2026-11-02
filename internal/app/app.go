@@ -25,6 +25,7 @@ import (
 )
 
 type Options struct {
+	Mode               string
 	DataDir            string
 	ListenAddress      string
 	NoBrowser          bool
@@ -53,6 +54,7 @@ type App struct {
 	fileConfig Config
 	configMu   sync.Mutex
 	dataDir    string
+	mode       string
 	now        func() time.Time
 
 	listener                 net.Listener
@@ -62,6 +64,7 @@ type App struct {
 	twitchMgr                *twitch.Manager
 	obsMgr                   *obs.Manager
 	coordinator              *incidents.Coordinator
+	rehearsal                *rehearsalState
 	monitoringStatusOverride func() incidents.Readiness
 
 	ui         *httpui.Server
@@ -108,9 +111,23 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	dataDir, err := ResolveDataDir(opts.DataDir)
+	mode := opts.Mode
+	if mode == "" {
+		mode = domain.ModeLive
+	}
+	if mode != domain.ModeLive && mode != domain.ModeRehearsal {
+		return nil, domain.ErrModeConflict
+	}
+	baseDir, err := ResolveDataDir(opts.DataDir)
 	if err != nil {
 		return nil, err
+	}
+	dataDir := baseDir
+	if mode == domain.ModeRehearsal {
+		dataDir, err = ResolveDataDir(filepath.Join(baseDir, "rehearsal"))
+		if err != nil {
+			return nil, err
+		}
 	}
 	cfg, err := LoadConfig(dataDir)
 	if err != nil {
@@ -139,7 +156,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 	}
 
 	dbPath := filepath.Join(dataDir, databaseFileName)
-	st, err := store.Open(ctx, dbPath)
+	st, err := store.OpenMode(ctx, dbPath, mode)
 	if err != nil {
 		cleanup()
 		return nil, err
@@ -156,12 +173,12 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 
 	var secretStore secrets.Store
 	var secretsStatus domain.SecretsStatus
-	if opts.SessionOnlySecrets {
+	if opts.SessionOnlySecrets || mode == domain.ModeRehearsal {
 		secretStore = secrets.NewMemory()
 		secretsStatus = domain.SecretsStatus{
 			Mode:      domain.SecretsModeMemory,
 			Available: true,
-			Detail:    "Explicit session-only mode: secrets are held in memory for this process only.",
+			Detail:    "Memory-only secrets for this process.",
 		}
 	} else {
 		newOSStore := deps.newOSStore
@@ -190,6 +207,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		cfg:           cfg,
 		fileConfig:    fileConfig,
 		dataDir:       dataDir,
+		mode:          mode,
 		now:           opts.Now,
 		listener:      ln,
 		store:         st,
@@ -224,49 +242,63 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		}
 	}()
 	a.baseURL = "http://" + net.JoinHostPort(host, port)
-	twitchOptions := twitch.Options{
-		Context:               baseCtx,
-		OAuth:                 twitch.NewOAuth(&http.Client{Timeout: 15 * time.Second}, twitch.DefaultEndpoints(), a.now),
-		Store:                 twitch.NewCredentialStore(secretStore),
-		Dialer:                twitch.CoderDialer{HTTP: &http.Client{}},
-		Endpoints:             twitch.DefaultEndpoints(),
-		ClientID:              fileConfig.TwitchClientID,
-		StorageMode:           secretsStatus.Mode,
-		Now:                   a.now,
-		OnUpdate:              a.onIntegrationUpdate,
-		OnCommand:             a.onTwitchCommand,
-		SuppressStaticReplies: true,
-		RefreshPeriod:         time.Hour,
+	if mode == domain.ModeRehearsal {
+		a.rehearsal = newRehearsalState(settings)
+	} else {
+		twitchOptions := twitch.Options{
+			Context:               baseCtx,
+			OAuth:                 twitch.NewOAuth(&http.Client{Timeout: 15 * time.Second}, twitch.DefaultEndpoints(), a.now),
+			Store:                 twitch.NewCredentialStore(secretStore),
+			Dialer:                twitch.CoderDialer{HTTP: &http.Client{}},
+			Endpoints:             twitch.DefaultEndpoints(),
+			ClientID:              fileConfig.TwitchClientID,
+			StorageMode:           secretsStatus.Mode,
+			Now:                   a.now,
+			OnUpdate:              a.onIntegrationUpdate,
+			OnCommand:             a.onTwitchCommand,
+			SuppressStaticReplies: true,
+			RefreshPeriod:         time.Hour,
+		}
+		if deps.configureTwitch != nil {
+			deps.configureTwitch(&twitchOptions)
+		}
+		a.twitchMgr = twitch.NewManager(twitchOptions)
+		obsOptions := obs.Options{
+			Context:  baseCtx,
+			Dialer:   obs.GoobsDialer{},
+			Secrets:  secretStore,
+			Now:      a.now,
+			OnUpdate: a.onIntegrationUpdate,
+		}
+		if deps.configureOBS != nil {
+			deps.configureOBS(&obsOptions)
+		}
+		a.obsMgr = obs.NewManager(obsOptions)
+		a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
 	}
-	if deps.configureTwitch != nil {
-		deps.configureTwitch(&twitchOptions)
-	}
-	a.twitchMgr = twitch.NewManager(twitchOptions)
-	obsOptions := obs.Options{
-		Context:  baseCtx,
-		Dialer:   obs.GoobsDialer{},
-		Secrets:  secretStore,
-		Now:      a.now,
-		OnUpdate: a.onIntegrationUpdate,
-	}
-	if deps.configureOBS != nil {
-		deps.configureOBS(&obsOptions)
-	}
-	a.obsMgr = obs.NewManager(obsOptions)
-	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
 	a.monitoringStatusOverride = deps.monitoringStatus
-	coordinator, err := incidents.NewChecked(incidents.Options{
-		Store:  st,
-		Repair: a.obsMgr.RepairTrack, ReadTrack: a.obsMgr.ReadTrackState,
-		Read: func(ctx context.Context, snapshot domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
-			return a.obsMgr.DiagnosticRead(ctx, snapshot)
-		},
+	coordinatorOptions := incidents.Options{
+		Store:    st,
 		Settings: a.currentSettings,
 		Status:   a.monitoringReadiness,
-		Reply:    a.twitchMgr.EnqueueReply,
 		OnChange: a.onIncidentUpdate,
 		Now:      a.now,
-	})
+		Mode:     mode,
+	}
+	if a.rehearsal != nil {
+		coordinatorOptions.Read = a.rehearsal.Read
+		coordinatorOptions.Repair = a.rehearsal.Repair
+		coordinatorOptions.ReadTrack = a.rehearsal.ReadTrack
+		coordinatorOptions.Reply = func(string) bool { return true }
+	} else {
+		coordinatorOptions.Repair = a.obsMgr.RepairTrack
+		coordinatorOptions.ReadTrack = a.obsMgr.ReadTrackState
+		coordinatorOptions.Read = func(ctx context.Context, snapshot domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+			return a.obsMgr.DiagnosticRead(ctx, snapshot)
+		}
+		coordinatorOptions.Reply = a.twitchMgr.EnqueueReply
+	}
+	coordinator, err := incidents.NewChecked(coordinatorOptions)
 	if err != nil {
 		a.Close()
 		return nil, err
@@ -277,7 +309,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		Backend: a,
 		Host:    host,
 		Port:    port,
-		Mode:    domain.ModeLive,
+		Mode:    mode,
 		Version: Version,
 		Assets:  web.FS,
 		Now:     a.now,
@@ -306,6 +338,7 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 func (a *App) ControlURL() string { return a.controlURL }
 func (a *App) BaseURL() string    { return a.baseURL }
 func (a *App) DataDir() string    { return a.dataDir }
+func (a *App) Mode() string       { return a.mode }
 
 func (a *App) Run(ctx context.Context) error {
 	defer a.Close()
@@ -320,8 +353,10 @@ func (a *App) Run(ctx context.Context) error {
 	fmt.Fprintf(a.stdout, "Private control (single-use link, valid 5 minutes): %s\n", a.controlURL)
 	fmt.Fprintln(a.stdout, "Twitch: not connected. OBS: not connected. Use the private control page to connect.")
 	a.logger.Info("listening", "address", a.baseURL)
-	a.twitchMgr.StartSaved()
-	a.twitchMgr.StartRefreshLoop()
+	if a.twitchMgr != nil {
+		a.twitchMgr.StartSaved()
+		a.twitchMgr.StartRefreshLoop()
+	}
 
 	if !a.noBrowser {
 		if err := openBrowser(a.controlURL); err != nil {
@@ -453,7 +488,9 @@ func (a *App) SaveSettings(ctx context.Context, expectedRevision int64, exp doma
 		if err != nil {
 			return err
 		}
-		a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+		if a.obsMgr != nil {
+			a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+		}
 
 		return nil
 	}
@@ -508,8 +545,21 @@ func (a *App) SubscribePublic() httpui.Subscription {
 }
 
 func (a *App) privateLocked() domain.PrivateState {
-	twitchState := a.twitchMgr.Snapshot()
-	obsState, discovery, observation, resolutionReady := a.obsMgr.SnapshotBundle(a.settings)
+	var twitchState domain.TwitchConnection
+	var obsState domain.OBSConnection
+	var discovery *domain.OBSDiscovery
+	var observation *domain.OBSObservation
+	resolutionReady := false
+	if a.rehearsal != nil {
+		now := a.now().UTC()
+		twitchState = domain.TwitchConnection{Status: domain.ConnectionConnected, ConnectionGeneration: 1, Login: "rehearsal"}
+		obsState = domain.OBSConnection{Status: domain.ConnectionConnected, Generation: 1, ConfigRevision: a.settings.Revision, SceneCollection: "Rehearsal", ObservedAt: &now, Broadcasting: boolPtr(true)}
+		discovery, observation, _ = a.rehearsal.Read(context.Background(), a.settings)
+		resolutionReady = true
+	} else {
+		twitchState = a.twitchMgr.Snapshot()
+		obsState, discovery, observation, resolutionReady = a.obsMgr.SnapshotBundle(a.settings)
+	}
 	var session *domain.MonitoringSessionInfo
 	var incidentsList []domain.Incident
 	var proposals []domain.Proposal
@@ -521,7 +571,7 @@ func (a *App) privateLocked() domain.PrivateState {
 	monitoringActive := session != nil && session.Active
 	return domain.PrivateState{
 		Proposals: proposals, Actions: actionRecords,
-		Mode:              domain.ModeLive,
+		Mode:              a.mode,
 		StateRevision:     a.stateRevision,
 		MonitoringActive:  monitoringActive,
 		Settings:          a.settings,
@@ -558,22 +608,37 @@ func (a *App) publicLocked() domain.PublicState {
 	}
 	status := domain.ServiceDisconnected
 	if active {
-		tw := a.twitchMgr.Snapshot()
-		obs, _, _, _ := a.obsMgr.SnapshotBundle(a.settings)
-		if tw.Status == domain.ConnectionConnected && obs.Status == domain.ConnectionConnected && !obs.Stale {
+		if a.rehearsal != nil {
 			status = "ready"
 			if jobs > 0 {
 				status = "checking"
 			}
+		} else {
+			tw := a.twitchMgr.Snapshot()
+			obs, _, _, _ := a.obsMgr.SnapshotBundle(a.settings)
+			if tw.Status == domain.ConnectionConnected && obs.Status == domain.ConnectionConnected && !obs.Stale {
+				status = "ready"
+				if jobs > 0 {
+					status = "checking"
+				}
+			}
 		}
 	}
 	return domain.PublicState{
-		Mode:             domain.ModeLive,
+		Mode:             a.mode,
 		StateRevision:    a.stateRevision,
 		MonitoringActive: active,
 		ServiceStatus:    status,
 		Incidents:        publicIncidents,
+		DemoLabel:        rehearsalLabel(a.mode),
 	}
+}
+
+func rehearsalLabel(mode string) string {
+	if mode == domain.ModeRehearsal {
+		return "REHEARSAL — simulated data"
+	}
+	return ""
 }
 
 func (a *App) secretsStatus() domain.SecretsStatus {

@@ -54,10 +54,14 @@ func Proposal(id string, inc domain.Incident, settings domain.Settings, discover
 }
 
 func Validate(p domain.Proposal, session *domain.MonitoringSessionInfo, settings domain.Settings, generation uint64, connected bool, now time.Time) error {
+	return ValidateMode(p, session, settings, generation, connected, now, domain.ModeLive)
+}
+
+func ValidateMode(p domain.Proposal, session *domain.MonitoringSessionInfo, settings domain.Settings, generation uint64, connected bool, now time.Time, ownerMode string) error {
 	if !now.Before(p.ExpiresAt) {
 		return domain.ErrProposalExpired
 	}
-	if !connected || generation != p.Generation || settings.Revision != p.ConfigRevision || p.Mode != domain.ModeLive || session == nil || !session.Active || session.ID != p.SessionID || settings.Microphone == nil || settings.StreamTrack == nil || settings.TrackConfirmedAt == nil || *settings.StreamTrack != p.SelectedTrack {
+	if !connected || generation != p.Generation || settings.Revision != p.ConfigRevision || p.Mode != ownerMode || session == nil || !session.Active || session.ID != p.SessionID || settings.Microphone == nil || settings.StreamTrack == nil || settings.TrackConfirmedAt == nil || *settings.StreamTrack != p.SelectedTrack {
 		return domain.ErrActionConflict
 	}
 	mic := *settings.Microphone

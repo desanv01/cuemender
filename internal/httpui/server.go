@@ -196,6 +196,10 @@ func (s *Server) buildHandler() http.Handler {
 	mux.HandleFunc("/api/v1/incidents/check", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentCheck)))).ServeHTTP)
 	mux.Handle("POST /api/v1/proposals/{id}/approve", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleApprove))))
 	mux.Handle("POST /api/v1/incidents/{id}/dismiss", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentDismiss))))
+	mux.Handle("POST /api/v1/incidents/{id}/close", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentClose))))
+	mux.Handle("POST /api/v1/rehearsal/scenario", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleRehearsalScenario))))
+	mux.Handle("POST /api/v1/rehearsal/report", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleRehearsalReport))))
+	mux.Handle("POST /api/v1/rehearsal/feedback", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleRehearsalFeedback))))
 
 	mux.HandleFunc("/public/v1/state", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicState)).ServeHTTP)
 	mux.HandleFunc("/public/v1/events", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicEvents)).ServeHTTP)
@@ -598,6 +602,138 @@ func (s *Server) handleIncidentDismiss(w http.ResponseWriter, r *http.Request) {
 	writeData(w, r, map[string]any{"incident_id": inc.ID, "stage": inc.Stage})
 }
 
+func (s *Server) handleIncidentClose(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		Outcome string `json:"outcome"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if body.Outcome != "viewer_confirmed" && body.Outcome != "local_only" && body.Outcome != "unresolved" {
+		writeError(w, r, http.StatusBadRequest, "invalid_closure_outcome", "outcome must be viewer_confirmed, local_only or unresolved.")
+		return
+	}
+	id := r.PathValue("id")
+	if strings.TrimSpace(id) == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid_incident_id", "incident id is required.")
+		return
+	}
+	backend, ok := s.backend.(interface {
+		CloseIncident(context.Context, string, string) (domain.Incident, error)
+	})
+	if !ok {
+		writeError(w, r, http.StatusServiceUnavailable, "unavailable", "Closure is unavailable.")
+		return
+	}
+	inc, err := backend.CloseIncident(r.Context(), id, body.Outcome)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeData(w, r, inc)
+}
+
+func (s *Server) handleRehearsalScenario(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		Scenario string `json:"scenario"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	switch body.Scenario {
+	case "track_missing", "mic_muted", "wrong_scene", "unknown_write":
+	default:
+		writeError(w, r, http.StatusBadRequest, "invalid_scenario", "Unknown rehearsal scenario.")
+		return
+	}
+	backend, ok := s.backend.(interface {
+		RehearsalScenario(context.Context, string) (domain.Settings, error)
+	})
+	if !ok {
+		writeError(w, r, http.StatusConflict, "mode_conflict", "Rehearsal is unavailable in live mode.")
+		return
+	}
+	settings, err := backend.RehearsalScenario(r.Context(), body.Scenario)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeData(w, r, settings)
+}
+
+func (s *Server) handleRehearsalReport(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		Category string `json:"category"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if body.Category != "audio" && body.Category != "video" {
+		writeError(w, r, http.StatusBadRequest, "invalid_category", "category must be audio or video.")
+		return
+	}
+	backend, ok := s.backend.(interface {
+		RehearsalReport(context.Context, string) (domain.Incident, error)
+	})
+	if !ok {
+		writeError(w, r, http.StatusConflict, "mode_conflict", "Rehearsal is unavailable in live mode.")
+		return
+	}
+	inc, err := backend.RehearsalReport(r.Context(), body.Category)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeDataStatus(w, r, http.StatusAccepted, inc)
+}
+
+func (s *Server) handleRehearsalFeedback(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		PublicID string `json:"public_id"`
+		Vote     string `json:"vote"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if body.PublicID == "" || (body.Vote != "fixed" && body.Vote != "stillbroken") {
+		writeError(w, r, http.StatusBadRequest, "invalid_feedback", "public_id and a valid vote are required.")
+		return
+	}
+	backend, ok := s.backend.(interface {
+		RehearsalFeedback(context.Context, string, string) (domain.Incident, error)
+	})
+	if !ok {
+		writeError(w, r, http.StatusConflict, "mode_conflict", "Rehearsal is unavailable in live mode.")
+		return
+	}
+	inc, err := backend.RehearsalFeedback(r.Context(), body.PublicID, body.Vote)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeDataStatus(w, r, http.StatusAccepted, inc)
+}
+
 func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
 	if err := requireJSON(w, r); err != nil {
 		writeClientError(w, r, err)
@@ -647,6 +783,14 @@ func writeIncidentError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusNotFound, "incident_not_found", "Incident was not found.")
 	case errors.Is(err, domain.ErrTerminalIncident):
 		writeError(w, r, http.StatusConflict, "incident_terminal", "That incident is terminal or belongs to another session.")
+	case errors.Is(err, domain.ErrClosureIneligible):
+		writeError(w, r, http.StatusConflict, "closure_ineligible", "That incident is not eligible for closure while work is pending.")
+	case errors.Is(err, domain.ErrClosureConflict):
+		writeError(w, r, http.StatusConflict, "closure_conflict", "That incident was already closed with a different outcome.")
+	case errors.Is(err, domain.ErrClosureFeedback):
+		writeError(w, r, http.StatusConflict, "closure_feedback", "Viewer confirmation or local verification is not eligible for this outcome.")
+	case errors.Is(err, domain.ErrModeConflict):
+		writeError(w, r, http.StatusConflict, "mode_conflict", "This operation is unavailable in the current runtime mode.")
 	case errors.Is(err, domain.ErrInvalidInput):
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "The request is invalid.")
 	case errors.Is(err, domain.ErrUnavailable):

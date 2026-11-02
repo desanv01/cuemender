@@ -117,6 +117,14 @@ Use Ctrl+C to stop the application. To isolate a trial:
 
 The default listener is **http://127.0.0.1:8787/**. The overlay is **http://127.0.0.1:8787/overlay/**.
 
+To explore the control and overlay safely without Twitch or OBS, run isolated rehearsal mode:
+
+~~~powershell
+.\dist\cuemender.exe --mode rehearsal --no-browser --data-dir ".\local-data\trial"
+~~~
+
+Rehearsal writes only under `trial\rehearsal`, uses memory-only simulated providers and no OS keyring, and labels every private/public surface **REHEARSAL — simulated data**. It includes fixed track-missing, muted-microphone, wrong-scene and unknown-write scenarios. Rehearsal is not live evidence and cannot configure Twitch or OBS.
+
 For compatibility with the initial foundation, the default data directory remains **%AppData%\LiveCheck**, the SQLite filename remains **livecheck.db**, and the credential-store namespace remains **LiveCheck**. The CueMender name does not silently move or delete that data.
 
 [Flags, configuration, HTTP behavior and detailed testing →](docs/DEVELOPMENT.md)

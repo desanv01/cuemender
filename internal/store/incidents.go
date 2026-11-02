@@ -194,7 +194,7 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 	var inc domain.Incident
 	if errors.Is(err, sql.ErrNoRows) {
 		inc = domain.Incident{
-			ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: domain.ModeLive,
+			ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: s.mode,
 			Origin: domain.OriginViewer, Category: category, Stage: domain.StageReported,
 			OpenedAt: now, UpdatedAt: now, LocalVerification: domain.LocalNotAttempted,
 			Findings: []domain.Finding{}, Checks: []domain.DiagnosticCheck{},
@@ -257,7 +257,7 @@ func (s *Store) AcceptReport(ctx context.Context, sessionID, category, deliveryI
 
 func (s *Store) CreateManualIncident(ctx context.Context, sessionID, category, incidentID, publicID string, now time.Time) (domain.Incident, error) {
 	inc := domain.Incident{
-		ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: domain.ModeLive,
+		ID: incidentID, PublicID: publicID, SessionID: sessionID, Mode: s.mode,
 		Origin: domain.OriginManual, Category: category, Stage: domain.StageReported,
 		OpenedAt: now, UpdatedAt: now, LocalVerification: domain.LocalNotAttempted,
 		Findings: []domain.Finding{}, Checks: []domain.DiagnosticCheck{},
@@ -414,6 +414,76 @@ func (s *Store) InterruptIncident(ctx context.Context, id string, expectedUpdate
 		return domain.Incident{}, false, err
 	}
 	return inc, true, nil
+}
+
+// CloseIncident atomically applies a broadcaster closure and invalidates
+// unused proposals. Pending repair work keeps the incident ineligible.
+func (s *Store) CloseIncident(ctx context.Context, id, outcome, sessionID string, now time.Time) (domain.Incident, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Incident{}, err
+	}
+	defer tx.Rollback()
+	inc, err := incidentFromRow(func(dest ...any) error {
+		return tx.QueryRowContext(ctx, incidentSelect+` WHERE id = ?`, id).Scan(dest...)
+	})
+	if err != nil {
+		return domain.Incident{}, err
+	}
+	if inc.Stage == domain.StageClosed {
+		if inc.ClosureOutcome == outcome {
+			return inc, nil
+		}
+		return domain.Incident{}, domain.ErrClosureConflict
+	}
+	eligible := map[string]bool{
+		domain.StageFindingAvailable: true, domain.StageAwaitingApproval: true,
+		domain.StageAwaitingFeedback: true, domain.StageUnresolved: true,
+		domain.StageNoSupportedFinding: true, domain.StageInsufficientInfo: true,
+		domain.StageInterrupted: true,
+	}
+	if !eligible[inc.Stage] {
+		return domain.Incident{}, domain.ErrClosureIneligible
+	}
+	var pending int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions WHERE incident_id = ? AND status IN (?,?,?,?)`,
+		id, domain.ActionReserved, domain.ActionIntent, "write_sent", domain.TrackRepairUnknown).Scan(&pending); err != nil {
+		return domain.Incident{}, err
+	}
+	if pending > 0 {
+		return domain.Incident{}, domain.ErrClosureIneligible
+	}
+	switch outcome {
+	case "viewer_confirmed":
+		if inc.SessionID != sessionID || inc.Feedback.Positive <= 0 || inc.Feedback.Negative != 0 {
+			return domain.Incident{}, domain.ErrClosureFeedback
+		}
+	case "local_only":
+		if inc.LocalVerification != domain.LocalVerified {
+			return domain.Incident{}, domain.ErrClosureFeedback
+		}
+	case "unresolved":
+	default:
+		return domain.Incident{}, domain.ErrInvalidInput
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE proposals SET status = ? WHERE incident_id = ? AND status = ?`,
+		domain.ProposalInvalidated, id, domain.ProposalProposed); err != nil {
+		return domain.Incident{}, err
+	}
+	inc.Stage = domain.StageClosed
+	inc.ClosureOutcome = outcome
+	inc.ClosedAt = &now
+	inc.UpdatedAt = now
+	inc.RepairAvailable = false
+	raw, _ := json.Marshal(inc)
+	if _, err := tx.ExecContext(ctx, `UPDATE incidents SET stage = ?, updated_at = ?, closed_at = ?, incident_json = ? WHERE id = ?`,
+		inc.Stage, formatTime(now), formatTime(now), string(raw), id); err != nil {
+		return domain.Incident{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.Incident{}, err
+	}
+	return inc, nil
 }
 
 // InterruptOpenIncidents closes prior-session work at startup. It never

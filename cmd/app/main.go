@@ -19,6 +19,7 @@ func main() {
 func run() int {
 	flags := flag.NewFlagSet("cuemender", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
+	mode := flags.String("mode", "live", "runtime mode: live or rehearsal")
 	dataDir := flags.String("data-dir", "", "data directory (default: user config directory / LiveCheck)")
 	listen := flags.String("listen", "", "loopback listen address override, e.g. 127.0.0.1:8787")
 	noBrowser := flags.Bool("no-browser", false, "do not open a browser; print the one-time control link")
@@ -44,6 +45,7 @@ func run() int {
 	defer stop()
 
 	a, err := app.New(ctx, app.Options{
+		Mode:               *mode,
 		DataDir:            *dataDir,
 		ListenAddress:      *listen,
 		NoBrowser:          *noBrowser,

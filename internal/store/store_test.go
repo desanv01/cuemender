@@ -49,8 +49,8 @@ func TestOpenMigratesAndPRAGMAs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 3 {
-		t.Fatalf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Fatalf("schema version = %d, want 4", version)
 	}
 	var foreignKeys int
 	if err := st.db.QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&foreignKeys); err != nil {
@@ -152,8 +152,8 @@ func TestMigrationsRepeatSafely(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if version != 3 {
-			t.Fatalf("version = %d, want 3", version)
+		if version != 4 {
+			t.Fatalf("version = %d, want 4", version)
 		}
 		if err := st.Close(); err != nil {
 			t.Fatal(err)
