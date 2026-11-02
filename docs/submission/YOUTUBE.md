@@ -1,6 +1,8 @@
 # YouTube publication text
 
-Title: CueMender — Viewer Reports to OBS Evidence | Codex x TwitchCon Hackathon | Desan Vasu
+Title: CueMender — Viewer Reports to OBS Evidence | Codex x TwitchCon Hackathon 2026 | Desan Vasu
+
+Published video: https://youtu.be/4mv0Kk3gm-w
 
 Description:
 

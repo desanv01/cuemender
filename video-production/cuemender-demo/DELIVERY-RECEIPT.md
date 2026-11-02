@@ -31,4 +31,4 @@ Capture app/browser processes were stopped; OBS was left open without starting a
 
 ## Publication state
 
-Revised cut is ready for user review; no approval is inferred from the first-cut review, which requested changes. YouTube publication and final Devpost submission are pending. Background account-browser control encountered a kernel-assets initialization error; no publication or submission success is inferred. Follow `docs/submission/PUBLICATION-HANDOFF.md` from the repository root if browser access remains unavailable.
+The user approved the revised cut. YouTube Studio confirmed publication on November 2, 2026: https://youtu.be/4mv0Kk3gm-w. The user subsequently reported successful Devpost submission; Codex did not independently inspect the final confirmation. YouTube required phone verification for a custom thumbnail, so the video uses a generated frame.
