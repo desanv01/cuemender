@@ -294,3 +294,38 @@ Correction started/finished UTC: 2026-11-02T01:59Z / 2026-11-02T02:01Z. Preserve
 - No rendered-browser or fresh live OBS check. Live P02-A/V06 and P03-D remain deferred under D30/issue #6.
 
 P03-R05 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R05.md and docs/execution/handoffs/P03-R04-review.md. Inspect actual changes and verify captured-session mutation/replies, atomic cleanup and the named provider/database/settings/protocol failure boundaries, preserving all prior regressions. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch stays deferred under D30/issue #6; P04 remains held for Codex release and recording.
+
+## P03-R06 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-02T02:12Z / 2026-11-02T02:13Z. Preserved R05 work. Two supplied failures reproduced first, fixed; all four R05/R06 review tests promoted. No production fixes by Codex.
+
+### A–B matrix
+
+| Group/boundary | Evidence | Result |
+|---|---|---|
+| A canceled-job interruption | `finishJob` retains observed durable UpdatedAt separately from new interruption time; conditional update now commits. `TestReviewR05CanceledJobPersistsInterruption` | pass |
+| A conditional stale version | `InterruptIncident` conditional transaction; `TestReviewR05ConditionalInterruptionPreservesNewerState` both subcases | pass |
+| A cache ordering | `installSettled` refuses older cache state; `TestCoordinatorSettledCacheDoesNotOverwriteNewerState` | pass |
+| A pending retry | Pending retries re-read current durable version and call conditional `InterruptIncident`; no unconditional newer overwrite | implemented |
+| A blocked Close | `TestReviewR05CloseJoinsDatabaseBlockedStart` with second SQLite connection; controlled lock release/join | pass |
+| B canceled upgrade fixture | Local EventSub handler reads closure concurrently and joins promptly; `TestReviewR05ProtocolFixtureJoinsCanceledUpgrade` under 1s without timeout inflation | pass |
+| B actual OBS loss/reconnect | Real local OBS WebSocket drops during outstanding diagnostic; app adapter reconnects; old result cannot become current. `TestP03ActualOBSLossDuringDiagnostic` | pass |
+| B preserved protocol/SSE | SQLite finding, idle help, OBS allowlist, active HTTP/SSE shutdown, local OAuth/Helix/EventSub success retained | pass |
+
+### Exact checks
+
+| Command/action | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=360s` | exit 0; all packages |
+| `go vet ./...`; `gofmt -l ./cmd ./internal ./web` | clean |
+| `CGO_ENABLED=0 go build -trimpath -o dist/cuemender.exe ./cmd/app` | exit 0; 20,015,616 bytes; SHA256 `92910B89A419F478962AF6E4331909623E1E9F5E6A0113D9F06152F9740BA807`; `0.3.0-p03` |
+| Four Node fixtures | all exit 0; review failures=[]; p03 problems=[] |
+| Review/protocol/OBS-loss/cache repeats ×3 | all focused tests pass |
+| WSL Linux `go test -race ./... -count=1 -timeout=360s` | exit 0; all packages race-clean; affected OBS-loss test also race-repeated ×3 |
+
+### Remaining gaps
+
+- No deterministic two-goroutine cleanup/dismiss/recheck interleaving test; conditional store update plus version-aware cache installation cover the path.
+- No rendered-browser or fresh live OBS check. Live P02-A/V06 and P03-D remain deferred under D30/issue #6.
+
+P03-R06 corrections are ready for review. Read the appended evidence, docs/execution/corrections/P03-R06.md and docs/execution/handoffs/P03-R05-review.md. Verify conditional cleanup versions, durable/cache ordering, retry ownership, canceled-socket cleanup and actual local provider-loss evidence while preserving all prior regressions. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch remains deferred under D30/#6; P04 stays held for Codex release and recording.

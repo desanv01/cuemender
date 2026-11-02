@@ -138,12 +138,23 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 				defer conn.Close()
 				_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "welcome", "message_type": "session_welcome", "message_timestamp": "2026-11-01T00:00:00Z"}, "payload": map[string]any{"session": map[string]any{"id": "session", "status": "connected", "keepalive_timeout_seconds": 30}}})
 				chat.welcome <- "ok"
+				readDone := make(chan struct{})
+				go func() {
+					for {
+						if _, _, err := conn.ReadMessage(); err != nil {
+							close(readDone)
+							return
+						}
+					}
+				}()
 				select {
 				case <-chat.help:
 					_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "help-1", "message_type": "notification", "message_timestamp": "2026-11-01T00:00:00Z"}, "payload": map[string]any{
 						"subscription": map[string]any{"type": "channel.chat.message", "version": "1"},
 						"event":        map[string]any{"broadcaster_user_id": "user-1", "chatter_user_id": "user-2", "message_id": "help-message", "message_type": "text", "message": map[string]any{"text": "!streamhelp"}},
 					}})
+				case <-readDone:
+					return
 				case <-time.After(5 * time.Second):
 					return
 				}
@@ -153,13 +164,12 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 						"subscription": map[string]any{"type": "channel.chat.message", "version": "1"},
 						"event":        map[string]any{"broadcaster_user_id": "user-1", "chatter_user_id": "user-2", "message_id": "message-1", "message_type": "text", "message": map[string]any{"text": "!issueaudio"}},
 					}})
+				case <-readDone:
+					return
 				case <-time.After(5 * time.Second):
+					return
 				}
-				for {
-					if _, _, err := conn.ReadMessage(); err != nil {
-						return
-					}
-				}
+				<-readDone
 			}
 			http.NotFound(w, r)
 		}

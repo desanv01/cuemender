@@ -316,6 +316,19 @@ func TestCoordinatorAutomaticProviderReplacementInvalidatesJob(t *testing.T) {
 	}
 }
 
+func TestCoordinatorSettledCacheDoesNotOverwriteNewerState(t *testing.T) {
+	c, _, _ := coordinatorFixture(t)
+	now := time.Now().UTC()
+	newer := domain.Incident{ID: "inc-cache", Stage: domain.StageDismissed, UpdatedAt: now.Add(time.Second)}
+	older := domain.Incident{ID: "inc-cache", Stage: domain.StageInterrupted, UpdatedAt: now}
+	c.setIncident(newer)
+	c.installSettled(older)
+	got, ok := c.Find("inc-cache")
+	if !ok || got.Stage != domain.StageDismissed || !got.UpdatedAt.Equal(newer.UpdatedAt) {
+		t.Fatal("older cleanup overwrote newer cache state")
+	}
+}
+
 func TestCoordinatorStartRequiresTrackConfirmation(t *testing.T) {
 	c, settings, _ := coordinatorFixture(t)
 	settings.TrackConfirmedAt = nil

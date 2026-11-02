@@ -8,8 +8,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/desanv01/cuemender/internal/obs"
 	"github.com/desanv01/cuemender/internal/store"
 	"github.com/desanv01/cuemender/internal/twitch"
+	gorilla "github.com/gorilla/websocket"
 )
 
 type p03Backend struct{}
@@ -145,6 +148,137 @@ func TestP03SaveSettingsInvalidatesBlockedDiagnosticAndRecheck(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("explicit recheck after settings change did not diagnose")
+}
+
+func lossyOBSServer(t *testing.T, lost chan struct{}, armed *atomic.Bool) *httptest.Server {
+	t.Helper()
+	var mu sync.Mutex
+	dropped := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := (&gorilla.Upgrader{}).Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.WriteJSON(map[string]any{"op": 0, "d": map[string]any{"obsWebSocketVersion": "5.7.3", "rpcVersion": 1}})
+		var identify map[string]any
+		if conn.ReadJSON(&identify) != nil {
+			return
+		}
+		_ = conn.WriteJSON(map[string]any{"op": 2, "d": map[string]any{"negotiatedRpcVersion": 1}})
+		for {
+			var request struct {
+				D struct {
+					Type string `json:"requestType"`
+					ID   string `json:"requestId"`
+				} `json:"d"`
+			}
+			if conn.ReadJSON(&request) != nil {
+				return
+			}
+			if request.D.Type == "GetInputMute" && armed.Load() {
+				mu.Lock()
+				first := !dropped
+				dropped = true
+				mu.Unlock()
+				if first {
+					close(lost)
+					return
+				}
+			}
+			data := map[string]any{}
+			switch request.D.Type {
+			case "GetVersion":
+				data = map[string]any{"obsVersion": "32.1.1", "obsWebSocketVersion": "5.7.3", "rpcVersion": 1}
+			case "GetInputList":
+				data = map[string]any{"inputs": []any{map[string]any{"inputName": "Test Mic", "inputUuid": "mic-uuid", "inputKind": "wasapi_input_capture"}}}
+			case "GetSceneList":
+				data = map[string]any{"scenes": []any{map[string]any{"sceneName": "Main", "sceneUuid": "scene-uuid"}}}
+			case "GetSceneItemList":
+				data = map[string]any{"sceneItems": []any{}}
+			case "GetSceneCollectionList":
+				data = map[string]any{"currentSceneCollectionName": "Collection"}
+			case "GetCurrentProgramScene":
+				data = map[string]any{"sceneName": "Main", "sceneUuid": "scene-uuid"}
+			case "GetInputMute":
+				data = map[string]any{"inputMuted": true}
+			case "GetInputAudioTracks":
+				data = map[string]any{"inputAudioTracks": map[string]bool{"1": false, "2": false, "3": false, "4": false, "5": false, "6": false}}
+			case "GetStreamStatus":
+				data = map[string]any{"outputActive": false}
+			}
+			_ = conn.WriteJSON(map[string]any{"op": 7, "d": map[string]any{"requestType": request.D.Type, "requestId": request.D.ID, "requestStatus": map[string]any{"result": true, "code": 100}, "responseData": data}})
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestP03ActualOBSLossDuringDiagnostic(t *testing.T) {
+	lost := make(chan struct{})
+	var armed atomic.Bool
+	server := lossyOBSServer(t, lost, &armed)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	a, err := newWithDependencies(context.Background(), Options{
+		DataDir: t.TempDir(), ListenAddress: fmt.Sprintf("127.0.0.1:%d", port),
+		NoBrowser: true, SessionOnlySecrets: true, Stdout: io.Discard, Stderr: io.Discard,
+	}, appDependencies{
+		configureOBS: func(opts *obs.Options) { opts.Dialer = obs.GoobsDialer{} },
+		monitoringStatus: func() incidents.Readiness {
+			return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, ResolutionReady: true}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	ctx := context.Background()
+	track := 2
+	if _, err := a.SaveSettings(ctx, 0, domain.Expectations{Microphone: &domain.InputRef{Name: "Test Mic", UUID: "mic-uuid", Context: "Collection"}, StreamTrack: &track}); err != nil {
+		t.Fatal(err)
+	}
+	password := ""
+	if err := a.OBSConnect(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), &password); err != nil {
+		t.Fatal(err)
+	}
+	waitP03Obs(t, a)
+	armed.Store(true)
+	if _, err := a.StartMonitoring(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	inc, err := a.CheckIncident(ctx, "audio", 1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-lost:
+	case <-time.After(3 * time.Second):
+		t.Fatal("OBS socket loss was not exercised")
+	}
+	deadline := time.Now().Add(6 * time.Second)
+	for time.Now().Before(deadline) {
+		got, _ := a.coordinator.Find(inc.ID)
+		if len(got.Findings) == 0 && (got.Stage == domain.StageInterrupted || got.Stage == domain.StageInsufficientInfo) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	got, _ := a.coordinator.Find(inc.ID)
+	if len(got.Findings) != 0 {
+		t.Fatal("old result became current after OBS socket loss")
+	}
+	reconnectDeadline := time.Now().Add(6 * time.Second)
+	for time.Now().Before(reconnectDeadline) && a.obsMgr.Snapshot().Status != domain.ConnectionConnected {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if a.obsMgr.Snapshot().Status != domain.ConnectionConnected {
+		t.Fatalf("OBS did not reconnect after socket replacement: %+v", a.obsMgr.Snapshot())
+	}
 }
 
 func TestP03BlockedDiagnosticWholeAppShutdown(t *testing.T) {

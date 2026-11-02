@@ -135,12 +135,21 @@ Private state exposes monitoring session, incidents, typed checks/findings, coun
 
 
 
+## P03-R06 corrections
+
+- Cleanup retains the observed durable `UpdatedAt` separately from the new interruption time and passes the observed version to `InterruptIncident`; canceled/timeout/provider-invalidated work settles truthfully.
+- Cache installation is version-aware: `installSettled` refuses to overwrite a newer recheck/dismissal. Pending interruption retries use the same conditional transition and never unconditionally overwrite newer work.
+- The EventSub fixture now reads client closure concurrently, so an upgraded socket canceled before help/report joins promptly without relying on a five-second timer.
+- A real local OBS WebSocket server drops the socket during an outstanding diagnostic; the app adapter reconnects and the old result cannot become current.
+
+
+
 ## Limits
 
 - **P03-D live Twitch chat-to-finding is deferred/unmet under D30/issue #6**: no real Twitch Public client/authorization/chat was attempted. Local normalized command callback and fixtures are not live evidence.
 - **P02-A/V06 remains deferred/unmet.** P02-B/V07 live OBS was previously verified by Codex; P03 did not repeat a live OBS comparison or alter the user's OBS.
 - The full local protocol acceptance test exercises production readiness/EventSub/OBS/reply wiring with local servers. A separate lower-level composition test still injects readiness; it is not the acceptance path.
-- Automatic provider replacement is covered through the coordinator readiness-generation seam, not an actual socket-drop/reconnect scenario. No dedicated Close-while-database-admission-blocked or EventSub upgraded-socket failure-path cleanup test was added. Concurrent cleanup/dismiss/recheck is protected by a conditional store transaction but lacks a dedicated deterministic ordering test.
+- A real local OBS socket drop/reconnect during an outstanding diagnostic is now covered. Concurrent cleanup/dismiss/recheck uses a conditional transaction and version-aware cache install, but a deterministic two-goroutine interleaving test was not added.
 - No rendered-browser check was possible; actual-script Node VM fixtures are distinct. No OBS mutations.
 - The final WSL Linux race suite passed.
 - No new dependencies or SDK changes. Migration 2 is forward-only; no downgrade path.

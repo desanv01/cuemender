@@ -205,25 +205,28 @@ func (c *Coordinator) Stop(ctx context.Context) error {
 		jobs = append(jobs, job)
 	}
 	c.mu.Unlock()
-	for id, inc := range pending {
-		if current, err := c.store.GetIncident(ctx, id); err == nil {
-			if current.Stage != domain.StageReported && current.Stage != domain.StageInvestigating {
-				c.mu.Lock()
-				delete(c.pending, id)
-				c.mu.Unlock()
-				continue
-			}
-			inc = current
+	for id := range pending {
+		current, err := c.store.GetIncident(ctx, id)
+		if err != nil {
+			return err
 		}
-		inc.Stage = domain.StageInterrupted
-		inc.UpdatedAt = c.now().UTC()
-		if err := c.store.SaveIncident(ctx, inc); err != nil {
+		if current.Stage != domain.StageReported && current.Stage != domain.StageInvestigating {
+			c.mu.Lock()
+			delete(c.pending, id)
+			c.mu.Unlock()
+			continue
+		}
+		now := c.now().UTC()
+		updated, changed, err := c.store.InterruptIncident(ctx, id, current.UpdatedAt, now)
+		if err != nil {
 			return err
 		}
 		c.mu.Lock()
 		delete(c.pending, id)
 		c.mu.Unlock()
-		c.setIncident(inc)
+		if changed {
+			c.installSettled(updated)
+		}
 	}
 	if !active {
 		if len(jobs) == 0 {
@@ -784,11 +787,24 @@ func (c *Coordinator) run(request *job) {
 	c.publish()
 }
 
+func (c *Coordinator) installSettled(inc domain.Incident) {
+	c.mu.Lock()
+	if current, ok := c.incidents[inc.ID]; ok && (current.UpdatedAt.After(inc.UpdatedAt) ||
+		(current.UpdatedAt.Equal(inc.UpdatedAt) && domain.StageTerminal(current.Stage))) {
+		c.mu.Unlock()
+		return
+	}
+	c.incidents[inc.ID] = inc
+	c.mu.Unlock()
+}
+
 func (c *Coordinator) finishJob(request *job) {
 	var interrupted *domain.Incident
+	var observedUpdated time.Time
 	c.mu.Lock()
 	if !request.settled {
 		if inc, ok := c.incidents[request.incident.ID]; ok && (inc.Stage == domain.StageReported || inc.Stage == domain.StageInvestigating) {
+			observedUpdated = inc.UpdatedAt
 			inc.Stage = domain.StageInterrupted
 			inc.UpdatedAt = c.now().UTC()
 			interrupted = &inc
@@ -800,14 +816,14 @@ func (c *Coordinator) finishJob(request *job) {
 	c.mu.Unlock()
 	if interrupted != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		updated, ok, err := c.store.InterruptIncident(ctx, interrupted.ID, interrupted.UpdatedAt, c.now().UTC())
+		updated, ok, err := c.store.InterruptIncident(ctx, interrupted.ID, observedUpdated, interrupted.UpdatedAt)
 		cancel()
 		if err != nil {
 			c.mu.Lock()
 			c.pending[interrupted.ID] = *interrupted
 			c.mu.Unlock()
 		} else if ok {
-			c.setIncident(updated)
+			c.installSettled(updated)
 		}
 	}
 	c.publish()
