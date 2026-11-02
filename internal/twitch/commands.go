@@ -35,6 +35,7 @@ type CommandEvent struct {
 	ReceivedAt           time.Time
 	Command              Command
 	ConnectionGeneration uint64
+	MonitoringSessionID  string
 }
 
 func ParseCommand(text string) (Command, bool) {

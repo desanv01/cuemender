@@ -112,7 +112,32 @@ use an active client broadcast for fault injection. In the private control page:
    program-scene, visual and streaming values separately from discovery; partial
    and stale warnings are retained together.
 
-## 5. Real Twitch chat check (when available)
+## 5. Monitoring and manual checks (P03)
+
+After Twitch and OBS are connected and the setup resolves against current OBS
+discovery, open the **Monitoring and incidents** panel:
+
+1. **Start monitoring** requires the current settings revision, connected Twitch,
+   connected/resolved OBS expectations and a configured microphone/track or visual
+   item. A configured microphone requires explicit track confirmation. Repeat
+   Start returns the same session.
+2. **Manual audio/video check** works while stopped and creates a manual incident
+   with no viewer report counts. It performs a fresh five-second read-only OBS
+   observation; unavailable/partial evidence becomes insufficient information,
+   never a healthy result.
+3. Incident cards show public code, category, stage, report/distinct counts,
+   findings, feedback counts and that repair is not yet available. **Recheck**
+   schedules a new diagnostic request; **Dismiss** cancels pending work and
+   retains terminal history.
+4. Chat issue commands are accepted only while monitoring is active. Duplicate
+   delivery/message IDs are inert, same-category reports group, and feedback is
+   latest-vote-per-actor. Idle issue commands do not open incidents; help remains
+   available.
+
+No OBS mutation occurs. Live Twitch chat-to-finding remains deferred under D30
+until the user completes phone/2FA/Public-client authorization.
+
+## 6. Real Twitch chat check (when available)
 
 Use a **separate viewer account** in the broadcaster's channel. The broadcaster's
 own messages are ignored.
@@ -135,7 +160,7 @@ Record the normalized receipt and a bounded reply without logging raw chat. A
 live check is not complete until a separate viewer's command is observed and a
 chat reply is actually marked sent by Helix.
 
-## 6. Real OBS comparison (when available)
+## 7. Real OBS comparison (when available)
 
 Compare private observations with OBS's own UI:
 
@@ -149,7 +174,7 @@ Record the exact OBS version, obs-websocket version and observation timestamp.
 Do not modify the scene/track as part of this comparison. The P02 live gate is
 unmet until this is done on the dedicated setup.
 
-## 7. Disconnect and recovery
+## 8. Disconnect and recovery
 
 - **Twitch disconnect** cancels polling/socket/reply work and deletes this
   application's credential. If deletion fails, the panel reports

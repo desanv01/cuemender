@@ -16,6 +16,7 @@ import (
 
 	"github.com/desanv01/cuemender/internal/domain"
 	"github.com/desanv01/cuemender/internal/httpui"
+	"github.com/desanv01/cuemender/internal/incidents"
 	"github.com/desanv01/cuemender/internal/obs"
 	"github.com/desanv01/cuemender/internal/secrets"
 	"github.com/desanv01/cuemender/internal/store"
@@ -41,8 +42,10 @@ type osSecretStore interface {
 // The private composition seam lets local fixtures exercise startup and the
 // credential boundary. Public New always uses the real stores and endpoints.
 type appDependencies struct {
-	newOSStore      func() osSecretStore
-	configureTwitch func(*twitch.Options)
+	newOSStore       func() osSecretStore
+	configureTwitch  func(*twitch.Options)
+	configureOBS     func(*obs.Options)
+	monitoringStatus func() incidents.Readiness
 }
 
 type App struct {
@@ -52,12 +55,14 @@ type App struct {
 	dataDir    string
 	now        func() time.Time
 
-	listener     net.Listener
-	store        *store.Store
-	secrets      secrets.Store
-	secretsState domain.SecretsStatus
-	twitchMgr    *twitch.Manager
-	obsMgr       *obs.Manager
+	listener                 net.Listener
+	store                    *store.Store
+	secrets                  secrets.Store
+	secretsState             domain.SecretsStatus
+	twitchMgr                *twitch.Manager
+	obsMgr                   *obs.Manager
+	coordinator              *incidents.Coordinator
+	monitoringStatusOverride func() incidents.Readiness
 
 	ui         *httpui.Server
 	httpServer *http.Server
@@ -77,9 +82,13 @@ type App struct {
 	connMu sync.Mutex
 	conns  map[net.Conn]http.ConnState
 
-	baseCtx    context.Context
-	baseCancel context.CancelFunc
-	closeOnce  sync.Once
+	baseCtx      context.Context
+	baseCancel   context.CancelFunc
+	closeOnce    sync.Once
+	intakeCh     chan twitch.CommandEvent
+	intakeCtx    context.Context
+	intakeCancel context.CancelFunc
+	intakeWG     sync.WaitGroup
 
 	baseURL    string
 	controlURL string
@@ -198,31 +207,70 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		baseCtx:       baseCtx,
 		baseCancel:    baseCancel,
 	}
+	intakeCtx, intakeCancel := context.WithCancel(baseCtx)
+	a.intakeCtx = intakeCtx
+	a.intakeCancel = intakeCancel
+	a.intakeCh = make(chan twitch.CommandEvent, 32)
+	a.intakeWG.Add(1)
+	go func() {
+		defer a.intakeWG.Done()
+		for {
+			select {
+			case <-intakeCtx.Done():
+				return
+			case event := <-a.intakeCh:
+				a.processTwitchCommand(event)
+			}
+		}
+	}()
 	a.baseURL = "http://" + net.JoinHostPort(host, port)
 	twitchOptions := twitch.Options{
-		Context:       baseCtx,
-		OAuth:         twitch.NewOAuth(&http.Client{Timeout: 15 * time.Second}, twitch.DefaultEndpoints(), a.now),
-		Store:         twitch.NewCredentialStore(secretStore),
-		Dialer:        twitch.CoderDialer{HTTP: &http.Client{}},
-		Endpoints:     twitch.DefaultEndpoints(),
-		ClientID:      fileConfig.TwitchClientID,
-		StorageMode:   secretsStatus.Mode,
-		Now:           a.now,
-		OnUpdate:      a.onIntegrationUpdate,
-		RefreshPeriod: time.Hour,
+		Context:               baseCtx,
+		OAuth:                 twitch.NewOAuth(&http.Client{Timeout: 15 * time.Second}, twitch.DefaultEndpoints(), a.now),
+		Store:                 twitch.NewCredentialStore(secretStore),
+		Dialer:                twitch.CoderDialer{HTTP: &http.Client{}},
+		Endpoints:             twitch.DefaultEndpoints(),
+		ClientID:              fileConfig.TwitchClientID,
+		StorageMode:           secretsStatus.Mode,
+		Now:                   a.now,
+		OnUpdate:              a.onIntegrationUpdate,
+		OnCommand:             a.onTwitchCommand,
+		SuppressStaticReplies: true,
+		RefreshPeriod:         time.Hour,
 	}
 	if deps.configureTwitch != nil {
 		deps.configureTwitch(&twitchOptions)
 	}
 	a.twitchMgr = twitch.NewManager(twitchOptions)
-	a.obsMgr = obs.NewManager(obs.Options{
+	obsOptions := obs.Options{
 		Context:  baseCtx,
 		Dialer:   obs.GoobsDialer{},
 		Secrets:  secretStore,
 		Now:      a.now,
 		OnUpdate: a.onIntegrationUpdate,
-	})
+	}
+	if deps.configureOBS != nil {
+		deps.configureOBS(&obsOptions)
+	}
+	a.obsMgr = obs.NewManager(obsOptions)
 	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+	a.monitoringStatusOverride = deps.monitoringStatus
+	coordinator, err := incidents.NewChecked(incidents.Options{
+		Store: st,
+		Read: func(ctx context.Context, snapshot domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
+			return a.obsMgr.DiagnosticRead(ctx, snapshot)
+		},
+		Settings: a.currentSettings,
+		Status:   a.monitoringReadiness,
+		Reply:    a.twitchMgr.EnqueueReply,
+		OnChange: a.onIncidentUpdate,
+		Now:      a.now,
+	})
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	a.coordinator = coordinator
 
 	ui, err := httpui.New(httpui.Options{
 		Backend: a,
@@ -315,8 +363,15 @@ func (a *App) Run(ctx context.Context) error {
 func (a *App) Close() {
 	a.closeOnce.Do(func() {
 		a.baseCancel()
+		if a.intakeCancel != nil {
+			a.intakeCancel()
+		}
+		a.intakeWG.Wait()
 		if a.ui != nil {
 			a.ui.Close()
+		}
+		if a.coordinator != nil {
+			a.coordinator.Close()
 		}
 		if a.twitchMgr != nil {
 			a.twitchMgr.Close()
@@ -395,6 +450,9 @@ func (a *App) SaveSettings(ctx context.Context, expectedRevision int64, exp doma
 		return domain.Settings{}, err
 	}
 	a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+	if a.coordinator != nil {
+		a.coordinator.Invalidate(ctx, "settings_changed")
+	}
 
 	// stateMu is the publication ordering lock: cache update, revision
 	// increment, both projections and both hub publications happen while a
@@ -438,11 +496,19 @@ func (a *App) SubscribePublic() httpui.Subscription {
 func (a *App) privateLocked() domain.PrivateState {
 	twitchState := a.twitchMgr.Snapshot()
 	obsState, discovery, observation, resolutionReady := a.obsMgr.SnapshotBundle(a.settings)
+	var session *domain.MonitoringSessionInfo
+	var incidentsList []domain.Incident
+	if a.coordinator != nil {
+		session, incidentsList = a.coordinator.Snapshot()
+	}
+	monitoringActive := session != nil && session.Active
 	return domain.PrivateState{
-		Mode:             domain.ModeLive,
-		StateRevision:    a.stateRevision,
-		MonitoringActive: false,
-		Settings:         a.settings,
+		Mode:              domain.ModeLive,
+		StateRevision:     a.stateRevision,
+		MonitoringActive:  monitoringActive,
+		Settings:          a.settings,
+		MonitoringSession: session,
+		Incidents:         incidentsList,
 		Setup: domain.SetupReadiness{
 			MicrophoneConfigured:   a.settings.Microphone != nil,
 			StreamTrackConfigured:  a.settings.StreamTrack != nil,
@@ -466,12 +532,29 @@ func (a *App) privateLocked() domain.PrivateState {
 }
 
 func (a *App) publicLocked() domain.PublicState {
+	active := false
+	var publicIncidents []domain.PublicIncident
+	jobs := 0
+	if a.coordinator != nil {
+		active, publicIncidents, jobs = a.coordinator.PublicSnapshot()
+	}
+	status := domain.ServiceDisconnected
+	if active {
+		tw := a.twitchMgr.Snapshot()
+		obs, _, _, _ := a.obsMgr.SnapshotBundle(a.settings)
+		if tw.Status == domain.ConnectionConnected && obs.Status == domain.ConnectionConnected && !obs.Stale {
+			status = "ready"
+			if jobs > 0 {
+				status = "checking"
+			}
+		}
+	}
 	return domain.PublicState{
 		Mode:             domain.ModeLive,
 		StateRevision:    a.stateRevision,
-		MonitoringActive: false,
-		ServiceStatus:    domain.ServiceDisconnected,
-		Incidents:        []domain.PublicIncident{},
+		MonitoringActive: active,
+		ServiceStatus:    status,
+		Incidents:        publicIncidents,
 	}
 }
 

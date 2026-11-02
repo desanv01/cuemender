@@ -42,17 +42,19 @@ type StartupInfo struct {
 // PrivateState is the projection served only to an authenticated control
 // session. It contains no credentials or bootstrap capability.
 type PrivateState struct {
-	Mode             string           `json:"mode"`
-	StateRevision    uint64           `json:"state_revision"`
-	MonitoringActive bool             `json:"monitoring_active"`
-	Settings         Settings         `json:"settings"`
-	Setup            SetupReadiness   `json:"setup"`
-	Secrets          SecretsStatus    `json:"secrets"`
-	Twitch           TwitchConnection `json:"twitch"`
-	OBS              OBSConnection    `json:"obs"`
-	OBSDiscovery     *OBSDiscovery    `json:"obs_discovery,omitempty"`
-	OBSObservation   *OBSObservation  `json:"obs_observation,omitempty"`
-	Startup          StartupInfo      `json:"startup"`
+	Mode              string                 `json:"mode"`
+	StateRevision     uint64                 `json:"state_revision"`
+	MonitoringActive  bool                   `json:"monitoring_active"`
+	Settings          Settings               `json:"settings"`
+	MonitoringSession *MonitoringSessionInfo `json:"monitoring_session,omitempty"`
+	Incidents         []Incident             `json:"incidents"`
+	Setup             SetupReadiness         `json:"setup"`
+	Secrets           SecretsStatus          `json:"secrets"`
+	Twitch            TwitchConnection       `json:"twitch"`
+	OBS               OBSConnection          `json:"obs"`
+	OBSDiscovery      *OBSDiscovery          `json:"obs_discovery,omitempty"`
+	OBSObservation    *OBSObservation        `json:"obs_observation,omitempty"`
+	Startup           StartupInfo            `json:"startup"`
 }
 
 // PublicIncident is the allowlisted public shape for future incidents. P01

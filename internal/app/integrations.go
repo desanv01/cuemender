@@ -65,6 +65,9 @@ func (a *App) TwitchDisconnect(ctx context.Context) error {
 		}
 		return domain.ErrUnavailable
 	}
+	if a.coordinator != nil {
+		a.coordinator.Invalidate(ctx, "twitch_disconnected")
+	}
 	return nil
 }
 
@@ -107,6 +110,9 @@ func (a *App) OBSDisconnect(ctx context.Context) error {
 	defer a.integrationMu.Unlock()
 	if err := a.obsMgr.Disconnect(ctx); err != nil {
 		return domain.ErrUnavailable
+	}
+	if a.coordinator != nil {
+		a.coordinator.Invalidate(ctx, "obs_disconnected")
 	}
 	return nil
 }

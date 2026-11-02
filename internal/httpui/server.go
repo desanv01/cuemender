@@ -41,6 +41,10 @@ type Backend interface {
 	OBSConnect(context.Context, string, *string) error
 	OBSDisconnect(context.Context) error
 	OBSDiscovery(context.Context) (domain.OBSDiscovery, error)
+	StartMonitoring(context.Context, int64) (domain.MonitoringSessionInfo, error)
+	StopMonitoring(context.Context) error
+	CheckIncident(context.Context, string, int64, string) (domain.Incident, error)
+	DismissIncident(context.Context, string) (domain.Incident, error)
 	SubscribePrivate() Subscription
 	SubscribePublic() Subscription
 }
@@ -187,6 +191,10 @@ func (s *Server) buildHandler() http.Handler {
 	mux.HandleFunc("/api/v1/obs/connect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleOBSConnect)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/obs/disconnect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleOBSDisconnect)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/obs/discovery", onlyMethod(http.MethodGet, s.requireSession(http.HandlerFunc(s.handleOBSDiscovery))).ServeHTTP)
+	mux.HandleFunc("/api/v1/monitoring/start", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleMonitoringStart)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/monitoring/stop", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleMonitoringStop)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/incidents/check", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentCheck)))).ServeHTTP)
+	mux.Handle("POST /api/v1/incidents/{id}/dismiss", s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleIncidentDismiss))))
 
 	mux.HandleFunc("/public/v1/state", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicState)).ServeHTTP)
 	mux.HandleFunc("/public/v1/events", onlyMethod(http.MethodGet, http.HandlerFunc(s.handlePublicEvents)).ServeHTTP)
@@ -491,6 +499,123 @@ func (s *Server) handleOBSDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, r, discovery)
+}
+
+func (s *Server) handleMonitoringStart(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		ExpectedRevision int64 `json:"expected_revision"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if body.ExpectedRevision < 0 {
+		writeError(w, r, http.StatusBadRequest, "invalid_revision", "expected_revision must be non-negative.")
+		return
+	}
+	session, err := s.backend.StartMonitoring(r.Context(), body.ExpectedRevision)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeData(w, r, map[string]any{"monitoring_active": session.Active, "session_id": session.ID})
+}
+
+func (s *Server) handleMonitoringStop(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct{}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if err := s.backend.StopMonitoring(r.Context()); err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeData(w, r, map[string]any{"monitoring_active": false, "session_id": nil})
+}
+
+func (s *Server) handleIncidentCheck(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct {
+		Category         string `json:"category"`
+		ExpectedRevision int64  `json:"expected_revision"`
+		IncidentID       string `json:"incident_id"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	if body.Category != "audio" && body.Category != "video" {
+		writeError(w, r, http.StatusBadRequest, "invalid_category", "category must be audio or video.")
+		return
+	}
+	if body.ExpectedRevision < 0 {
+		writeError(w, r, http.StatusBadRequest, "invalid_revision", "expected_revision must be non-negative.")
+		return
+	}
+	inc, err := s.backend.CheckIncident(r.Context(), body.Category, body.ExpectedRevision, body.IncidentID)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeDataStatus(w, r, http.StatusAccepted, map[string]any{
+		"incident_id": inc.ID, "public_id": inc.PublicID, "stage": inc.Stage,
+	})
+}
+
+func (s *Server) handleIncidentDismiss(w http.ResponseWriter, r *http.Request) {
+	if err := requireJSON(w, r); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	var body struct{}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeClientError(w, r, err)
+		return
+	}
+	id := r.PathValue("id")
+	if strings.TrimSpace(id) == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid_incident_id", "incident id is required.")
+		return
+	}
+	inc, err := s.backend.DismissIncident(r.Context(), id)
+	if err != nil {
+		writeIncidentError(w, r, err)
+		return
+	}
+	writeData(w, r, map[string]any{"incident_id": inc.ID, "stage": inc.Stage})
+}
+
+func writeIncidentError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, domain.ErrRevisionConflict):
+		writeError(w, r, http.StatusConflict, "revision_conflict", "Settings changed since they were loaded.")
+	case errors.Is(err, domain.ErrNotReady):
+		writeError(w, r, http.StatusConflict, "monitoring_not_ready", "Monitoring prerequisites are not ready.")
+	case errors.Is(err, domain.ErrJobLimit), errors.Is(err, domain.ErrBusy):
+		writeError(w, r, http.StatusTooManyRequests, "diagnostic_busy", "A diagnostic job is already running for that category.")
+	case errors.Is(err, domain.ErrIncidentNotFound):
+		writeError(w, r, http.StatusNotFound, "incident_not_found", "Incident was not found.")
+	case errors.Is(err, domain.ErrTerminalIncident):
+		writeError(w, r, http.StatusConflict, "incident_terminal", "That incident is terminal or belongs to another session.")
+	case errors.Is(err, domain.ErrInvalidInput):
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "The request is invalid.")
+	case errors.Is(err, domain.ErrUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "unavailable", "The requested service is unavailable.")
+	default:
+		writeError(w, r, http.StatusInternalServerError, "internal", "The operation failed.")
+	}
 }
 
 func writeIntegrationError(w http.ResponseWriter, r *http.Request, err error) {

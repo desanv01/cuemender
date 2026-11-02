@@ -17,3 +17,5 @@ dist/
 *.mkv
 *.mov
 *.webm
+/.playwright-cli/
+/output/playwright/

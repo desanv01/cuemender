@@ -135,6 +135,25 @@ always closes the final socket on cancellation. Ordinary socket replacement
 advances the connection generation; queue/receipt state is not treated as a new
 authorization.
 
+## P03 diagnostics integration
+
+- SQLite migration 2 adds monitoring_sessions, incidents, findings, reports,
+  report_dedup and feedback. Migration 1 is untouched; a real version-1 database
+  preserves app_settings/revision.
+- `internal/diagnostics` implements only the three supported checks. Missing,
+  incomplete, stale, revision/generation/context-mismatched evidence remains
+  unknown and never becomes healthy.
+- `internal/incidents` owns monitoring sessions, durable report dedup, category
+  grouping, bounded jobs, transition rules, dismissal and feedback. Jobs use a
+  fresh `obs.Manager.DiagnosticRead` five-second read, not SnapshotBundle.
+- The P03 Twitch seam uses `twitch.Options.OnCommand` and the existing
+  `ReplyQueue`; application wiring suppresses P02's static idle acknowledgment
+  and queues only the durable coordinator reply. No second bot/queue exists.
+- Routes are the four C09 private mutations under the existing session, CSRF,
+  Origin, host, strict-body and envelope boundaries. Public incidents contain
+  only current monitoring-session fixed fields.
+- No new modules, dependency versions, OBS writes or P04 approval endpoints.
+
 ## P02-R01 correction evidence
 
 - **R01:** real goobs wire keys normalize at the adapter boundary; protocol

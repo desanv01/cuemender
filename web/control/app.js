@@ -2,7 +2,7 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { csrf: '', revision: 0, connected: false, discovery: null, discoverySignature: '' };
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '' };
   let events = null;
 
   class ApiError extends Error {
@@ -246,11 +246,171 @@
     $('visual-context').value = visual && visual.source.context ? visual.source.context : '';
   }
 
+  function renderMonitoring(privateState) {
+    const active = Boolean(privateState.monitoring_active);
+    const session = privateState.monitoring_session;
+    state.monitoringSessionId = active && session ? session.id : '';
+    state.incidents = Array.isArray(privateState.incidents) ? privateState.incidents : [];
+    setText('monitor-status', active ? 'Monitoring active' + (session && session.id ? ' (session ' + session.id.slice(0, 8) + '…)' : '') : 'Monitoring is stopped.');
+    renderIncidents(state.incidents);
+  }
+
+  function renderIncidents(incidents) {
+    const list = $('incident-list');
+    if (!list) {
+      return;
+    }
+    list.replaceChildren();
+    if (!incidents.length) {
+      list.replaceChildren();
+      list.textContent = 'No incidents in this session.';
+      return;
+    }
+    for (const incident of incidents) {
+      const card = document.createElement('div');
+      card.className = 'device-box';
+      const title = document.createElement('p');
+      title.className = 'connection-status';
+      title.textContent = incident.public_id + ' · ' + incident.category + ' · ' + incident.stage;
+      card.appendChild(title);
+      const meta = document.createElement('p');
+      meta.className = 'muted';
+      const evidenceTime = incident.evidence_at ? new Date(incident.evidence_at).toISOString() : 'unknown';
+      const revision = (incident.findings || []).length ? incident.findings[0].expectation_revision : 'unknown';
+      const streaming = typeof incident.streaming === 'boolean' ? String(incident.streaming) : 'unknown';
+      meta.textContent = incident.category + ' · origin: ' + incident.origin + ' · reports: ' + incident.report_count +
+        ' · distinct: ' + incident.distinct_reporters + ' · evidence: ' + evidenceTime + ' · expectation revision: ' + revision +
+        ' · local streaming: ' + streaming + ' · feedback: ' + incident.feedback.positive + ' positive / ' + incident.feedback.negative + ' negative';
+      card.appendChild(meta);
+      const evidence = document.createElement('p');
+      evidence.className = 'muted';
+      const findings = (incident.findings || []).map((finding) => finding.code).join(', ');
+      const guidance = (incident.findings || []).map((finding) => finding.manual_guidance).filter(Boolean).join(' ');
+      const limitations = (incident.checks || []).map((check) => check.unavailable_reason).filter(Boolean).join(' ');
+      let evidenceText;
+      if (findings) {
+        evidenceText = 'Findings: ' + findings + (guidance ? '. ' + guidance : '');
+      } else if (incident.stage === 'no_supported_finding') {
+        evidenceText = 'No supported conflict was found in a completed sufficient check.';
+      } else if (incident.stage === 'insufficient_information' || incident.stage === 'interrupted') {
+        evidenceText = 'No completed diagnosis. ';
+      } else {
+        evidenceText = 'Diagnosis is not complete. ';
+      }
+      if (limitations) {
+        evidenceText += ' Limitations: ' + limitations;
+      }
+      evidence.textContent = evidenceText + ' Local verification: ' + incident.local_verification + '. Repair is not yet available.';
+      card.appendChild(evidence);
+      if (incident.manual_guidance) {
+        const guidance = document.createElement('p');
+        guidance.className = 'muted';
+        guidance.textContent = incident.manual_guidance;
+        card.appendChild(guidance);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const terminal = ['dismissed', 'closed', 'expired', 'invalidated'].includes(incident.stage);
+      const currentSession = state.monitoringSessionId && incident.session_id === state.monitoringSessionId;
+      if (!terminal && currentSession) {
+        const recheck = document.createElement('button');
+        recheck.type = 'button';
+        recheck.className = 'secondary';
+        recheck.textContent = 'Recheck';
+        recheck.addEventListener('click', () => recheckIncident(incident.id));
+        actions.appendChild(recheck);
+      }
+      if (!terminal) {
+        const dismiss = document.createElement('button');
+        dismiss.type = 'button';
+        dismiss.className = 'secondary';
+        dismiss.textContent = 'Dismiss';
+        dismiss.addEventListener('click', () => dismissIncident(incident.id));
+        actions.appendChild(dismiss);
+      }
+      card.appendChild(actions);
+      list.appendChild(card);
+    }
+  }
+
+  async function startMonitoring() {
+    try {
+      await request('/api/v1/monitoring/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
+        body: JSON.stringify({ expected_revision: state.currentRevision })
+      });
+      showNotice('Monitoring started.', 'ok');
+      await loadState();
+    } catch (error) {
+      showNotice(error.message || 'Monitoring could not start.', 'error');
+    }
+  }
+
+  async function stopMonitoring() {
+    try {
+      await request('/api/v1/monitoring/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
+        body: '{}'
+      });
+      showNotice('Monitoring stopped.', 'ok');
+      await loadState();
+    } catch (error) {
+      showNotice(error.message || 'Monitoring could not stop.', 'error');
+    }
+  }
+
+  async function manualCheck(category) {
+    try {
+      await request('/api/v1/incidents/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
+        body: JSON.stringify({ category, expected_revision: state.currentRevision })
+      });
+      showNotice('Manual check scheduled.', 'ok');
+      await loadState();
+    } catch (error) {
+      showNotice(error.message || 'Manual check could not start.', 'error');
+    }
+  }
+
+  async function recheckIncident(id) {
+    try {
+      const incident = (state.incidents || []).find((entry) => entry.id === id);
+      await request('/api/v1/incidents/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
+        body: JSON.stringify({ category: incident ? incident.category : 'audio', expected_revision: state.currentRevision, incident_id: id })
+      });
+      showNotice('Recheck scheduled.', 'ok');
+      await loadState();
+    } catch (error) {
+      showNotice(error.message || 'Recheck could not start.', 'error');
+    }
+  }
+
+  async function dismissIncident(id) {
+    try {
+      await request('/api/v1/incidents/' + encodeURIComponent(id) + '/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
+        body: '{}'
+      });
+      showNotice('Incident dismissed.', 'ok');
+      await loadState();
+    } catch (error) {
+      showNotice(error.message || 'Incident could not be dismissed.', 'error');
+    }
+  }
+
   function render(privateState) {
     showApp();
     if (typeof privateState.csrf_token === 'string' && privateState.csrf_token) {
       state.csrf = privateState.csrf_token;
     }
+    state.currentRevision = privateState.settings ? privateState.settings.revision : 0;
+    renderMonitoring(privateState);
     setText('mode', privateState.mode || 'live');
     setText('revision', String(privateState.settings ? privateState.settings.revision : 0));
     setText('state-revision', String(privateState.state_revision || 0));
@@ -487,6 +647,10 @@
 
   $('refresh').addEventListener('click', loadState);
   $('settings-form').addEventListener('submit', save);
+  $('monitor-start').addEventListener('click', startMonitoring);
+  $('monitor-stop').addEventListener('click', stopMonitoring);
+  $('manual-audio').addEventListener('click', () => manualCheck('audio'));
+  $('manual-video').addEventListener('click', () => manualCheck('video'));
   $('visual-enabled').addEventListener('change', (event) => {
     $('visual-fields').disabled = !event.target.checked;
   });
