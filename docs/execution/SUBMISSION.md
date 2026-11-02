@@ -94,3 +94,8 @@ Adjust every sentence to what was actually completed. If test coverage or integr
 - Submission confirmed before deadline, with final version recorded.
 
 The current preparation creates no external repository, release, video upload or Devpost entry.
+
+
+## D37 submission evidence distinction
+
+Show the real receive-only Twitch report and local OBS result as actual integration; state whether the channel was offline. Show any approval workflow separately in visibly labeled rehearsal. Explain that developer registration is blocked by account verification, so this fallback has no automated replies, OAuth ownership proof or real OBS repair. Do not imply fixtures/rehearsal establish a broadcast fix. Preserve original Codex build footage; later capture the final working Twitch flow for the video. Anonymous implementation alone is not a finished video or guarantee of eligibility. MIT is owner-selected for P06.

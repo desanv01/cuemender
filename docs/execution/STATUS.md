@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 2.9
-Last update: 2026-11-02T06:42Z
-Current packet: P05
-Current state: accepted_local
+Revision: 3.0
+Last update: 2026-11-02T11:33Z
+Current packet: P06
+Current state: ready
 Current owner: Codex
-Released packet revision: none active; P05 v1.1/R02 locally completed under D36
-Code writer active: none; DeepSeek and Codex implementation agents stopped
+Released packet revision: P06 v1.1 on locally accepted P05 and accepted D37/C12 receive-only fallback; worker launch prompt in PROMPTS.md.
+Code writer active: none; Codex implementation/tests complete, DeepSeek not yet dispatched
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -33,7 +33,7 @@ Git repository: https://github.com/desanv01/cuemender (public)
 Accepted foundation commit: a07b3df3c33f0284c1da450a323fbba3e9ed1771
 Publication tracking: https://github.com/desanv01/cuemender/issues/1
 P02 tracking: https://github.com/desanv01/cuemender/issues/2
-Worker branch: feature/p05-user-experience; source baseline 6c09f11178f8bed8230d000cfd2652b74ea68265; dispatch documentation committed on this branch
+Worker branch: feature/p06-release-readiness after integration of feature/receive-only-chat; verify the current branch before P06 claim.
 P02 source checkpoint: 1b068843e38bee905ff6ea80c44f612e88ed32d4
 P02 integration PR: https://github.com/desanv01/cuemender/pull/5 (merged under D30)
 P03 starting development baseline: af2ec69ce95cdba6fc9f080cc177da34695fbfb0
@@ -46,12 +46,12 @@ Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-clos
 Closure record: docs/execution/handoffs/P04-codex-build.md
 Implementation: P05 accepted locally after R02 and Codex closure; real gates remain deferred under D34
 Environment note: docs/implementation/P01-environment.md
-Review: docs/execution/handoffs/P05-codex-closure.md — Codex implementation/self-verification; prior worker review retained as history
+Review: docs/execution/handoffs/anonymous-chat-review.md — D37 Codex implementation/self-verification; P05-codex-closure.md remains accepted baseline history
 Correction: docs/execution/corrections/P05-R02.md; worker checkpoint 8275fca
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: prepare/release P06 separately from the accepted local P05 baseline. No active worker dispatch. Live Twitch/OBS approval pending.
+Next action: dispatch one DeepSeek worker with P06 v1.1 prompt after Codex Git checkpoint. D37 receive-only real offline-channel/read-only-OBS evidence passed; original authenticated Twitch and real OBS approval remain pending.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
@@ -129,3 +129,6 @@ Codex-owned implementation: P04 plus needed integration/debugging work after han
 - 2026-11-01: R02 re-review confirmed fourteen earlier regressions plus Go/Node checks, vet/build and five active-SSE shutdown runs pass. Six new review fixtures fail: OBS Hello cancellation, stale readiness, unknown starting context, discovery revision relabelling, delayed handover intake and disconnect maintenance cancellation. P02-R03 consolidates unfinished R02 scope; review fixtures/documents only authored by Codex. No P02 commit/PR/merge; P03 held.
 
 Pending live runbook: docs/execution/LIVE-VERIFICATION.md — retained at user request; live hold unchanged.
+
+D37 fallback tracking: https://github.com/desanv01/cuemender/issues/15; accepted scope and limits in handoffs/anonymous-chat-review.md.
+P06 tracking: https://github.com/desanv01/cuemender/issues/14; packet v1.1 / CONTRACTS v1.6/C12; MIT selected.

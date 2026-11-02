@@ -2,7 +2,7 @@
 
 Revision: 2.7
 
-Current dispatch: **none**. P05 is accepted locally after Codex closure under D36. DeepSeek stays stopped. Live Twitch and real approved OBS trial remain pending under D34. P06 requires separate release. All earlier prompts below are historical and must not be launched.
+Current dispatch: **P06 v1.1 ready** under D37 after receive-only acceptance. Use the P06 prompt below and check STATUS/branch before claiming. No worker is active. P05 remains accepted locally. Live Twitch and real approved OBS trial remain pending under D34. P06 requires separate release. All earlier prompts below are historical and must not be launched.
 
 ## P05-R02 v1.0 — historical, completed by worker and Codex closure
 
@@ -485,16 +485,28 @@ Finish setup/control/overlay, viewer feedback and isolated rehearsal. Preserve t
 Write docs/execution/handoffs/P05-worker-report.md, with screenshots when available and no secrets. Update operational STATUS fields, stop editing/processes, and give me a short Codex review prompt. Do not begin P06.
 ~~~
 
-### P06
+### P06 — v1.1 (run only when STATUS releases it)
 
 ~~~text
-In C:\Users\Dv\Desktop\Twitch Hackathon, act as the sole DeepSeek implementation worker for P06 only.
+You are the sole DeepSeek implementation worker for P06 v1.1 in:
+C:\Users\Dv\Desktop\Twitch Hackathon
 
-Read AGENTS.md; docs/execution/STATUS.md, WORKFLOW.md, PROJECT_SPEC.md, ARCHITECTURE.md, CONTRACTS.md, VERIFICATION.md, SUBMISSION.md; docs/execution/packages/P06-release-readiness.md; and docs/execution/handoffs/P05-review.md. Proceed only if P05 is accepted, P06 explicitly released and no other writer is active.
+Codex owns planning, contracts, independent acceptance, Git/GitHub and publishing. Do not create agents or parallel writers. Check STATUS before editing: P06 v1.1 must be released and no other writer active. Claim the packet as instructed; do not start if Codex is still finishing D37.
 
-Finish required reliability checks, local Windows release ZIP, clean-folder trial and accurate setup/troubleshooting documentation. Report real Twitch/OBS behavior separately from rehearsal. Do not expand scope, change specifications, initialize/commit/push Git, upload artifacts, contact others or submit anything.
+Read AGENTS.md; docs/execution/README.md, STATUS.md, WORKFLOW.md, PROJECT_SPEC.md, ARCHITECTURE.md, CONTRACTS.md (v1.6/C12), ANONYMOUS-CHAT.md, VERIFICATION.md, REPOSITORY_PRESENTATION.md and SUBMISSION.md; docs/execution/packages/P06-release-readiness.md; docs/execution/handoffs/P05-codex-closure.md and anonymous-chat-review.md; and templates/WORKER_REPORT.md.
 
-Write docs/execution/handoffs/P06-worker-report.md with artifact path/hash, exact build/test evidence and all remaining limitations. Update operational STATUS fields, stop editing/processes, and give me a short Codex acceptance prompt. Final external release/submission remains with Codex and the user.
+Implement P06 v1.1 end to end: effective-data-directory single-instance protection, safe transactional C07 history clear/retention, reproducible versioned CGo-free Windows ZIP, owner-selected MIT LICENSE (2026 Desan Vasu), dependency notices including patched goobs attribution, clean-extraction verification, appropriate Go/Node/WSL-race checks and accurate README/setup/troubleshooting. Preserve existing Go dependencies and UI design. Ordinary in-scope implementation decisions are allowed; report necessary contract/dependency changes to Codex.
+
+The receive-only fallback is already implemented. Package and verify it; do not redesign it. It must retain separate channel-scoped storage, explicit private channel confirmation, strict metadata/session/generation admission, no OAuth ownership claim, no bot replies, no repair/reconciliation executor and server-side approval rejection. Preserve authenticated EventSub and isolated rehearsal. Use fixtures and rehearsal for worker checks. Do not log in, register applications, send real chat, access real OBS, change OBS settings, start streaming, record video or touch account verification. Live authenticated Twitch #6 and real OBS approval #10 remain deferred. Existing real offline-channel chat-to-read-only-OBS evidence is not broadcast recovery or real repair evidence.
+
+Use the installed workspace Go toolchain and configured WSL race environment. Do not install system-wide software or change machine policy/PATH. Stop and record an exact blocker if needed. Do not initialize Git, commit, branch/switch/reset/clean/stash, push, open/merge PRs, mutate issues, upload releases or submit anything. Codex handles that lifecycle.
+
+Write docs/implementation/P06-release.md and docs/execution/handoffs/P06-worker-report.md. Include changed files, actual tool versions, commands and exits, artifact paths/SHA256/manifest, dependency licenses, isolated clean-run evidence, exact coverage of P06-A through E, failed/skipped checks and remaining limits. Never store credentials, private bootstrap URLs or raw chat in reports. Distinguish development-machine extraction from a clean-machine test, fixtures from live evidence, and local packaging from submission readiness.
+
+When finished or blocked, stop owned processes, update only P06 operational STATUS fields, transfer ownership to Codex with no active writer, and stop editing. Do not publish or start another packet.
+
+End with this handoff:
+"P06 v1.1 handoff is ready. Read docs/execution/handoffs/P06-worker-report.md and docs/implementation/P06-release.md; inspect actual changes against P06 v1.1 and CONTRACTS v1.6/C12, verify locking/history-clear, the actual ZIP and clean extraction, dependency notices and receive-only/rehearsal/authenticated boundaries. DeepSeek has stopped editing. Record acceptance or consolidated corrections. Keep #6/#10 and final live/submission gaps explicit; fixtures and offline-channel diagnostics are not broadcast recovery or approved OBS repair evidence."
 ~~~
 
 ## Correction prompt template

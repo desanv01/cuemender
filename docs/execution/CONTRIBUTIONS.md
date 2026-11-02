@@ -78,3 +78,8 @@ After R06 handoff, user authorized sole-writer Codex takeover. Worker R06 source
 ## P05 Codex closure — 2026-11-02
 
 User authorized takeover after DeepSeek P05-R02 (checkpoint 8008ced). Codex implemented coordinator-owned atomic scenario replacement, transactional settings/session/incident/proposal updates, typed report/feedback acceptance, simulated-provider provenance/cancellation/exact-map guards, keyed browser controls/expiry/focus, correct rehearsal targeting and visible errors. GPT-6.1 Sol high agents audited backend/UI; one added deterministic ownership/rollback tests during an exclusive test-writing interval and one verified hidden browser behavior. Root remained sole production writer. Verification of these contributions is self-verification; see P05-codex-closure.md. No live Twitch or real OBS write, no new recording/dependencies, and no P06 implementation.
+
+
+## D37 receive-only fallback — 2026-11-02
+
+Codex directly implemented the anonymous IRC lifecycle/parser, immutable channel-scoped composition, private confirmation API, structural repair/reply isolation, UI labels and focused tests. Root ran actual two-account Twitch probes and a real Twitch report-to-local-OBS read through the rendered private UI; the user sent the messages. OBS remained offline and unchanged. Verification of this Codex code is self-verification. No DeepSeek or subagent implementation contributed to this packet. Original EventSub and approved-OBS gates remain deferred.

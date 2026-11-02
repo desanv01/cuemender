@@ -35,5 +35,7 @@ if (!node('demo').hidden) failures.push('rehearsal watermark persisted into live
 errorListener();
 if (node('panel').hidden) failures.push('connection error left idle overlay hidden');
 if (!text(node('status')).includes('Not connected')) failures.push('connection error did not show disconnected status');
+stateListener({ data: JSON.stringify({ mode: 'live', chat_mode: 'receive_only', service_status: 'ready', incidents: [{ public_id: 'CM-PUBLIC', category: 'audio', stage: 'finding_available', feedback_summary: '0 positive / 0 negative' }] }) });
+if (node('demo').hidden || !text(node('demo')).includes('RECEIVE-ONLY') || !text(node('demo')).includes('no repairs')) failures.push('receive-only capability label missing');
 console.log(JSON.stringify({ failures }, null, 2));
 if (failures.length) process.exitCode = 1;

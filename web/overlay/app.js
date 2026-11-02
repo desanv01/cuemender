@@ -57,8 +57,8 @@
       feedback.textContent = 'Viewer feedback: ' + incident.feedback_summary;
       incidentsNode.appendChild(feedback);
     }
-    demoNode.hidden = !(state.mode === 'rehearsal' && state.demo_label);
-    if (!demoNode.hidden) demoNode.textContent = state.demo_label;
+    demoNode.hidden = !(state.mode === 'rehearsal' && state.demo_label) && state.chat_mode !== 'receive_only';
+    if (!demoNode.hidden) demoNode.textContent = state.chat_mode === 'receive_only' ? 'RECEIVE-ONLY · local OBS diagnostics · no repairs' : state.demo_label;
   }
 
   const events = new EventSource('/public/v1/events');

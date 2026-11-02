@@ -86,3 +86,11 @@ C11/contracts v1.5 defines immutable constructor mode, rehearsal child data dire
 ## D36 — P05 Codex closure ownership (2026-11-02)
 
 After P05-R02, the user explicitly transferred remaining implementation and verification to Codex, with DeepSeek stopped, and authorized GPT-6.1 Sol high subagents for this work. Root owns production edits; audit agents are read-only except a bounded, sequentially delegated test-file write while root abstains from editing. This supersedes D34's earlier P05 agent restriction. Codex-authored fixes/tests are self-verification, not independent acceptance by another tool. Complete the local P05 gates before integration; keep real Twitch #6 and approved OBS trial #10 and dependent real V14/V18/V19 pending. P06 implementation is not started by this takeover.
+
+## D37 — Anonymous chat probe and conditional read-only fallback (2026-11-02)
+
+User authorized Codex to prove anonymous receive-only chat connectivity against their own channel, using their separate signed-in viewer to send the test messages. Background computer access only. No stream start/stop, OBS mutation, login or developer registration work. The initial isolated probe must verify actual message receipt, stable sender/room/message/time metadata and reconnection before production integration proceeds.
+
+If the probe passes, Codex is authorized to implement a separately identified read-only chat provider with explicit local channel confirmation, bounded validated command intake and actual local OBS diagnostics. No OAuth ownership claim, chat replies or real OBS repair approval is permitted through this provider. Preserve EventSub and isolated rehearsal. Update contracts and P06 scope before dispatch. Anonymous evidence does not close EventSub-specific issue #6 or real approval issue #10. Offline-channel evidence is identified honestly; organizer acceptance is not guaranteed. DeepSeek remains stopped.
+
+User separately selected MIT for the project license. P06 should prepare the MIT license and dependency notices; no project license file existed at this decision.

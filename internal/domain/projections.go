@@ -24,6 +24,7 @@ type SecretsStatus struct {
 }
 
 type SetupReadiness struct {
+	ChatConnected          bool `json:"chat_connected"`
 	MicrophoneConfigured   bool `json:"microphone_configured"`
 	StreamTrackConfigured  bool `json:"stream_track_configured"`
 	VisualConfigured       bool `json:"visual_configured"`
@@ -74,6 +75,7 @@ type PublicIncident struct {
 // PublicState is the complete public projection. It must never contain
 // settings, source names, usernames, endpoints or credentials.
 type PublicState struct {
+	ChatMode         string           `json:"chat_mode,omitempty"`
 	Mode             string           `json:"mode"`
 	StateRevision    uint64           `json:"state_revision"`
 	MonitoringActive bool             `json:"monitoring_active"`

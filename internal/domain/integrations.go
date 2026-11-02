@@ -29,6 +29,8 @@ type CommandReceipt struct {
 // TwitchConnection is the private Twitch setup projection. Detail fields are
 // fixed safe codes/copy; no provider error body or token is included.
 type TwitchConnection struct {
+	Provider                      string               `json:"provider,omitempty"`
+	ReceiveOnly                   bool                 `json:"receive_only"`
 	Status                        string               `json:"status"`
 	DetailCode                    string               `json:"detail_code,omitempty"`
 	Detail                        string               `json:"detail,omitempty"`

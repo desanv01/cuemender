@@ -26,7 +26,7 @@ func (a *App) monitoringReadiness() incidents.Readiness {
 		return a.monitoringStatusOverride()
 	}
 	settings := a.currentSettings()
-	tw := a.twitchMgr.Snapshot()
+	tw := a.chatSnapshot()
 	obs, _, _, resolution := a.obsMgr.SnapshotBundle(settings)
 	return incidents.Readiness{
 		OBSContext:       obs.SceneCollection,
@@ -96,8 +96,8 @@ func (a *App) processTwitchCommand(event twitch.CommandEvent) {
 			reply = a.coordinator.HandleFeedbackInSessionAt(ctx, string(event.Command.Kind), event.Command.IncidentCode, event.ActorID, event.ConnectionGeneration, event.ReceivedAt, event.MonitoringSessionID)
 		}
 	}
-	if strings.TrimSpace(reply) != "" {
-		tw := a.twitchMgr.Snapshot()
+	if strings.TrimSpace(reply) != "" && a.twitchMgr != nil {
+		tw := a.chatSnapshot()
 		if tw.Status != domain.ConnectionConnected || event.ConnectionGeneration == 0 || tw.ConnectionGeneration != event.ConnectionGeneration {
 			return
 		}
@@ -148,6 +148,9 @@ func (a *App) CloseIncident(ctx context.Context, incidentID, outcome string) (do
 }
 
 func (a *App) ApproveProposal(ctx context.Context, id string, revision int64) (domain.Action, error) {
+	if a.anonymous != nil {
+		return domain.Action{}, domain.ErrModeConflict
+	}
 	if a.coordinator == nil {
 		return domain.Action{}, domain.ErrUnavailable
 	}
