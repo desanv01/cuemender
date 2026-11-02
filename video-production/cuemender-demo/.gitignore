@@ -1,0 +1,10 @@
+node_modules/
+.hyperframes/
+.thumbnails/
+.media/
+assets/footage/
+renders/
+captures/
+snapshots/
+*.log
+check*.json

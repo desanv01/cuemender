@@ -1,0 +1,91 @@
+{
+  "duration": 165,
+  "fps": 30,
+  "reference": "ErrataScope_Demo_Desan_Vasu.mp4",
+  "scenes": [
+    {
+      "id": "opening",
+      "start": 0,
+      "duration": 8,
+      "summary": "Exact reference opening geometry and motion; CueMender identity."
+    },
+    {
+      "id": "overview",
+      "start": 8,
+      "duration": 10,
+      "summary": "Actual monitoring UI in reference full-footage panel."
+    },
+    {
+      "id": "chat",
+      "start": 18,
+      "duration": 10,
+      "summary": "Actual Twitch message, reference split focus layout."
+    },
+    {
+      "id": "report",
+      "start": 28,
+      "duration": 20,
+      "summary": "Real report arrival and incident creation, unchanged source time."
+    },
+    {
+      "id": "evidence",
+      "start": 48,
+      "duration": 14,
+      "summary": "Readable MIC_MUTED finding in full-width reference panel."
+    },
+    {
+      "id": "overlay",
+      "start": 62,
+      "duration": 10,
+      "summary": "Reference split focus; actual matching public overlay."
+    },
+    {
+      "id": "boundary",
+      "start": 72,
+      "duration": 10,
+      "summary": "Reference title-card geometry, explicit capability boundary."
+    },
+    {
+      "id": "proposal",
+      "start": 82,
+      "duration": 10,
+      "summary": "Actual proposal still hold, full-width panel, amber simulation badge."
+    },
+    {
+      "id": "approval",
+      "start": 92,
+      "duration": 13,
+      "summary": "Actual rehearsal approval/read-back recording."
+    },
+    {
+      "id": "feedback",
+      "start": 105,
+      "duration": 12,
+      "summary": "Actual rehearsal feedback and closure interaction."
+    },
+    {
+      "id": "closed",
+      "start": 117,
+      "duration": 5,
+      "summary": "Authentic closed-incident screenshot hold."
+    },
+    {
+      "id": "codex",
+      "start": 122,
+      "duration": 25,
+      "summary": "Actual Codex excerpts, reference full-footage frame; no fictional test footage."
+    },
+    {
+      "id": "limits",
+      "start": 147,
+      "duration": 10,
+      "summary": "Reference title-card layout with honest remaining limits."
+    },
+    {
+      "id": "closing",
+      "start": 157,
+      "duration": 8,
+      "summary": "Exact reference closing geometry and half-second title motion."
+    }
+  ]
+}

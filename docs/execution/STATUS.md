@@ -1,7 +1,7 @@
 # Execution status
 
 Revision: 3.1
-Last update: 2026-11-02T12:24Z
+Last update: 2026-11-02T13:34Z
 Current packet: P06
 Current state: accepted — local P06 release scope under D37; authenticated/live repair and submission gates pending
 Current owner: Codex
@@ -51,7 +51,7 @@ Correction: docs/execution/corrections/P05-R02.md; worker checkpoint 8275fca
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: Codex checkpoints accepted P06 source, completes PR/merge and rebuilds/verifies a clean-source ZIP; then recording/submission plan. See handoffs/P06-review.md. Authenticated Twitch/real OBS approval remain pending under #6/#10.
+Next action: Post-P06 video/submission execution authorized. P06 merged through PR #17 at fed7787; public v1.0.0 preview release published and verified. Codex owns video authoring; read-only GPT-6.1 Sol high audits are authorized. Actual offline-channel chat-to-MIC_MUTED evidence recorded on 2026-11-02T12:49:30.482Z; original Mic/Aux mute state restored. Authenticated Twitch/real OBS approval remain pending under #6/#10. See video-production/cuemender-demo/CAPTURE-MANIFEST.md.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
@@ -82,7 +82,7 @@ P02 setup: docs/implementation/P02-setup.md
 | P04 | conditionally accepted local development baseline; real approval pending | P04-review.md + D34 | Integrated via PR #11; issue #10 stays open |
 | P05 | accepted local baseline; real journey deferred | P05-codex-closure.md + D34/D36 | No worker dispatch; integrate PR #13 |
 | P06 | accepted locally — Codex fixes, full checks and actual ZIP extraction passed | P06-review.md | Git release checkpoint; final live/submission gates remain |
-| Submission | planned | Not started | Release review and user-controlled external steps |
+| Submission | in progress | Reference-matched165s film rendered; browser/visual review and encoded decode passed; Devpost draft created | Revised cut review, public YouTube link and final submission pending; background browser tool currently unavailable |
 
 ## Known prerequisites
 
