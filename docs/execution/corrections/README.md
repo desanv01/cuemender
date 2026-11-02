@@ -8,6 +8,7 @@
 - [P03-R02](P03-R02.md): earlier regressions and actual protocol success path pass; remaining failure handling and ownership boundaries recorded in review.
 - [P03-R03](P03-R03.md): earlier failures corrected; runtime retry/retention/publication/close and required boundary evidence remain incomplete.
 - [P03-R04](P03-R04.md): supplied regressions pass; captured-session ownership, atomic cleanup and named local checks remain incomplete.
-- [P03-R05](P03-R05.md): current dispatch; complete remaining R04 session/cleanup ownership and provider/database/failure-path evidence.
+- [P03-R05](P03-R05.md): session regressions, blocked-database join and store conditional protection pass; coordinator expected-version and cancellation fixture defects remain.
+- [P03-R06](P03-R06.md): current dispatch; correct conditional cleanup/caching and finish cancellation/provider protocol evidence.
 
 Codex creates Pxx-Rnn.md from [the correction template](../templates/CORRECTION.md) when an actual review finds changes required. Workers do not create their own acceptance waiver or silently redesign the contract.
