@@ -1,6 +1,6 @@
 # Shared contracts
 
-Revision: 1.5 • Changes require Codex decision and affected-packet review.
+Revision: 1.6 • Changes require Codex decision and affected-packet review.
 
 This specifies observable behavior and data semantics, not mandatory function names. Introduce structures as consumed; P01 does not implement the full future state machine.
 
@@ -297,3 +297,8 @@ Implementation clarification: proposals also bind the originating Twitch generat
 - Private `POST /api/v1/rehearsal/report`: only `{"category":"audio"|"video"}`. Private `POST /api/v1/rehearsal/feedback`: only `{"public_id":"CODE","vote":"fixed"|"stillbroken"}`. Generate bounded synthetic actor/delivery IDs internally and use shared coordinator/intake/dedup/feedback ownership. One documented simulated viewer changes its previous vote. Idle/stale/terminal/cross-mode work is rejected. Accepted simulated intake is 202; bounded busy/conflict follows existing rules. All routes use normal private security and reject in live before doing work.
 - track_missing: six complete flags, one missing confirmed track, explicit private approval, one simulated write/readback. mic_muted: manual-only guidance. wrong_scene: limitation/insufficient evidence, no hidden-item assertion. unknown_write: exactly one simulated mutation may occur; report unknown, then read-only reconcile with honest attribution; never retry writer automatically. Rehearsal cannot reach real OBS.
 - Tests prove zero live constructors/keyring/dial/send calls, not only mode labels. Cover forged/cross-mode IDs, setup/approval routes, restart/DB marker conflicts, scenario ownership, invalid CLI mode and default-live compatibility. Rehearsal is never live acceptance evidence.
+
+
+## C12 — Receive-only Twitch fallback
+
+D37 authorizes the separate capability model, CLI/channel-scoped storage, private confirmation route, strict IRC intake and structural write prohibition in [ANONYMOUS-CHAT.md](ANONYMOUS-CHAT.md). This supersedes the own-channel OAuth prerequisite only for receive-only diagnostic monitoring. It does not waive authenticated repair authorization or relabel IRC as EventSub. `setup.twitch_authorized=false`, `setup.chat_connected` reports actual intake connectivity, private Twitch state includes `provider=anonymous_irc` and `receive_only=true`, and public state adds only `chat_mode=receive_only`. Existing modes, feedback eligibility, session/generation rules, C10/C11 and secret boundaries remain.

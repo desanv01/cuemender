@@ -86,6 +86,19 @@
 
   function renderTwitch(twitch) {
     const value = twitch || { status: 'not_connected', receipt: {} };
+    state.receiveOnly = value.receive_only === true;
+    state.receiveOnlyChannel = state.receiveOnly ? value.login : '';
+    for (const id of ['twitch-client-label','twitch-client-id','twitch-auth-help']) { if ($(id)) $(id).hidden = state.receiveOnly; }
+    if ($('receive-only-setup')) $('receive-only-setup').hidden = !state.receiveOnly;
+    setText('receive-only-channel', 'Receive-only channel: ' + state.receiveOnlyChannel);
+    setText('twitch-connect', state.receiveOnly ? 'Connect receive-only chat' : 'Connect Twitch');
+    if (state.receiveOnly) {
+      setText('mode-badge','LIVE · RECEIVE-ONLY');
+      setText('runtime-help','Real Twitch chat reports check this local OBS instance. Channel ownership is unverified. All corrections are manual in receive-only mode.');
+      setText('obs-action-help','Read-only local discovery and diagnostics. CueMender cannot change OBS in receive-only mode.');
+      setText('monitor-help','Viewer reports trigger fresh local OBS checks. Receive-only mode offers manual guidance; it cannot reply in chat or change OBS.');
+      setText('footer-help','Local control · receive-only Twitch chat · read-only OBS diagnostics');
+    }
     setText('twitch', value.status || 'not_connected');
     setText('twitch-status', value.detail || value.status || 'not connected');
     const device = value.device;
@@ -353,7 +366,7 @@
       if (limitations) {
         evidenceText += ' Limitations: ' + limitations;
       }
-      evidence.textContent = evidenceText + ' Local verification: ' + incident.local_verification + '. Track repair requires an exact private approval while monitoring.';
+      evidence.textContent = evidenceText + ' Local verification: ' + incident.local_verification + (state.receiveOnly ? '. All corrections are manual in receive-only mode.' : '. Track repair requires an exact private approval while monitoring.');
       card.appendChild(evidence);
       if (incident.manual_guidance) {
         const guidance = document.createElement('p');
@@ -586,6 +599,7 @@
     state.currentRevision = privateState.settings ? privateState.settings.revision : 0;
     state.hasVisualExpectation = Boolean(privateState.settings && privateState.settings.visual);
     renderMode(privateState.mode || 'live');
+    state.receiveOnly = Boolean(privateState.twitch && privateState.twitch.receive_only);
     renderMonitoring(privateState);
     if (!state.sectionChosen) {
       const settings = privateState.settings;
@@ -665,6 +679,15 @@
   }
 
   async function connectTwitch() {
+    if (state.receiveOnly) {
+      if (!$('receive-only-confirm').checked) { showNotice('Confirm the selected channel and local OBS pairing first.', 'error'); return; }
+      try {
+        await postPrivate('/api/v1/twitch/receive-only/connect', { channel: state.receiveOnlyChannel, confirmed: true });
+        showNotice('Connecting receive-only chat. Replies and repairs are unavailable.', 'ok');
+        await loadState();
+      } catch (error) { showNotice(error.message || 'Receive-only connection failed.', 'error'); }
+      return;
+    }
     const clientID = $('twitch-client-id').value.trim();
     if (!clientID) {
       showNotice('Enter the Twitch Public client ID first.', 'error');

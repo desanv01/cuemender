@@ -86,6 +86,7 @@ const snapshot = {
   }
 };
 
+let receiveOnlyRequest = null;
 let postedSettings = null;
 let disconnected = false;
 let reloadSavedIdentity = false;
@@ -112,6 +113,11 @@ const sandbox = {
       const { expected_revision, ...saved } = postedSettings;
       snapshot.settings = { ...saved, revision: expected_revision + 1 };
       return { ok: true, status: 200, json: async () => ({ data: snapshot.settings }) };
+    }
+    if (url === '/api/v1/twitch/receive-only/connect') {
+      receiveOnlyRequest = JSON.parse(options.body);
+      if (options.headers['X-CSRF-Token'] !== snapshot.csrf_token) throw new Error('receive-only request lost CSRF');
+      return { ok: true, status: 202, json: async () => ({ data: { status: 'connecting' } }) };
     }
     if (url === '/api/v1/obs/disconnect') {
       disconnected = true;
@@ -191,6 +197,15 @@ setImmediate(async () => {
       postedSettings.visual.source.context !== 'Main Collection' || postedSettings.microphone.context !== 'Main Collection') {
     failure = failure || 'visual or microphone identity was discarded on save';
   }
+  snapshot.twitch = { status: 'not_connected', provider: 'anonymous_irc', receive_only: true, login: 'testchannel', receipt: {} };
+  snapshot.state_revision++;
+  stateListener({data: JSON.stringify(snapshot)});
+  if (!node('twitch-client-id').hidden || node('receive-only-setup').hidden || !node('mode-badge').textContent.includes('RECEIVE-ONLY')) failure = failure || 'anonymous capabilities mislabeled';
+  await node('twitch-connect').handlers.click();
+  if (receiveOnlyRequest) failure = failure || 'unchecked channel confirmation dispatched';
+  node('receive-only-confirm').checked = true;
+  await node('twitch-connect').handlers.click();
+  if (!receiveOnlyRequest || receiveOnlyRequest.channel !== 'testchannel' || receiveOnlyRequest.confirmed !== true) failure = failure || 'confirmed channel did not dispatch';
   console.log(JSON.stringify({
     deviceCode: node('twitch-user-code').textContent,
     deviceVisible: node('twitch-device').hidden === false,

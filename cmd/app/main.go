@@ -19,6 +19,7 @@ func main() {
 func run() int {
 	flags := flag.NewFlagSet("cuemender", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
+	receiveOnly := flags.String("receive-only-channel", "", "opt-in receive-only Twitch channel; replies and OBS repairs disabled")
 	mode := flags.String("mode", "live", "runtime mode: live or rehearsal")
 	dataDir := flags.String("data-dir", "", "data directory (default: user config directory / LiveCheck)")
 	listen := flags.String("listen", "", "loopback listen address override, e.g. 127.0.0.1:8787")
@@ -45,6 +46,7 @@ func run() int {
 	defer stop()
 
 	a, err := app.New(ctx, app.Options{
+		ReceiveOnlyChannel: *receiveOnly,
 		Mode:               *mode,
 		DataDir:            *dataDir,
 		ListenAddress:      *listen,

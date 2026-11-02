@@ -1,10 +1,12 @@
 # Worker and reviewer protocol
 
-Revision: 1.2
+Revision: 1.3
 
 Current release exception D34/D35: user authorized P05 on conditionally accepted P04 local baseline, merged via PR #11. Live Twitch #6, real approved OBS trial #10, dependent real P05 journey and final readiness remain unmet. P05 v1.1/C11/written brief is released to one DeepSeek worker; P06 stays held. This supersedes earlier P05-hold wording, not production guards or evidence requirements.
 
 Current exception: D30 explicitly permits P03 development on the conditionally accepted P02 baseline while live Twitch gates remain deferred/unmet in issue #6. This changes phase sequencing only, not live-evidence requirements or final readiness. Earlier P02/P03 hold wording in historical reports is superseded by this recorded decision; consult STATUS for the current release. No automatic P04 release follows.
+
+Current D37 exception: Codex alone implements/validates the explicitly approved receive-only fallback before P06 dispatch. It has no real repair capability or OAuth ownership claim. Original authenticated gates stay pending; consult ANONYMOUS-CHAT.md and STATUS. Earlier hold wording is historical where superseded by D37.
 
 ## Ownership sequence
 

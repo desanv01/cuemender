@@ -33,6 +33,9 @@ func (a *App) onIntegrationUpdate() {
 // TwitchConnect persists the non-secret public client ID before starting the
 // asynchronous device flow.
 func (a *App) TwitchConnect(ctx context.Context, clientID string) error {
+	if a.anonymous != nil {
+		return domain.ErrModeConflict
+	}
 	if a.rehearsal != nil {
 		return domain.ErrModeConflict
 	}
@@ -68,6 +71,13 @@ func (a *App) TwitchDisconnect(ctx context.Context) error {
 	}
 	a.integrationMu.Lock()
 	defer a.integrationMu.Unlock()
+	if a.anonymous != nil {
+		a.anonymous.Disconnect()
+		if a.coordinator != nil {
+			a.coordinator.Invalidate(ctx, "twitch_disconnected")
+		}
+		return nil
+	}
 	if err := a.twitchMgr.Disconnect(ctx); err != nil {
 		if errors.Is(err, twitch.ErrCredentialDeleteFailed) {
 			return domain.ErrCredentialStorage

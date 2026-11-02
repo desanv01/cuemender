@@ -65,3 +65,8 @@ No undo in required scope. No runtime AI in required scope. No broad source-cont
 All M01–M14 have mapped evidence in VERIFICATION. A clear blocker remains a blocker even near the deadline. The user can choose a smaller submission after seeing the tradeoff; workers cannot silently remove required features or mislabel simulation as live success.
 
 Use original/authorized assets. Maintain truthful Codex and DeepSeek contribution records for the entry. See SUBMISSION for the final external checklist.
+
+
+## D37 reduced submission scope
+
+Optional receive-only Twitch chat is now supported per [C12](ANONYMOUS-CHAT.md). It supplies real chat-triggered local OBS diagnostics without developer-app registration, with explicit channel confirmation and unverified ownership. All OBS corrections are manual; no automated replies or repair executor is available in this path. EventSub and labeled rehearsal remain. Real offline chat evidence does not establish streamed audio recovery; original authenticated/approved-write gates remain unmet.

@@ -90,3 +90,8 @@ Prefer small consumer-owned interfaces and typed results over a universal event 
 One adapter instance graph per run: live or rehearsal. Never switch a live writer into rehearsal by changing only a boolean in the UI.
 
 P05/C11 resolution: constructor-owned immutable mode selects the graph before provider/secret initialization. Live defaults/names stay compatible. Rehearsal uses a child data directory, mode-owned DB and isolated memory secrets; no live manager, dialer, sender or OS-keyring constructor. Shared coordinator/diagnostics/approval operate with matching mode provenance through narrow seams. C11 owns route schemas and storage/mode migration decisions.
+
+
+## D37 receive-only composition
+
+`internal/twitch/anonymous.go` is a bounded stdlib TLS IRC receiver. No new module dependency. CLI selection is immutable and isolates data under receive-only/LOGIN. It supplies normalized events through the existing intake queue and current-session/generation gates. The App constructs no authenticated Twitch manager and attaches neither repair nor reconciliation callbacks to the coordinator; approval rejects at the App boundary too. The UI and public projection declare receive-only capabilities. See [C12](ANONYMOUS-CHAT.md).

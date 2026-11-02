@@ -187,6 +187,7 @@ func (s *Server) buildHandler() http.Handler {
 	mux.HandleFunc("/api/v1/settings", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleSettings)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/events", onlyMethod(http.MethodGet, s.requireSession(http.HandlerFunc(s.handlePrivateEvents))).ServeHTTP)
 	mux.HandleFunc("/api/v1/twitch/connect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleTwitchConnect)))).ServeHTTP)
+	mux.HandleFunc("/api/v1/twitch/receive-only/connect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleReceiveOnlyConnect)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/twitch/disconnect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleTwitchDisconnect)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/obs/connect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleOBSConnect)))).ServeHTTP)
 	mux.HandleFunc("/api/v1/obs/disconnect", onlyMethod(http.MethodPost, s.requireSession(s.requireCSRF(http.HandlerFunc(s.handleOBSDisconnect)))).ServeHTTP)
@@ -802,6 +803,8 @@ func writeIncidentError(w http.ResponseWriter, r *http.Request, err error) {
 
 func writeIntegrationError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case errors.Is(err, domain.ErrModeConflict):
+		writeError(w, r, http.StatusConflict, "mode_conflict", "This operation is unavailable for the selected connection mode.")
 	case errors.Is(err, domain.ErrBusy):
 		writeError(w, r, http.StatusConflict, "integration_busy", "That integration is already busy.")
 	case errors.Is(err, domain.ErrInvalidInput):

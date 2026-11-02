@@ -32,6 +32,14 @@ A viewer notices missing audio. The streamer needs to find the cause without dis
 
 CueMender is being built around that interaction: receive a report through Twitch, compare OBS configuration with the streamer's declared expectations, explain the evidence, and request approval for a narrowly supported correction. Local configuration verification and viewer feedback remain separate.
 
+## Receive-only Twitch chat
+
+Without a developer app, launch `cuemender.exe --receive-only-channel YOUR_LOGIN`. In private Setup, confirm that the selected channel chat is intended to report on your local OBS, then connect chat and OBS, select expectations and start monitoring. A separate viewer can send `!issueaudio` or `!issuevideo` in that channel.
+
+This optional path receives real Twitch messages and reads real local OBS state. It **cannot reply in chat, prove channel ownership or approve/change OBS**. All corrections remain manual. It uses a separate `receive-only/LOGIN` data directory, certificate-verified TLS IRC on port 6697 and no Twitch credentials. The existing authenticated EventSub path and isolated rehearsal remain available.
+
+Verified locally on 2026-11-02: actual separate-account messages before/after reconnect, and a real offline-channel report triggering a fresh local OBS diagnostic. OBS was not broadcasting; no broadcast recovery or real repair claim follows. See [evidence and limits](docs/execution/handoffs/anonymous-chat-review.md).
+
 ## Features
 
 The foundation below supports connection setup, three diagnoses and private approval of one microphone-track addition.
@@ -151,7 +159,7 @@ One local process, with no separate frontend server or cloud database.
 
 - **Accepted:** application lifecycle, validated persistence, local private sessions, CSRF protection, separate public/private state, embedded pages, and the corrected reload/concurrency/shutdown/error-redaction paths.
 - **Implemented locally:** Twitch/OBS connections, three diagnoses, persistent incidents/feedback, and the private track-approval engine with durable intent, one dispatch, read-back and read-only recovery.
-- **Next:** P05 user experience and isolated rehearsal are released for implementation under D34. Real Twitch/approved-repair verification stays pending; P06 release packaging remains held.
+- **Next:** P01–P05 are locally complete. Receive-only chat is implemented under D37; P06 packaging follows its acceptance. Authenticated Twitch and real approved OBS repair gates remain pending.
 - **Outside the MVP:** automatic unmute or source reveal, raw audio analysis, computer vision, OS-device repair, multiple channels and autonomous control.
 - **Verification limits:** local OAuth/EventSub/OBS protocol servers and headless rendered-browser checks do not prove live Twitch behavior. P02 live OBS read-only evidence is recorded separately; it is not a P04 live-write trial. Final commands, race results and remaining gates are recorded in [P04 verification](docs/execution/handoffs/P04-review.md). OBS has no atomic compare-and-set against other clients; local track read-back does not prove viewer audio recovery.
 
@@ -170,4 +178,4 @@ One local process, with no separate frontend server or cloud database.
 
 ## License
 
-A project license has not been selected yet. Dependency license notes are recorded in [the environment report](docs/implementation/P01-environment.md).
+MIT has been selected by the owner; P06 will add the project LICENSE and distribution notices. Dependency license notes are recorded in [the environment report](docs/implementation/P01-environment.md).

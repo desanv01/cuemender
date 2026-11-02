@@ -25,6 +25,7 @@ import (
 )
 
 type Options struct {
+	ReceiveOnlyChannel string
 	Mode               string
 	DataDir            string
 	ListenAddress      string
@@ -43,19 +44,22 @@ type osSecretStore interface {
 // The private composition seam lets local fixtures exercise startup and the
 // credential boundary. Public New always uses the real stores and endpoints.
 type appDependencies struct {
-	newOSStore       func() osSecretStore
-	configureTwitch  func(*twitch.Options)
-	configureOBS     func(*obs.Options)
-	monitoringStatus func() incidents.Readiness
+	configureAnonymous func(*twitch.AnonymousOptions)
+	newOSStore         func() osSecretStore
+	configureTwitch    func(*twitch.Options)
+	configureOBS       func(*obs.Options)
+	monitoringStatus   func() incidents.Readiness
 }
 
 type App struct {
-	cfg        Config
-	fileConfig Config
-	configMu   sync.Mutex
-	dataDir    string
-	mode       string
-	now        func() time.Time
+	anonymous          *twitch.Anonymous
+	receiveOnlyChannel string
+	cfg                Config
+	fileConfig         Config
+	configMu           sync.Mutex
+	dataDir            string
+	mode               string
+	now                func() time.Time
 
 	listener                 net.Listener
 	store                    *store.Store
@@ -118,6 +122,9 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 	if mode != domain.ModeLive && mode != domain.ModeRehearsal {
 		return nil, domain.ErrModeConflict
 	}
+	if opts.ReceiveOnlyChannel != "" && (mode != domain.ModeLive || !twitch.ValidChannel(opts.ReceiveOnlyChannel)) {
+		return nil, fmt.Errorf("%w: receive-only requires live mode and a lowercase channel login", domain.ErrInvalidInput)
+	}
 	baseDir, err := ResolveDataDir(opts.DataDir)
 	if err != nil {
 		return nil, err
@@ -125,6 +132,12 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 	dataDir := baseDir
 	if mode == domain.ModeRehearsal {
 		dataDir, err = ResolveDataDir(filepath.Join(baseDir, "rehearsal"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if opts.ReceiveOnlyChannel != "" {
+		dataDir, err = ResolveDataDir(filepath.Join(baseDir, "receive-only", opts.ReceiveOnlyChannel))
 		if err != nil {
 			return nil, err
 		}
@@ -204,26 +217,27 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 
 	baseCtx, baseCancel := context.WithCancel(context.Background())
 	a := &App{
-		cfg:           cfg,
-		fileConfig:    fileConfig,
-		dataDir:       dataDir,
-		mode:          mode,
-		now:           opts.Now,
-		listener:      ln,
-		store:         st,
-		secrets:       secretStore,
-		secretsState:  secretsStatus,
-		stdout:        opts.Stdout,
-		stderr:        opts.Stderr,
-		noBrowser:     opts.NoBrowser,
-		logger:        slog.New(slog.NewTextHandler(opts.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
-		settings:      settings,
-		stateRevision: 1,
-		privateHub:    newHub(),
-		publicHub:     newHub(),
-		conns:         make(map[net.Conn]http.ConnState),
-		baseCtx:       baseCtx,
-		baseCancel:    baseCancel,
+		receiveOnlyChannel: opts.ReceiveOnlyChannel,
+		cfg:                cfg,
+		fileConfig:         fileConfig,
+		dataDir:            dataDir,
+		mode:               mode,
+		now:                opts.Now,
+		listener:           ln,
+		store:              st,
+		secrets:            secretStore,
+		secretsState:       secretsStatus,
+		stdout:             opts.Stdout,
+		stderr:             opts.Stderr,
+		noBrowser:          opts.NoBrowser,
+		logger:             slog.New(slog.NewTextHandler(opts.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		settings:           settings,
+		stateRevision:      1,
+		privateHub:         newHub(),
+		publicHub:          newHub(),
+		conns:              make(map[net.Conn]http.ConnState),
+		baseCtx:            baseCtx,
+		baseCancel:         baseCancel,
 	}
 	intakeCtx, intakeCancel := context.WithCancel(baseCtx)
 	a.intakeCtx = intakeCtx
@@ -262,7 +276,9 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		if deps.configureTwitch != nil {
 			deps.configureTwitch(&twitchOptions)
 		}
-		a.twitchMgr = twitch.NewManager(twitchOptions)
+		if opts.ReceiveOnlyChannel == "" {
+			a.twitchMgr = twitch.NewManager(twitchOptions)
+		}
 		obsOptions := obs.Options{
 			Context:  baseCtx,
 			Dialer:   obs.GoobsDialer{},
@@ -275,6 +291,13 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		}
 		a.obsMgr = obs.NewManager(obsOptions)
 		a.obsMgr.SetSettings(settings.Revision, settings.Expectations)
+	}
+	if opts.ReceiveOnlyChannel != "" {
+		anonymousOptions := twitch.AnonymousOptions{Context: baseCtx, Channel: opts.ReceiveOnlyChannel, Now: a.now, OnUpdate: a.onIntegrationUpdate, OnCommand: a.onTwitchCommand}
+		if deps.configureAnonymous != nil {
+			deps.configureAnonymous(&anonymousOptions)
+		}
+		a.anonymous = twitch.NewAnonymous(anonymousOptions)
 	}
 	a.monitoringStatusOverride = deps.monitoringStatus
 	coordinatorOptions := incidents.Options{
@@ -291,12 +314,16 @@ func newWithDependencies(ctx context.Context, opts Options, deps appDependencies
 		coordinatorOptions.ReadTrack = a.rehearsal.ReadTrack
 		coordinatorOptions.Reply = func(string) bool { return true }
 	} else {
-		coordinatorOptions.Repair = a.obsMgr.RepairTrack
-		coordinatorOptions.ReadTrack = a.obsMgr.ReadTrackState
+		if a.anonymous == nil {
+			coordinatorOptions.Repair = a.obsMgr.RepairTrack
+			coordinatorOptions.ReadTrack = a.obsMgr.ReadTrackState
+		}
 		coordinatorOptions.Read = func(ctx context.Context, snapshot domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
 			return a.obsMgr.DiagnosticRead(ctx, snapshot)
 		}
-		coordinatorOptions.Reply = a.twitchMgr.EnqueueReply
+		if a.twitchMgr != nil {
+			coordinatorOptions.Reply = a.twitchMgr.EnqueueReply
+		}
 	}
 	coordinator, err := incidents.NewChecked(coordinatorOptions)
 	if err != nil {
@@ -401,6 +428,9 @@ func (a *App) Close() {
 		a.baseCancel()
 		if a.intakeCancel != nil {
 			a.intakeCancel()
+		}
+		if a.anonymous != nil {
+			a.anonymous.Close()
 		}
 		a.intakeWG.Wait()
 		if a.ui != nil {
@@ -560,7 +590,7 @@ func (a *App) privateLocked() domain.PrivateState {
 		discovery, observation, _ = a.rehearsal.Read(context.Background(), a.settings)
 		resolutionReady = true
 	} else {
-		twitchState = a.twitchMgr.Snapshot()
+		twitchState = a.chatSnapshot()
 		obsState, discovery, observation, resolutionReady = a.obsMgr.SnapshotBundle(a.settings)
 	}
 	var session *domain.MonitoringSessionInfo
@@ -584,7 +614,8 @@ func (a *App) privateLocked() domain.PrivateState {
 			MicrophoneConfigured:   a.settings.Microphone != nil,
 			StreamTrackConfigured:  a.settings.StreamTrack != nil,
 			VisualConfigured:       a.settings.Visual != nil,
-			TwitchAuthorized:       twitchState.Status == domain.ConnectionConnected,
+			TwitchAuthorized:       !twitchState.ReceiveOnly && twitchState.Status == domain.ConnectionConnected,
+			ChatConnected:          twitchState.Status == domain.ConnectionConnected,
 			OBSConnected:           obsState.Status == domain.ConnectionConnected,
 			OBSDiscoveryReady:      discovery != nil,
 			LiveOBSResolutionReady: obsState.Status == domain.ConnectionConnected && !obsState.Stale && resolutionReady,
@@ -617,7 +648,7 @@ func (a *App) publicLocked() domain.PublicState {
 				status = "checking"
 			}
 		} else {
-			tw := a.twitchMgr.Snapshot()
+			tw := a.chatSnapshot()
 			obs, _, _, _ := a.obsMgr.SnapshotBundle(a.settings)
 			if tw.Status == domain.ConnectionConnected && obs.Status == domain.ConnectionConnected && !obs.Stale {
 				status = "ready"
@@ -627,7 +658,12 @@ func (a *App) publicLocked() domain.PublicState {
 			}
 		}
 	}
+	chatMode := ""
+	if a.anonymous != nil {
+		chatMode = "receive_only"
+	}
 	return domain.PublicState{
+		ChatMode:         chatMode,
 		Mode:             a.mode,
 		StateRevision:    a.stateRevision,
 		MonitoringActive: active,
