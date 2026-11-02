@@ -1,10 +1,31 @@
 # Copy-paste prompts
 
-Revision: 2.0
+Revision: 2.1
 
-Current dispatch: P03-R03 v1.0. Earlier regressions and the actual protocol success path pass; four reproduced failures and remaining required local boundaries prevent acceptance. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
+Current dispatch: P03-R04 v1.0. Earlier regressions and the actual protocol success path pass; runtime persistence/ownership failures and remaining named boundaries prevent acceptance. D30/CONTRACTS v1.3 unchanged; live Twitch deferred in issue #6.
 
-## Current: P03-R03 v1.0 — paste into DeepSeek
+## Current: P03-R04 v1.0 — paste into DeepSeek
+
+~~~text
+Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R04 v1.0.
+
+Read AGENTS.md; docs/execution/README.md, STATUS.md, WORKFLOW.md, CONTRACTS.md v1.3/C04/C06/C09 and DECISIONS.md D30; packages/P03-diagnostics.md; corrections/P03-R03.md and P03-R04.md; handoffs/P03-R03-review.md; and the appended worker report. Paths after docs/execution refer to that directory.
+
+Confirm STATUS releases P03-R04, branch feature/p03-diagnostics, and no active writer. Read Git status/diff and actual HEAD, preserve existing work and claim operational ownership. Codex added tests/docs only. Preserve the R03 improvements; do not restart P03.
+
+Complete P03-R04 groups A-C: runtime retained loading/error propagation and durable stop retry/cleanup; operation lifetime and originating-session-bound intake/replies; remaining actual HTTP/SSE/settings/provider/protocol evidence. Four new tests fail and one occupied-production-gate cancellation test passes in internal/incidents/p03_r03_review_test.go under -tags reviewrepro. Preserve their behavioral assertions and promote all five after fixing. The recoverable SQLite fault test uses a second connection and trigger; the private store handle is not a blocker. Replace obsolete opMu-based test synchronization with the actual production gate.
+
+Complete all named packet boundaries, not just supplied failures. In particular, no commit after Close returns, no loss of retained incidents after dismissal, no false-success stop retry, settled job publication, captured session ownership, actual running HTTP/SSE shutdown, evidence-revision/late-result checks and explicit observed OBS read-only request allowlist. Record every required boundary with a test name and executed result; report a concrete technical blocker rather than silently deferring it again.
+
+No specification changes, new dependencies/services, OBS writes, P04 code, UI redesign, new agents or Git/GitHub mutations. Background-only computer access. No live OBS configuration changes. Live Twitch P02-A/V06 and P03-D remain deferred/unmet under D30/issue #6: no account work or real chat; fixtures are not live evidence.
+
+Run focused checks, then full Go tests, vet, formatting, CGo-free build, all four Node fixtures, affected repeated lifecycle/protocol checks and configured WSL race. Append a P03-R04 A-C evidence matrix to handoffs/P03-worker-report.md; update implementation/P03-diagnostics.md. Preserve prior reports. Stop owned processes, transfer STATUS to Codex with ready_for_review or a specific blocker and no writer, then stop editing. P04 remains held for explicit release and recording.
+
+Return:
+"P03-R04 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P03-R04.md and docs/execution/handoffs/P03-R03-review.md. Inspect actual changes and rerun preserved regressions plus retained-state, recoverable-fault, close/session ownership, publication and required actual-app/protocol boundaries. DeepSeek has stopped editing. Record acceptance or remaining corrections. Live Twitch remains deferred under D30/issue #6; P04 stays held for Codex release and recording."
+~~~
+
+## Historical: P03-R03 v1.0 — partial completion; use R04
 
 ~~~text
 Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek implementation worker for P03-R03 v1.0.
