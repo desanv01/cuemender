@@ -213,7 +213,13 @@ func TestP04ActualAppPrivateApprovalProtocolFlow(t *testing.T) {
 		}
 		until := time.Now().Add(120 * time.Second)
 		stopped := false
+		feedbackSent := false
 		for time.Now().Before(until) {
+			current, _ := a.coordinator.Find(p.IncidentID)
+			if current.LocalVerification == domain.LocalVerified && !feedbackSent {
+				chat.feedback <- "!fixed " + current.PublicID
+				feedbackSent = true
+			}
 			if _, err := os.Stat(filepath.Join(dir, "stop")); err == nil {
 				stopped = true
 				break
@@ -233,6 +239,9 @@ func TestP04ActualAppPrivateApprovalProtocolFlow(t *testing.T) {
 		inc, _ := a.coordinator.Find(p.IncidentID)
 		if len(inc.Findings) != 2 || inc.LocalVerification != domain.LocalVerified {
 			t.Fatal("browser flow lost remaining diagnosis")
+		}
+		if inc.Stage != domain.StageClosed || inc.ClosureOutcome != "viewer_confirmed" || inc.Feedback.Positive != 1 {
+			t.Fatalf("browser protocol feedback/closure incomplete: %+v", inc)
 		}
 		cancel()
 		select {

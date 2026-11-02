@@ -81,3 +81,8 @@ Codex inspected the actual P04 rendered screen and applied the available 12ui sk
 ## D35 — P05 contract resolution (2026-11-02)
 
 C11/contracts v1.5 defines immutable constructor mode, rehearsal child data directory/DB ownership, memory-only rehearsal secrets with zero OS-keyring calls, isolated in-process adapters, fixed private scenario/intake routes and transactional broadcaster closure. Isolation is structural, not a UI boolean or readiness override. P04 remains live-only by default; trusted rehearsal may share rules only with matching provenance. Existing feedback is reused. Migration 4 is authorized for closure/mode ownership with backward preservation tests. Written visual brief scopes functional reorganization in the current language, not a new framework or generated-design claim.
+
+
+## D36 — P05 Codex closure ownership (2026-11-02)
+
+After P05-R02, the user explicitly transferred remaining implementation and verification to Codex, with DeepSeek stopped, and authorized GPT-6.1 Sol high subagents for this work. Root owns production edits; audit agents are read-only except a bounded, sequentially delegated test-file write while root abstains from editing. This supersedes D34's earlier P05 agent restriction. Codex-authored fixes/tests are self-verification, not independent acceptance by another tool. Complete the local P05 gates before integration; keep real Twitch #6 and approved OBS trial #10 and dependent real V14/V18/V19 pending. P06 implementation is not started by this takeover.

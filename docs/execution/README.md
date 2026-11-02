@@ -1,12 +1,12 @@
 # CueMender execution pack
 
-Revision: 2.8 • Updated 2026-11-02 (Malaysia) • P05 released; live checks deferred.
+Revision: 2.9 • Updated 2026-11-02 (Malaysia) • P05 accepted locally; live checks deferred.
 
 ## Immediate next action
 
-**Current: P05-R01 reviewed; corrections remain.** The original eight regressions pass, but three new tests and actual browser flows reproduce unfinished behavior. See [latest review](handoffs/P05-R01-review.md), [P05-R02](corrections/P05-R02.md) and active correction in PROMPTS. P06 held. The user's retained [live-verification plan](LIVE-VERIFICATION.md) stays pending until the 2FA hold is released. Original release summary below is historical context.
+**Current: P05 accepted locally after Codex takeover.** Atomic scenario replacement, typed intake, simulated-provider guards and rendered controls are verified in the [closure record](handoffs/P05-codex-closure.md). No worker dispatch is active; P06 needs a separate release. The user's retained [live-verification plan](LIVE-VERIFICATION.md) stays pending until the 2FA hold is released. Original release summary below is historical context.
 
-**P05 v1.1 is released to one DeepSeek worker under D34/D35 and contracts v1.5/C11.** P04 is conditionally accepted for development and merged via PR #11; genuine build footage is saved. Read [STATUS](STATUS.md), [P05 packet](packages/P05-user-experience.md), [written visual brief](P05-VISUAL-BRIEF.md) and [PROMPTS](PROMPTS.md). P06 stays held. No P05 application code was written during dispatch preparation.
+**Historical P05 dispatch: v1.1 was released to DeepSeek under D34/D35 and contracts v1.5/C11.** P04 is conditionally accepted for development and merged via PR #11; genuine build footage is saved. Read [STATUS](STATUS.md), [P05 packet](packages/P05-user-experience.md), [written visual brief](P05-VISUAL-BRIEF.md) and [PROMPTS](PROMPTS.md). P06 stays held. No P05 application code was written during dispatch preparation.
 
 P03 local acceptance is documented in its [closure review](handoffs/P03-codex-closure-review.md); PR #9 merged and #7/#8 closed. P02-A/V06 and P03-D real Twitch remain deferred in [issue #6](https://github.com/desanv01/cuemender/issues/6). P04's active-monitoring approval gate is retained, so dependent full live approval verification may remain unmet. Track P04 in [issue #10](https://github.com/desanv01/cuemender/issues/10). No live Twitch login work or simulated-as-live claims.
 
@@ -30,7 +30,7 @@ Consult [decisions](DECISIONS.md), [verification matrix](VERIFICATION.md), [init
 | [P02 — Live connections](packages/P02-live-connections.md) | Own-channel Twitch chat and OBS discovery/read evidence | Development baseline conditionally accepted under D30; Twitch deferred |
 | [P03 — Diagnostics](packages/P03-diagnostics.md) | Three evidence-based checks and persistent incidents | Accepted local baseline under D30/D31 |
 | [P04 — Approved repair](packages/P04-approved-repair.md) | Codex approval, correction, reconciliation and tests | Conditional development acceptance D34; required real approval pending |
-| [P05 — User experience](packages/P05-user-experience.md) | Setup, controls, overlay, closure, isolated rehearsal | Released v1.1 to DeepSeek; dependent real journey deferred |
+| [P05 — User experience](packages/P05-user-experience.md) | Setup, controls, overlay, closure, isolated rehearsal | Accepted locally after Codex closure; dependent real journey deferred |
 | [P06 — Release readiness](packages/P06-release-readiness.md) | Tested Windows ZIP and reproducible instructions | Planned |
 | [Final integration/submission](SUBMISSION.md) | Codex review, actual demonstration, accurate entry | Codex/user stage |
 

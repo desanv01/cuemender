@@ -1,10 +1,10 @@
 # Copy-paste prompts
 
-Revision: 2.6
+Revision: 2.7
 
-Current dispatch: **P05-R02 v1.0 to one DeepSeek worker**, contracts v1.5/C11, D34/D35. Live Twitch and real approved OBS trial stay pending. P06 held. Earlier prompts below are historical.
+Current dispatch: **none**. P05 is accepted locally after Codex closure under D36. DeepSeek stays stopped. Live Twitch and real approved OBS trial remain pending under D34. P06 requires separate release. All earlier prompts below are historical and must not be launched.
 
-## P05-R02 v1.0 — active correction prompt
+## P05-R02 v1.0 — historical, completed by worker and Codex closure
 
 ~~~text
 Resume CueMender in C:\Users\Dv\Desktop\Twitch Hackathon as the sole DeepSeek worker for P05-R02 v1.0. Stay on feature/p05-user-experience. No Git mutations, agents, live Twitch/OBS, recording or foreground control.

@@ -73,3 +73,8 @@ Codex independently confirmed all fourteen previous regressions, the ordinary su
 ## P03 Codex closure — 2026-11-02
 
 After R06 handoff, user authorized sole-writer Codex takeover. Worker R06 source was checkpointed separately as 2a9dcf9. Codex implemented operation-gated final settlement, immutable pending retry versions, concurrent Close joining, cancellation admission checks, upgraded-socket reader joining and small truthful UI copy. Codex added coordinator/store concurrent dismissal/recheck and pending/Close tests, ran Windows/full WSL race/Node checks and actual headless-browser flows. These are implementation self-verification; no independent reviewer is claimed for Codex code. See [work record](../implementation/P03-codex-closure.md) and [local acceptance](handoffs/P03-codex-closure-review.md). No P04 code or recording, live Twitch, fresh live OBS, new dependency or contract change.
+
+
+## P05 Codex closure — 2026-11-02
+
+User authorized takeover after DeepSeek P05-R02 (checkpoint 8008ced). Codex implemented coordinator-owned atomic scenario replacement, transactional settings/session/incident/proposal updates, typed report/feedback acceptance, simulated-provider provenance/cancellation/exact-map guards, keyed browser controls/expiry/focus, correct rehearsal targeting and visible errors. GPT-6.1 Sol high agents audited backend/UI; one added deterministic ownership/rollback tests during an exclusive test-writing interval and one verified hidden browser behavior. Root remained sole production writer. Verification of these contributions is self-verification; see P05-codex-closure.md. No live Twitch or real OBS write, no new recording/dependencies, and no P06 implementation.

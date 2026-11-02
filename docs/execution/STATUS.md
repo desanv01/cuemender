@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 2.8
-Last update: 2026-11-02T06:07Z
+Revision: 2.9
+Last update: 2026-11-02T06:42Z
 Current packet: P05
-Current state: ready_for_review
+Current state: accepted_local
 Current owner: Codex
-Released packet revision: P05-R02 v1.0 against P05 v1.1, CONTRACTS v1.5/C11 and visual brief v1.0
-Code writer active: none
+Released packet revision: none active; P05 v1.1/R02 locally completed under D36
+Code writer active: none; DeepSeek and Codex implementation agents stopped
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -44,21 +44,21 @@ P03 closure checkpoint: separate Codex implementation/self-verification commit f
 Deferred Twitch tracking: https://github.com/desanv01/cuemender/issues/6
 Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-closure-review.md
 Closure record: docs/execution/handoffs/P04-codex-build.md
-Implementation: P04 conditionally accepted under D34; P05-R01 reviewed, remaining corrections required
+Implementation: P05 accepted locally after R02 and Codex closure; real gates remain deferred under D34
 Environment note: docs/implementation/P01-environment.md
-Review: docs/execution/handoffs/P05-R01-review.md — independent review; original eight fixed, three new regressions fail
+Review: docs/execution/handoffs/P05-codex-closure.md — Codex implementation/self-verification; prior worker review retained as history
 Correction: docs/execution/corrections/P05-R02.md; worker checkpoint 8275fca
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: Codex reviews P05-R02 actual changes and evidence, including typed/HTTP and production-protocol feedback/closure, generation-coherent simulated provider, UI targeting/focus, Node/Go/race results and the remaining atomic-scenario/visual limits. P06 remains held.
+Next action: prepare/release P06 separately from the accepted local P05 baseline. No active worker dispatch. Live Twitch/OBS approval pending.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
 P04 merge: 6c09f11178f8bed8230d000cfd2652b74ea68265
 P05 tracking: https://github.com/desanv01/cuemender/issues/12
-P05 integration PR: https://github.com/desanv01/cuemender/pull/13 — draft; corrections required, not merged
-P05 checkpoints: initial worker 3ebf6be; first review e6308fd; R01 worker 8275fca; subsequent review commit in branch history
+P05 integration PR: https://github.com/desanv01/cuemender/pull/13 — local acceptance authorized for integration; GitHub records final merge state
+P05 checkpoints: initial worker 3ebf6be; first review e6308fd; R01 worker 8275fca; R02 worker 8008ced; Codex fixes 5540440; final test/acceptance checkpoint in PR #13
 P05 started at (UTC): 2026-11-02T04:19Z
 P05 finished at (UTC): 2026-11-02T04:42Z
 P05-R01 started at (UTC): 2026-11-02T04:55Z
@@ -78,7 +78,7 @@ P02 setup: docs/implementation/P02-setup.md
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
 | P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 subsequently released under D32 |
 | P04 | conditionally accepted local development baseline; real approval pending | P04-review.md + D34 | Integrated via PR #11; issue #10 stays open |
-| P05 | ready_for_review — P05-R02 corrections; atomic-scenario/visual acceptance gaps recorded | P05-R01-review.md | Codex acceptance or consolidated corrections; P06 held |
+| P05 | accepted local baseline; real journey deferred | P05-codex-closure.md + D34/D36 | No worker dispatch; integrate PR #13 |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
 | Submission | planned | Not started | Release review and user-controlled external steps |
 
