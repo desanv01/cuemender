@@ -1,12 +1,12 @@
 # Execution status
 
-Revision: 3.0
-Last update: 2026-11-02T11:33Z
+Revision: 3.1
+Last update: 2026-11-02T12:24Z
 Current packet: P06
-Current state: ready
+Current state: accepted — local P06 release scope under D37; authenticated/live repair and submission gates pending
 Current owner: Codex
 Released packet revision: P06 v1.1 on locally accepted P05 and accepted D37/C12 receive-only fallback; worker launch prompt in PROMPTS.md.
-Code writer active: none; Codex implementation/tests complete, DeepSeek not yet dispatched
+Code writer active: none — DeepSeek stopped; Codex owns release coordination
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
 R01 started at (UTC): 2026-11-01T17:24Z
@@ -51,7 +51,7 @@ Correction: docs/execution/corrections/P05-R02.md; worker checkpoint 8275fca
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: dispatch one DeepSeek worker with P06 v1.1 prompt after Codex Git checkpoint. D37 receive-only real offline-channel/read-only-OBS evidence passed; original authenticated Twitch and real OBS approval remain pending.
+Next action: Codex checkpoints accepted P06 source, completes PR/merge and rebuilds/verifies a clean-source ZIP; then recording/submission plan. See handoffs/P06-review.md. Authenticated Twitch/real OBS approval remain pending under #6/#10.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
@@ -65,6 +65,8 @@ P05-R01 started at (UTC): 2026-11-02T04:55Z
 P05-R01 finished at (UTC): 2026-11-02T05:05Z
 P05-R02 started at (UTC): 2026-11-02T05:51Z
 P05-R02 finished at (UTC): 2026-11-02T06:07Z
+P06 started at (UTC): 2026-11-02T11:49Z
+P06 finished at (UTC): 2026-11-02T12:02Z
 P05 expected report: docs/execution/handoffs/P05-worker-report.md
 P05 design brief: docs/execution/P05-VISUAL-BRIEF.md; 12ui retry authorized but service budget exhausted, no generated design claim
 Additional deferred evidence: real P05-A/V14 end-to-end journey and final V18/V19; local protocol/rehearsal work proceeds
@@ -79,7 +81,7 @@ P02 setup: docs/implementation/P02-setup.md
 | P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 subsequently released under D32 |
 | P04 | conditionally accepted local development baseline; real approval pending | P04-review.md + D34 | Integrated via PR #11; issue #10 stays open |
 | P05 | accepted local baseline; real journey deferred | P05-codex-closure.md + D34/D36 | No worker dispatch; integrate PR #13 |
-| P06 | planned / held | Not started | Codex acceptance of P05 and release |
+| P06 | accepted locally — Codex fixes, full checks and actual ZIP extraction passed | P06-review.md | Git release checkpoint; final live/submission gates remain |
 | Submission | planned | Not started | Release review and user-controlled external steps |
 
 ## Known prerequisites

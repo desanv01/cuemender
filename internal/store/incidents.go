@@ -513,6 +513,57 @@ func (s *Store) CloseIncident(ctx context.Context, id, outcome, sessionID string
 	return inc, nil
 }
 
+// ClearHistory deletes completed incidents and cascaded detail. Any pending
+// or uncertain action blocks the whole operation so recovery evidence remains.
+func (s *Store) ClearHistory(ctx context.Context) (int, error) {
+	ids, err := s.ClearHistoryIDs(ctx)
+	return len(ids), err
+}
+
+// ClearHistoryIDs returns only IDs whose deletion committed. Callers can remove
+// those exact entries from caches without fallible reads after the commit.
+func (s *Store) ClearHistoryIDs(ctx context.Context) ([]string, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var pending int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM actions WHERE status IN (?,?,?,?)`,
+		domain.ActionReserved, domain.ActionIntent, "write_sent", domain.TrackRepairUnknown).Scan(&pending); err != nil {
+		return nil, err
+	}
+	if pending > 0 {
+		return nil, domain.ErrClosureIneligible
+	}
+	rows, err := tx.QueryContext(ctx, `DELETE FROM incidents WHERE stage IN (?,?,?,?) RETURNING id`,
+		domain.StageDismissed, domain.StageClosed, domain.StageExpired, domain.StageInvalidated)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	closeErr := rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 // InterruptOpenIncidents closes prior-session work at startup. It never
 // auto-monitors or replays work.
 func (s *Store) InterruptOpenIncidents(ctx context.Context, now time.Time) error {

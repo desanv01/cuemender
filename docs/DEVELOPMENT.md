@@ -1,15 +1,28 @@
-# CueMender — development and foundation testing
+# CueMender — development and testing
 
-CueMender is a local Windows stream-diagnostics application. The repository
-contains the accepted P01 foundation plus P02 Twitch/OBS connection setup:
-embedded private-control and public-overlay pages, a one-time local session,
-validated SQLite expectations, public-client Twitch authorization, EventSub chat
-intake, and read-only local OBS discovery/observations.
+CueMender includes P01–P06 local functionality: connection setup, diagnostics,
+incidents/feedback, privately approved track addition, isolated rehearsal and
+Windows packaging. Receive-only Twitch chat has separate channel-scoped storage
+and no replies or repair capability. Actual offline-channel chat and local OBS
+reads are verified; authenticated EventSub and approved real OBS repair remain
+pending in issues #6/#10. Fixtures and rehearsal do not establish those gates.
+See [P06 review](execution/handoffs/P06-review.md).
 
-Live Twitch and OBS behavior has **not** been validated in this workspace: no
-Twitch Public client is registered and OBS's WebSocket server is disabled.
-Fixture tests are not live evidence. Diagnostics, approvals and the supported
-track correction remain later packets.
+## Release packaging
+
+With Go 1.27.3 installed, run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1 -Version 1.0.0
+```
+
+Bypass applies only
+to that process, not machine policy. The script resolves its own project root;
+`-Offline` uses already cached modules. A fresh clone may need module downloads.
+It emits a CGo-free Windows ZIP, BUILD-MANIFEST.json inside the ZIP, and
+SHA256SUMS.txt beside it. Dirty source is labeled `-dirty`; publish only an
+artifact rebuilt from the reviewed clean checkpoint. This is recipe
+repeatability, not byte-identical archives: timestamps vary.
 
 ## Requirements
 
@@ -33,7 +46,7 @@ $env:GOTMPDIR = "$PWD\.tools\gotmp"
 $env:PATH = "$env:GOROOT\bin;$env:PATH"
 
 go version
-go mod tidy
+go mod download
 gofmt -w ./cmd ./internal ./web
 go test ./...
 go vet ./...
@@ -68,11 +81,14 @@ application if the link expires or has already been used.
 | Flag | Behavior |
 |---|---|
 | `--mode MODE` | Immutable runtime mode: `live` (default) or `rehearsal`. |
-| `--data-dir PATH` | Isolate configuration and SQLite data. Supports spaces and Unicode. In rehearsal this is the base; effective data is `PATH\rehearsal`. |
+| `--receive-only-channel LOGIN` | Live-only optional receive-only Twitch IRC chat for a lowercase channel login. Uses `receive-only/LOGIN` storage; no OAuth, replies or OBS repairs. |
+| `--data-dir PATH` | Isolate configuration and SQLite data. Supports spaces and Unicode. In rehearsal this is the base; effective data is `PATH\rehearsal`. In receive-only this is the base; effective data is `PATH\receive-only\LOGIN`. |
 | `--listen ADDRESS` | Override the loopback listen address, e.g. `127.0.0.1:8788`. |
 | `--no-browser` | Do not open a browser; print the link for manual use. |
 | `--session-only-secrets` | Explicit memory-only credential mode for this process. Rehearsal always uses memory-only secrets. |
 | `--version` | Print version/build metadata and exit without touching data. |
+
+Each effective data directory is protected by an OS advisory lock (`.cuemender.lock`). A second CueMender process using the same live, rehearsal or receive-only directory is rejected even when it uses a different HTTP port. The lock is released on normal shutdown and on failed startup; a stale lock file alone does not block a later process. Separate directories can run concurrently.
 
 Rehearsal is structurally isolated: it constructs no Twitch/OBS managers, sockets, senders or OS-keyring store. It uses an in-process simulated provider and a child data directory whose SQLite database is marked rehearsal. A live process pointed at that database, or a rehearsal process pointed at an existing unmarked/live database, fails with a mode conflict. Rehearsal UI and projections always carry the REHEARSAL label. Live Twitch and real OBS approval remain deferred; rehearsal is not live evidence.
 
@@ -106,6 +122,10 @@ are rejected. A malformed file is reported and left untouched.
 - `POST /api/v1/obs/connect` — connect read-only to local OBS WebSocket.
 - `POST /api/v1/obs/disconnect` — cancel reads and invalidate observations.
 - `GET /api/v1/obs/discovery` — authorized discovery snapshot.
+- `POST /api/v1/incidents/{id}/close` — explicit broadcaster closure outcome.
+- `POST /api/v1/history/clear` — clear completed history; blocked while diagnostic or unreconciled action recovery evidence is pending.
+- `POST /api/v1/rehearsal/scenario`, `/report`, `/feedback` — rehearsal-only fixed controls; rejected in live mode.
+- `POST /api/v1/twitch/receive-only/connect` — explicit receive-only channel confirmation in a receive-only launch; no OAuth or replies.
 - `GET /overlay/` — static public overlay.
 - `GET /public/v1/state` — sanitized public snapshot.
 - `GET /public/v1/events` — sanitized public SSE.
@@ -147,7 +167,7 @@ return HTTP 409 and never overwrite newer data.
   embeddable for OBS.
 - `--version` exits before creating a database.
 
-## Current limitations
+## Historical P02 verification snapshot (superseded by P06 above)
 
 - Live Twitch authorization/chat is deferred by the user due to 2FA/phone
   setup; live OBS reads are verified on OBS 32.1.1 / obs-websocket 5.7.3.
@@ -159,7 +179,7 @@ return HTTP 409 and never overwrite newer data.
   Linux race checks passed; see [the closure record](implementation/P02-codex-closure.md).
 - OBS reads are intentionally read-only in P02; no mutation route exists.
 
-## Next packet
+## Historical P02 handoff
 
 P03 adds evidence-based diagnostics and the persistent incident lifecycle. It is
 not part of P02; P03 v1.2 is released under the user's D30 sequencing decision.
@@ -169,7 +189,5 @@ See [execution status](execution/STATUS.md) for its current dispatch state.
 
 ## License
 
-No license has been selected. Dependency notices are recorded in
-[P02 compatibility](implementation/P02-compatibility.md) and
-[P01 environment](implementation/P01-environment.md); final repository
-licensing is a release decision.
+The owner selected MIT; see [LICENSE](../LICENSE) and the distribution
+[third-party notices](../release/THIRD_PARTY_NOTICES.md).

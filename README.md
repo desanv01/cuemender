@@ -24,7 +24,7 @@
   <a href="docs/DEVELOPMENT.md">Testing guide</a>
 </p>
 
-> **Development milestone:** connections, diagnostics and the private track-approval engine are implemented. Local tests and protocol fixtures are distinct from live evidence: Twitch verification and the real approved-repair trial remain pending. This is not yet the complete hackathon demo. See the [current verification record](docs/execution/handoffs/P04-review.md).
+> **Release scope:** Windows packaging, diagnostics, receive-only Twitch chat and isolated rehearsal are implemented. Real offline-channel chat-to-local-OBS diagnostics have been verified; authenticated EventSub and the real approved-repair trial remain pending. See the [P06 review](docs/execution/handoffs/P06-review.md) for release verification and limits.
 
 ## Why CueMender
 
@@ -83,7 +83,7 @@ The foundation supports OS credential storage or an explicitly selected memory-o
 
 ## Demo
 
-The development preview includes connection setup, private evidence and approval controls, and a separate public overlay. The steps below exercise only the foundation. For connection prerequisites, see [setup](docs/implementation/P02-setup.md); real Twitch and full approved-repair evidence remain pending.
+The application includes connection setup, diagnostic evidence, private approval controls and a separate public overlay. For a complete account-free simulated journey, run `cuemender.exe --mode rehearsal`, choose a scenario, start monitoring, send a simulated report and follow its evidence/approval/feedback controls. Rehearsal is labeled and cannot contact real Twitch or OBS. The following basic steps exercise the local settings surface. For real connection prerequisites, see [setup](docs/implementation/P02-setup.md).
 
 1. Build and run the application below.
 2. Open the one-time private control link printed in the console.
@@ -109,9 +109,20 @@ go build -trimpath -o .\dist\cuemender.exe .\cmd\app
 .\dist\cuemender.exe --no-browser
 ~~~
 
-The production build is verified with CGo disabled. Go and Node are not needed to run a compiled executable; Node is used only for the optional developer-side JavaScript regression fixture.
+### Install the Windows release
 
-A release ZIP has not been published yet. The portable toolchain in the original developer's workspace is ignored by Git and is not part of a fresh clone.
+The release ZIP contains `cuemender.exe`, this README, `README-QUICKSTART.md`, the MIT `LICENSE`, `THIRD_PARTY_NOTICES.md`, the patched-goobs attribution and dependency license texts. Extract it to a directory of your choice (spaces are supported) and run the executable; Go and Node are not required. The ZIP is built from source with `CGO_ENABLED=0` and embedded web assets. SHA-256 values are supplied with the local release artifact rather than fabricated online links.
+
+```powershell
+Expand-Archive .\cuemender-windows-x64-1.0.0.zip -DestinationPath "C:\Program Files\CueMender"
+& "C:\Program Files\CueMender\cuemender.exe" --receive-only-channel YOUR_LOGIN
+```
+
+Runtime data is stored under `%AppData%\LiveCheck` (live), `%AppData%\LiveCheck\rehearsal` (rehearsal), or `%AppData%\LiveCheck\receive-only\YOUR_LOGIN` (receive-only). `--data-dir` changes the base. To reset, stop CueMender and remove only the selected app-owned directory after exporting data you need; never pair a receive-only directory with an authenticated database. The executable refuses a second process using the same effective data directory.
+
+Troubleshooting: a Twitch chat write failure in receive-only mode is expected (there are no replies); OBS authentication errors usually mean the WebSocket password or endpoint changed; incomplete discovery means OBS is not on a supported scene/collection; a port conflict can be resolved with `--listen 127.0.0.1:8788`; OS keyring failures can be handled with `--session-only-secrets`; unknown action outcomes stay read-only until reconciled and cannot be closed or cleared while recovery is pending.
+
+The production build is verified with CGo disabled. Go and Node are not needed to run a compiled executable; Node is used only for the optional developer-side JavaScript regression fixture. The portable toolchain in the original developer's workspace is ignored by Git and is not part of a fresh clone.
 
 ### Open the controls
 
@@ -141,7 +152,7 @@ For compatibility with the initial foundation, the default data directory remain
 
 Codex defined the architecture and execution contracts, reviewed DeepSeek's work, implemented connection/diagnostic closure fixes, and implemented the P04 approval-and-repair engine with its tests.
 
-DeepSeek implemented P01–P03 and their worker corrections. Codex implemented P04 using the main chat and user-requested GPT-6.1 Sol high subagents with one writer at a time. Genuine main-chat build footage was recorded; final video editing and the live demonstration are still pending. Codex's tests of its own code are self-verification, with separately recorded peer inspection.
+DeepSeek implemented P01–P03, P05 and P06 worker packets and corrections. Codex implemented P04 using the main chat and user-requested GPT-6.1 Sol high subagents with one writer at a time, completed integration/release fixes, and implemented the receive-only fallback. Genuine main-chat build footage was recorded; final video editing and submission remain pending. Codex's tests of its own code are self-verification, with separately recorded peer inspection where performed.
 
 [Actual contribution record →](docs/execution/CONTRIBUTIONS.md) · [Foundation acceptance →](docs/execution/handoffs/P01-R01-review.md)
 
@@ -159,7 +170,7 @@ One local process, with no separate frontend server or cloud database.
 
 - **Accepted:** application lifecycle, validated persistence, local private sessions, CSRF protection, separate public/private state, embedded pages, and the corrected reload/concurrency/shutdown/error-redaction paths.
 - **Implemented locally:** Twitch/OBS connections, three diagnoses, persistent incidents/feedback, and the private track-approval engine with durable intent, one dispatch, read-back and read-only recovery.
-- **Next:** P01–P05 are locally complete. Receive-only chat is implemented under D37; P06 packaging follows its acceptance. Authenticated Twitch and real approved OBS repair gates remain pending.
+- **Release scope:** P01–P06 local implementation and release packaging; receive-only chat is included under D37. Authenticated Twitch and real approved OBS repair gates remain pending under issues #6/#10. Final demo and submission are separate work.
 - **Outside the MVP:** automatic unmute or source reveal, raw audio analysis, computer vision, OS-device repair, multiple channels and autonomous control.
 - **Verification limits:** local OAuth/EventSub/OBS protocol servers and headless rendered-browser checks do not prove live Twitch behavior. P02 live OBS read-only evidence is recorded separately; it is not a P04 live-write trial. Final commands, race results and remaining gates are recorded in [P04 verification](docs/execution/handoffs/P04-review.md). OBS has no atomic compare-and-set against other clients; local track read-back does not prove viewer audio recovery.
 
@@ -178,4 +189,4 @@ One local process, with no separate frontend server or cloud database.
 
 ## License
 
-MIT has been selected by the owner; P06 will add the project LICENSE and distribution notices. Dependency license notes are recorded in [the environment report](docs/implementation/P01-environment.md).
+CueMender is [MIT licensed](LICENSE). Distribution notices, upstream bundled notices and patched-goobs attribution are preserved in [release/](release/THIRD_PARTY_NOTICES.md) and the Windows ZIP.

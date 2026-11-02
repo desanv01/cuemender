@@ -147,6 +147,13 @@ func (a *App) CloseIncident(ctx context.Context, incidentID, outcome string) (do
 	return a.coordinator.CloseIncident(ctx, incidentID, outcome)
 }
 
+func (a *App) ClearHistory(ctx context.Context) (int, error) {
+	if a.coordinator == nil {
+		return 0, domain.ErrUnavailable
+	}
+	return a.coordinator.ClearHistory(ctx)
+}
+
 func (a *App) ApproveProposal(ctx context.Context, id string, revision int64) (domain.Action, error) {
 	if a.anonymous != nil {
 		return domain.Action{}, domain.ErrModeConflict
