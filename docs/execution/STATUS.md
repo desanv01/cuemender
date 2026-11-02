@@ -1,11 +1,11 @@
 # Execution status
 
 Revision: 2.7
-Last update: 2026-11-02T04:42Z
+Last update: 2026-11-02T04:54Z
 Current packet: P05
-Current state: ready_for_review
+Current state: changes_required — P05-R01 v1.0 released; eight Codex review regressions fail
 Current owner: Codex
-Released packet revision: P05 v1.1, CONTRACTS v1.5/C11, P05-VISUAL-BRIEF v1.0; live gates deferred, not passed
+Released packet revision: P05-R01 v1.0 against P05 v1.1, CONTRACTS v1.5/C11 and visual brief v1.0
 Code writer active: none
 Started at (UTC): 2026-11-01T15:46Z
 P03 finished at (UTC): 2026-11-01T16:05Z
@@ -46,12 +46,12 @@ Previous report: docs/execution/handoffs/P02-worker-report.md and P02-codex-clos
 Closure record: docs/execution/handoffs/P04-codex-build.md
 Implementation: P04 local engine conditionally accepted for development under D34; P05 has not started
 Environment note: docs/implementation/P01-environment.md
-Review: docs/execution/handoffs/P04-review.md — self-verification plus separately recorded peer source inspection
-Correction: P03-R06 complete; no active correction dispatch
+Review: docs/execution/handoffs/P05-review.md — Codex independent review of DeepSeek implementation
+Correction: docs/execution/corrections/P05-R01.md; worker checkpoint 3ebf6be
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: Codex reviews P05 actual implementation/evidence, including rendered control surface, closure transaction, rehearsal isolation, overlay copy and unmet visual/live gates. P06 remains held.
+Next action: dispatch P05-R01 to one DeepSeek worker using PROMPTS.md. Preserve review assertions and complete named boundaries; P06 held.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
@@ -72,7 +72,7 @@ P02 setup: docs/implementation/P02-setup.md
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
 | P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 subsequently released under D32 |
 | P04 | conditionally accepted local development baseline; real approval pending | P04-review.md + D34 | Integrated via PR #11; issue #10 stays open |
-| P05 | ready_for_review — local P05 implementation/verification; mobile/live gates unmet | P05-worker-report.md | Codex acceptance or consolidated corrections; P06 held |
+| P05 | changes required; P05-R01 released | P05-review.md, eight failing review tests | One correction worker; P06 held |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
 | Submission | planned | Not started | Release review and user-controlled external steps |
 
@@ -121,3 +121,5 @@ Codex-owned implementation: P04 plus needed integration/debugging work after han
 - 2026-11-01: P02 reviewed with changes required. Existing Go/Node checks/build passed, but seven added review regressions failed. Codex authored review fixtures/documents only; released P02-R01 v1.0 (eight correction groups), opened issue #4 and updated issue #2. P02 remains unmerged; P03 held; live gates unmet.
 - 2026-11-01: R01 re-review confirmed seven original regressions fixed and existing suite passing; seven remaining-path regressions fail. P02-R02 issued under existing issue #4. Manual OBS Connect after restart approved as D25. No production fixes by Codex; P03 remains held.
 - 2026-11-01: R02 re-review confirmed fourteen earlier regressions plus Go/Node checks, vet/build and five active-SSE shutdown runs pass. Six new review fixtures fail: OBS Hello cancellation, stale readiness, unknown starting context, discovery revision relabelling, delayed handover intake and disconnect maintenance cancellation. P02-R03 consolidates unfinished R02 scope; review fixtures/documents only authored by Codex. No P02 commit/PR/merge; P03 held.
+
+Pending live runbook: docs/execution/LIVE-VERIFICATION.md — retained at user request; live hold unchanged.
