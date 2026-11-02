@@ -88,3 +88,5 @@ The HTTP contract specifies the bootstrap and SSE behavior. Loopback HTTP is an 
 Prefer small consumer-owned interfaces and typed results over a universal event bus. Keep vendor SDK types inside adapters. P01 does not implement imaginary versions of goobs interfaces; P02 records the actual pinned SDK methods and protocol fields. Contract changes come to Codex with evidence.
 
 One adapter instance graph per run: live or rehearsal. Never switch a live writer into rehearsal by changing only a boolean in the UI.
+
+P05/C11 resolution: constructor-owned immutable mode selects the graph before provider/secret initialization. Live defaults/names stay compatible. Rehearsal uses a child data directory, mode-owned DB and isolated memory secrets; no live manager, dialer, sender or OS-keyring constructor. Shared coordinator/diagnostics/approval operate with matching mode provenance through narrow seams. C11 owns route schemas and storage/mode migration decisions.

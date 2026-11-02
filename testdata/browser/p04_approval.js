@@ -45,7 +45,7 @@ snapshot.actions = [];
 let requests = [];
 let stateListener = null;
 const sandbox = {
-  document: { getElementById: node, createElement: () => fakeNode('') },
+  document: { getElementById: node, createElement: () => { const n=fakeNode(''); const data=n.dataset; Object.defineProperty(n,'dataset',{get:()=>data}); return n; } },
   location: { hash: '', pathname: '/control/', search: '' },
   history: { replaceState() {} },
   URLSearchParams, Option: FakeOption,
@@ -73,6 +73,19 @@ setImmediate(async () => {
   if (!approve || approve.disabled) problems.push('eligible approval missing or disabled');
   const text = controls().map((entry) => entry.textContent).join(' ');
   if (!text.includes('<private mic>') || !text.includes('track1=true') || !text.includes('Other findings remain')) problems.push('exact target/preservation/remaining findings copy missing');
+  // Expiry/action-only SSE must update eligibility even before any click.
+  const future=snapshot.proposals[0].expires_at;
+  snapshot.proposals[0].expires_at=new Date(Date.now()-1).toISOString();
+  stateListener({data:JSON.stringify(snapshot)});
+  if (!controls().find(n=>n.textContent==='Approve track addition')?.disabled) problems.push('unclicked expiry left approval enabled');
+  snapshot.proposals[0].expires_at=future;
+  snapshot.actions=[{id:'unknown',incident_id:'inc-fixture',status:'unknown',detail_code:'fixture',created_at:new Date().toISOString()}];
+  stateListener({data:JSON.stringify(snapshot)});
+  if (controls().some(n=>n.textContent==='Recheck')) problems.push('action-only update left recheck available');
+  if (!controls().some(n=>n.textContent.includes('Local action: unknown'))) problems.push('action-only result absent');
+  snapshot.actions=[];
+  stateListener({data:JSON.stringify(snapshot)});
+  approve=controls().find(n=>n.textContent==='Approve track addition');
   if (approve) await approve.handlers.click();
   const post = requests.find((entry) => entry.url.endsWith('/approve'));
   if (!post || post.csrf !== 'FIXTURE_CSRF' || post.body !== JSON.stringify({ expected_revision: 2 })) problems.push('approval did not send only revision with CSRF');
@@ -86,6 +99,11 @@ setImmediate(async () => {
   snapshot.actions[0].status = 'verified'; snapshot.actions[0].reconciled = true; snapshot.incidents[0].stage = 'awaiting_feedback'; snapshot.incidents[0].local_verification = 'verified'; snapshot.state_revision++;
   stateListener({ data: JSON.stringify(snapshot) });
   if (!controls().some((entry) => entry.textContent.includes('does not establish who changed it or viewer recovery'))) problems.push('reconciled outcome falsely attributes recovery');
+  snapshot.state_revision=100; snapshot.incidents[0].stage='closed'; snapshot.incidents[0].closure_outcome='viewer_confirmed';
+  stateListener({data:JSON.stringify(snapshot)});
+  snapshot.state_revision=99; snapshot.incidents[0].stage='awaiting_feedback';
+  stateListener({data:JSON.stringify(snapshot)});
+  if (!controls().some(n=>n.textContent.includes('Persisted closure: viewer_confirmed'))) problems.push('stale state response overwrote newer SSE');
   console.log(JSON.stringify({ fixture: 'P04 actual control script', problems }, null, 2));
   if (problems.length) process.exitCode = 1;
 });

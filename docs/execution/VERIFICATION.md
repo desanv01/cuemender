@@ -4,7 +4,7 @@ Revision: 1.1 • Initial status of every row: NOT RUN.
 
 Current sequencing exception (D30): V06 and P03-D real-chat integration are deferred/unmet in issue #6 while the user's Twitch 2FA is blocked. P03 local implementation may proceed; neither these gates nor V18's full live workflow are waived. See STATUS and actual reports for current evidence rather than the original initial-status label.
 
-P04 local implementation evidence is in [P04-review.md](handoffs/P04-review.md). V12/V13 and local V11 protocol/browser coverage are recorded separately from **unmet real V11**. The active-monitoring connection gate is retained; no live Twitch or real approved OBS write was performed in P04. P05 remains held.
+P04 local evidence is in [P04-review.md](handoffs/P04-review.md). V12/V13 and local V11 coverage remain separate from **unmet real V11**. Under user decision D34, P05 may proceed with local protocols/rehearsal; real V06, P03-D, V11, dependent real P05-A/V14 and final V18/V19 stay deferred/unmet. No production guard is weakened. P06 remains held; rehearsal isolation V15 still requires actual composition tests.
 
 For DeepSeek packets, the worker fills its report and Codex reviews the implementation. For Codex-owned P04 and direct Codex fixes, record build evidence and self-verification explicitly; do not call it independent review. Mocked tests, local browser checks and actual Twitch/OBS checks are separate evidence classes.
 
@@ -49,3 +49,8 @@ P06: test the shipped artifact and actual run instructions. Don't assume source 
 Each command records working directory, command, exit code/result and relevant summary. Include failure output only after redacting secrets. Skipped means skipped, with cause and owner for follow-up. Live setup problems are reported without blocking independent fixture checks, but a required live acceptance gate is not marked passed.
 
 For Go race testing, use a supported runner/toolchain with the necessary C compiler. Race instrumentation may require CGo even though the release build does not; report this distinction. Do not install an unrelated compiler merely to remove a skipped label under time pressure.
+
+
+## P05 Codex local closure — 2026-11-02
+
+P05 local implementation is accepted after the worker R02 checkpoint and Codex takeover. Authoritative final evidence: [P05 closure](handoffs/P05-codex-closure.md). Previous worker remaining-gap lists are historical. Coordinator-owned transactional scenario replacement and deterministic diagnosis/approval/reconciliation/rollback boundaries now pass. Typed report/feedback results and provider provenance guards are verified. Full Go/vet/CGo-free build, six Node fixtures and the WSL race rerun passed; one earlier race fixture assertion failed and its unresolved root cause is recorded. Hidden-browser checks cover four rehearsal scenarios, feedback/closure/reload, 390px layout, CSS 200% reflow, measured contrast, focus/selection stability and overlay reconnect. A rendered production-composition journey against local protocol fixtures also passed, including separate synthetic viewer feedback and closure. Native browser-menu zoom and a comprehensive screen-reader audit were not performed. These are local/self-verification results, not live evidence. Real Twitch #6, real OBS approval #10 and dependent real V14/V18/V19 stay pending under D34. P06 has not started.

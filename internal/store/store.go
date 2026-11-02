@@ -118,15 +118,29 @@ CREATE TABLE actions (
 );
 CREATE INDEX actions_status ON actions(status);
 `},
+	{version: 4, sql: `
+CREATE TABLE IF NOT EXISTS db_meta (
+ key TEXT PRIMARY KEY,
+ value TEXT NOT NULL
+);
+`},
 }
 
 // Store owns the local SQLite database. SQL and schema details stay here.
 type Store struct {
 	db   *sql.DB
 	path string
+	mode string
 }
 
 func Open(ctx context.Context, path string) (*Store, error) {
+	return OpenMode(ctx, path, domain.ModeLive)
+}
+
+func OpenMode(ctx context.Context, path, mode string) (*Store, error) {
+	if mode != domain.ModeLive && mode != domain.ModeRehearsal {
+		return nil, domain.ErrModeConflict
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolve database path: %w", err)
@@ -154,11 +168,62 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("configure foreign keys: %w", err)
 	}
 
+	var schemaVersion int
+	var schemaTable int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_migrations'`).Scan(&schemaTable); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("inspect schema metadata: %w", err)
+	}
+	if schemaTable > 0 {
+		if err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&schemaVersion); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("inspect schema version: %w", err)
+		}
+	}
+	var priorMode string
+	if schemaVersion > 0 {
+		var metaTable int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='db_meta'`).Scan(&metaTable); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("inspect mode metadata: %w", err)
+		}
+		if metaTable > 0 {
+			if err := db.QueryRowContext(ctx, `SELECT value FROM db_meta WHERE key = 'mode'`).Scan(&priorMode); err != nil && err != sql.ErrNoRows {
+				db.Close()
+				return nil, fmt.Errorf("read database mode: %w", err)
+			}
+		}
+		if priorMode != "" && priorMode != mode {
+			db.Close()
+			return nil, fmt.Errorf("%w: database is %s, requested %s", domain.ErrModeConflict, priorMode, mode)
+		}
+		if priorMode == "" && mode == domain.ModeRehearsal {
+			db.Close()
+			return nil, fmt.Errorf("%w: existing unmarked database is live-only", domain.ErrModeConflict)
+		}
+	}
 	s := &Store{db: db, path: abs}
 	if err := s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, err
 	}
+	if priorMode == "" {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			db.Close()
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO db_meta(key, value) VALUES('mode', ?)`, mode); err != nil {
+			tx.Rollback()
+			db.Close()
+			return nil, fmt.Errorf("mark database mode: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("commit database mode: %w", err)
+		}
+	}
+	s.mode = mode
 	return s, nil
 }
 
@@ -170,6 +235,7 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) Path() string { return s.path }
+func (s *Store) Mode() string { return s.mode }
 
 func (s *Store) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `

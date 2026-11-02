@@ -12,7 +12,7 @@
       <h1>CueMender</h1>
       <p class="subtitle">Community-assisted stream diagnostics · connection setup</p>
     </div>
-    <span class="badge">Diagnostics and approved track repair</span>
+    <span id="mode-badge" class="badge">LIVE</span>
   </header>
 
   <main>
@@ -23,7 +23,15 @@
     </section>
 
     <section id="app" hidden>
-      <section class="panel" aria-labelledby="status-heading">
+      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+      <nav id="section-tabs" class="tabs" aria-label="Control sections">
+        <button type="button" data-section="setup">Setup</button>
+        <button type="button" data-section="monitor" class="active">Monitor</button>
+        <button type="button" data-section="rehearsal" id="rehearsal-tab" hidden>Rehearsal</button>
+      </nav>
+      <p id="mode-watermark" class="rehearsal-watermark" hidden>REHEARSAL — simulated data; no live provider or credential call.</p>
+
+      <section class="panel" data-section="setup" aria-labelledby="status-heading">
         <div class="panel-heading">
           <h2 id="status-heading">Status</h2>
           <button id="refresh" type="button" class="secondary">Refresh</button>
@@ -37,9 +45,12 @@
           <div><dt>OBS</dt><dd id="obs">not connected</dd></div>
         </dl>
         <p class="note">Run manual checks, or connect Twitch and OBS to monitor community reports. Only adding the selected microphone to its confirmed track can be privately approved while monitoring. Mute and visibility changes remain manual.</p>
+        <label for="overlay-url">Public overlay URL</label>
+        <input id="overlay-url" type="text" readonly>
+        <div class="actions"><button id="overlay-copy" type="button" class="secondary">Copy overlay URL</button><span id="overlay-copy-status" class="muted" role="status"></span></div>
       </section>
 
-      <section class="panel" aria-labelledby="twitch-heading">
+      <section class="panel" data-section="setup" aria-labelledby="twitch-heading">
         <h2 id="twitch-heading">Twitch connection</h2>
         <p class="muted">Authorize the broadcaster's own channel with a Twitch Public client. No client secret is used.</p>
         <label for="twitch-client-id">Public client ID</label>
@@ -58,7 +69,7 @@
         <p id="twitch-receipt" class="muted">No commands received.</p>
       </section>
 
-      <section class="panel" aria-labelledby="obs-heading">
+      <section class="panel" data-section="setup" aria-labelledby="obs-heading">
         <h2 id="obs-heading">OBS connection</h2>
         <p class="muted">Local discovery and diagnostics. An exact private approval can add the selected mic to its confirmed track. Mute and visibility remain manual.</p>
         <label for="obs-address">WebSocket address</label>
@@ -97,7 +108,7 @@
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="setup-heading">
+      <section class="panel" data-section="setup" aria-labelledby="setup-heading">
         <h2 id="setup-heading">Declared expectations</h2>
         <p class="muted">Select from OBS discovery when connected, or enter identities manually. Live resolution is shown separately.</p>
         <form id="settings-form" novalidate>
@@ -105,10 +116,13 @@
             <legend>Microphone</legend>
             <label for="mic-name">OBS input name</label>
             <input id="mic-name" name="mic-name" type="text" maxlength="256" autocomplete="off" placeholder="e.g. Mic/Aux">
-            <label for="mic-uuid">Stable input UUID <span class="optional">(optional)</span></label>
-            <input id="mic-uuid" name="mic-uuid" type="text" maxlength="256" autocomplete="off">
-            <label for="mic-context">Context <span class="optional">(optional)</span></label>
-            <input id="mic-context" name="mic-context" type="text" maxlength="256" autocomplete="off">
+            <details class="advanced">
+              <summary>Advanced microphone identity</summary>
+              <label for="mic-uuid">Stable input UUID <span class="optional">(optional)</span></label>
+              <input id="mic-uuid" name="mic-uuid" type="text" maxlength="256" autocomplete="off">
+              <label for="mic-context">Context <span class="optional">(optional)</span></label>
+              <input id="mic-context" name="mic-context" type="text" maxlength="256" autocomplete="off">
+            </details>
           </fieldset>
 
           <fieldset>
@@ -135,28 +149,32 @@
             <fieldset id="visual-fields" class="nested" disabled>
               <label for="visual-scene">Scene name</label>
               <input id="visual-scene" type="text" maxlength="256" autocomplete="off">
-              <label for="visual-scene-uuid">Stable scene UUID <span class="optional">(optional)</span></label>
-              <input id="visual-scene-uuid" type="text" maxlength="256" autocomplete="off">
               <label for="visual-item">Scene item ID</label>
               <input id="visual-item" type="text" maxlength="256" autocomplete="off">
               <label for="visual-source">Source name</label>
               <input id="visual-source" type="text" maxlength="256" autocomplete="off">
-              <label for="visual-source-uuid">Stable source UUID <span class="optional">(optional)</span></label>
-              <input id="visual-source-uuid" type="text" maxlength="256" autocomplete="off">
-              <label for="visual-context">Context <span class="optional">(optional)</span></label>
-              <input id="visual-context" type="text" maxlength="256" autocomplete="off">
+              <details class="advanced">
+                <summary>Advanced scene/source identity</summary>
+                <label for="visual-scene-uuid">Stable scene UUID <span class="optional">(optional)</span></label>
+                <input id="visual-scene-uuid" type="text" maxlength="256" autocomplete="off">
+                <label for="visual-source-uuid">Stable source UUID <span class="optional">(optional)</span></label>
+                <input id="visual-source-uuid" type="text" maxlength="256" autocomplete="off">
+                <label for="visual-context">Context <span class="optional">(optional)</span></label>
+                <input id="visual-context" type="text" maxlength="256" autocomplete="off">
+              </details>
             </fieldset>
           </fieldset>
 
           <div class="actions">
             <button id="save" type="submit">Save expectations</button>
-            <span id="notice" class="notice" role="status" aria-live="polite"></span>
+
           </div>
         </form>
       </section>
 
-      <section class="panel" aria-labelledby="monitoring-heading">
+      <section class="panel" data-section="monitor" aria-labelledby="monitoring-heading">
         <h2 id="monitoring-heading">Monitoring and incidents</h2>
+        <p id="monitor-context" class="muted">Connection and readiness status appears here.</p>
         <p class="muted">Reports create bounded incidents. Manual checks use a fresh read-only OBS observation. An eligible microphone track finding can offer one expiring private approval.</p>
         <div class="actions">
           <button id="monitor-start" type="button">Start monitoring</button>
@@ -168,6 +186,25 @@
         </div>
         <p id="monitor-status" class="connection-status">Monitoring is stopped.</p>
         <div id="incident-list"></div>
+      </section>
+
+      <section id="rehearsal-panel" class="panel" aria-labelledby="rehearsal-heading" hidden>
+        <h2 id="rehearsal-heading">Rehearsal scenario</h2>
+        <p class="muted">Simulated in-process providers only. Approval performs one simulated write/read-back; unknown_write deliberately reports an uncertain outcome. Rehearsal is not live evidence.</p>
+        <label for="rehearsal-scenario">Scenario</label>
+        <select id="rehearsal-scenario">
+          <option value="track_missing">Track missing → approve → simulated verified</option>
+          <option value="mic_muted">Microphone muted (manual only)</option>
+          <option value="wrong_scene">Wrong scene limitation</option>
+          <option value="unknown_write">Unknown write → read-only reconcile</option>
+        </select>
+        <div class="actions">
+          <button id="rehearsal-apply" type="button">Apply scenario</button>
+          <button id="rehearsal-report" type="button" class="secondary">Simulate viewer report</button>
+          <button id="rehearsal-feedback-fixed" type="button" class="secondary">Simulate !fixed</button>
+          <button id="rehearsal-feedback-broken" type="button" class="secondary">Simulate !stillbroken</button>
+        </div>
+        <p id="rehearsal-status" class="muted" role="status" aria-live="polite">No scenario applied.</p>
       </section>
     </section>
   </main>

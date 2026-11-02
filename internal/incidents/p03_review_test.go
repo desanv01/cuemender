@@ -63,7 +63,7 @@ func TestReviewP03RejectIneligibleFeedback(t *testing.T) {
 	_, list := c.Snapshot()
 	inc := list[0]
 	if inc.Stage != domain.StageFindingAvailable {
-		t.Fatalf("fixture stage %s", inc.Stage)
+		t.Fatalf("fixture stage %s: checks=%+v", inc.Stage, inc.Checks)
 	}
 	c.HandleFeedback(context.Background(), "fixed", inc.PublicID, "b")
 	got, _ := c.Find(inc.ID)

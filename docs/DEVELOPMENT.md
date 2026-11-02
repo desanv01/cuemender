@@ -67,13 +67,14 @@ application if the link expires or has already been used.
 
 | Flag | Behavior |
 |---|---|
-| `--data-dir PATH` | Isolate configuration and SQLite data. Supports spaces and Unicode. |
+| `--mode MODE` | Immutable runtime mode: `live` (default) or `rehearsal`. |
+| `--data-dir PATH` | Isolate configuration and SQLite data. Supports spaces and Unicode. In rehearsal this is the base; effective data is `PATH\rehearsal`. |
 | `--listen ADDRESS` | Override the loopback listen address, e.g. `127.0.0.1:8788`. |
 | `--no-browser` | Do not open a browser; print the link for manual use. |
-| `--session-only-secrets` | Explicit memory-only credential mode for this process. |
+| `--session-only-secrets` | Explicit memory-only credential mode for this process. Rehearsal always uses memory-only secrets. |
 | `--version` | Print version/build metadata and exit without touching data. |
 
-`--mode` and future integration flags are intentionally not accepted in P01.
+Rehearsal is structurally isolated: it constructs no Twitch/OBS managers, sockets, senders or OS-keyring store. It uses an in-process simulated provider and a child data directory whose SQLite database is marked rehearsal. A live process pointed at that database, or a rehearsal process pointed at an existing unmarked/live database, fails with a mode conflict. Rehearsal UI and projections always carry the REHEARSAL label. Live Twitch and real OBS approval remain deferred; rehearsal is not live evidence.
 
 ## Configuration
 

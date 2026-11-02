@@ -2,8 +2,13 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '' };
+  const queryAll = (selector) => typeof document.querySelectorAll === 'function' ? Array.from(document.querySelectorAll(selector)) : [];
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor', sectionChosen: false, closeOutcomes: {}, rehearsalPublicID: '', appliedScenario: '', approving: new Set() };
   let events = null;
+  try {
+    const saved = sessionStorage.getItem('cuemender-control-section');
+    if (['setup','monitor','rehearsal'].includes(saved)) { state.section = saved; state.sectionChosen = true; }
+  } catch (_) { /* Storage is optional; never store secrets. */ }
 
   class ApiError extends Error {
     constructor(status, body) {
@@ -117,7 +122,8 @@
       setText('obs-broadcast', 'Broadcasting state unknown.');
     }
     setText('obs-stale', value.stale ? 'Observation data is stale.' : '');
-    setText('obs-readiness', setup && setup.live_obs_resolution_ready ? 'Live resolution ready.' : 'Live resolution not ready.');
+    const readiness = setup && setup.live_obs_resolution_ready ? 'Live resolution ready.' : 'Live resolution not ready.';
+    setText('obs-readiness', state.mode === 'rehearsal' ? 'Simulated provider resolution ready.' : readiness);
     setText('obs-observed', value.observed_at ? 'Observed at ' + value.observed_at : 'Observation time unknown.');
     if (startup && startup.obs_address && !$('obs-address').value) {
       $('obs-address').value = startup.obs_address;
@@ -254,7 +260,35 @@
     state.actionRecords = Array.isArray(privateState.actions) ? privateState.actions : [];
     state.incidents = Array.isArray(privateState.incidents) ? privateState.incidents : [];
     setText('monitor-status', active ? 'Monitoring active' + (session && session.id ? ' (session ' + session.id.slice(0, 8) + '…)' : '') : 'Monitoring is stopped.');
+    const tw = privateState.twitch ? privateState.twitch.status : 'not connected';
+    const obs = privateState.obs ? privateState.obs.status : 'not connected';
+    const broadcast = privateState.obs && typeof privateState.obs.broadcasting === 'boolean' ? String(privateState.obs.broadcasting) : 'unknown';
+    setText('monitor-context', (state.mode === 'rehearsal' ? 'Simulated providers' : 'Local providers') + ' · Twitch: ' + tw + ' · OBS: ' + obs + ' · broadcast: ' + broadcast + ' · monitoring: ' + (active ? 'active' : 'stopped'));
     renderIncidents(state.incidents);
+  }
+
+  // Patch rendered evidence while preserving the actual keyed form controls.
+  // Moving focus back after replacing a select does not preserve its interaction.
+  function patchIncidentNode(old, fresh) {
+    if (!old || old.tagName !== fresh.tagName) return fresh;
+    old.className = fresh.className;
+    old.hidden = fresh.hidden;
+    if ('disabled' in fresh) old.disabled = fresh.disabled;
+    if (old.tagName === 'SELECT') return old;
+    if (!fresh.children.length) { old.textContent = fresh.textContent; return old; }
+    const previous = Array.from(old.children);
+    const used = new Set();
+    const wanted = Array.from(fresh.children).map((child, index) => {
+      const prior = child.id ? previous.find(n => n.id === child.id) : previous[index];
+      if (prior && !used.has(prior) && prior.id === child.id && prior.tagName === child.tagName) {
+        used.add(prior);
+        return patchIncidentNode(prior, child);
+      }
+      return child;
+    });
+    wanted.forEach((child, index) => { if (old.children[index] !== child) old.insertBefore(child, old.children[index] || null); });
+    for (const child of Array.from(old.children)) if (!wanted.includes(child)) child.remove();
+    return old;
   }
 
   function renderIncidents(incidents) {
@@ -262,14 +296,31 @@
     if (!list) {
       return;
     }
-    list.replaceChildren();
+    const focusedID = document.activeElement && document.activeElement.id ? document.activeElement.id : '';
+    const priorCards = Array.from(list.children || []);
+    const cards = [];
+    if (incidents.length && !priorCards.length) list.textContent = '';
     if (!incidents.length) {
       list.replaceChildren();
       list.textContent = 'No incidents in this session.';
       return;
     }
     for (const incident of incidents) {
+      const relatedProposals = (state.proposals || []).filter(p => p.incident_id === incident.id);
+      const relatedActions = (state.actionRecords || []).filter(a => a.incident_id === incident.id);
+      const signature = JSON.stringify({
+        incident: { ...incident, updated_at: undefined }, session: state.monitoringSessionId,
+        revision: state.currentRevision, proposals: relatedProposals, actions: relatedActions, approving: Array.from(state.approving),
+        expired: relatedProposals.map(p => Date.now() >= Date.parse(p.expires_at))
+      });
+      const prior = priorCards.find((card) => card.dataset && card.dataset.incidentId === incident.id && card.dataset.signature === signature);
+      if (prior) {
+        cards.push(prior);
+        continue;
+      }
       const card = document.createElement('div');
+      card.dataset.incidentId = incident.id;
+      card.dataset.signature = signature;
       card.className = 'device-box';
       const title = document.createElement('p');
       title.className = 'connection-status';
@@ -311,6 +362,7 @@
         card.appendChild(guidance);
       }
       const actions = document.createElement('div');
+      actions.id = 'incident-actions-' + incident.id;
       actions.className = 'actions';
       const pendingAction = (state.actionRecords || []).find((entry) => entry.incident_id === incident.id && ['reserved', 'intent_recorded', 'write_sent', 'unknown'].includes(entry.status));
       const proposal = (state.proposals || []).find((entry) => entry.incident_id === incident.id && entry.status === 'proposed');
@@ -319,8 +371,10 @@
         detail.textContent = 'Add ' + proposal.input.name + ' to confirmed track ' + proposal.selected_track + '. Preserve assignments: ' + Object.entries(proposal.expected_tracks).map(([key, value]) => key + '=' + value).join(', ') + '. Expires ' + new Date(proposal.expires_at).toISOString() + '. Other findings remain. Another OBS client may change assignments between the read and write.';
         card.appendChild(detail);
         const approve = document.createElement('button'); approve.type = 'button'; approve.textContent = 'Approve track addition';
-        approve.disabled = !state.monitoringSessionId || proposal.session_id !== state.monitoringSessionId || Date.now() >= Date.parse(proposal.expires_at) || Boolean(pendingAction);
-        approve.addEventListener('click', async () => { approve.disabled = true; try { await postPrivate('/api/v1/proposals/' + encodeURIComponent(proposal.id) + '/approve', { expected_revision: proposal.config_revision }); await loadState(); } catch (error) { showNotice(error.message || 'Approval could not be accepted.', 'error'); await loadState(); } });
+        approve.id = 'approve-' + proposal.id;
+        if (typeof setTimeout === 'function') setTimeout(() => { approve.disabled = true; }, Math.max(0, Date.parse(proposal.expires_at) - Date.now()));
+        approve.disabled = state.approving.has(proposal.id) || !state.monitoringSessionId || proposal.session_id !== state.monitoringSessionId || Date.now() >= Date.parse(proposal.expires_at) || Boolean(pendingAction);
+        approve.addEventListener('click', async () => { if (state.approving.has(proposal.id)) return; state.approving.add(proposal.id); approve.disabled = true; try { await postPrivate('/api/v1/proposals/' + encodeURIComponent(proposal.id) + '/approve', { expected_revision: proposal.config_revision }); } catch (error) { showNotice(error.message || 'Approval could not be accepted.', 'error'); } finally { state.approving.delete(proposal.id); await loadState(); } });
         actions.appendChild(approve);
       }
       const lastAction = (state.actionRecords || []).filter((entry) => entry.incident_id === incident.id).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
@@ -330,10 +384,17 @@
       }
       const terminal = ['dismissed', 'closed', 'expired', 'invalidated'].includes(incident.stage);
       const currentSession = state.monitoringSessionId && incident.session_id === state.monitoringSessionId;
+      if (incident.stage === 'closed') {
+        const closure = document.createElement('p');
+        closure.className = 'muted';
+        closure.textContent = 'Persisted closure: ' + (incident.closure_outcome || 'unknown') + '. Further feedback, recheck and approval are rejected.';
+        card.appendChild(closure);
+      }
       if (!terminal && currentSession && !pendingAction) {
         const recheck = document.createElement('button');
         recheck.type = 'button';
         recheck.className = 'secondary';
+        recheck.id = 'recheck-' + incident.id;
         recheck.textContent = 'Recheck';
         recheck.addEventListener('click', () => recheckIncident(incident.id));
         actions.appendChild(recheck);
@@ -342,12 +403,55 @@
         const dismiss = document.createElement('button');
         dismiss.type = 'button';
         dismiss.className = 'secondary';
+        dismiss.id = 'dismiss-' + incident.id;
         dismiss.textContent = 'Dismiss';
         dismiss.addEventListener('click', () => dismissIncident(incident.id));
         actions.appendChild(dismiss);
+        if (['finding_available','awaiting_approval','awaiting_feedback','unresolved','no_supported_finding','insufficient_information','interrupted'].includes(incident.stage)) {
+        const closeLabel = document.createElement('label');
+        closeLabel.textContent = 'Close outcome';
+        closeLabel.htmlFor = 'close-' + incident.id;
+        const closeSelect = document.createElement('select');
+        closeSelect.id = 'close-' + incident.id;
+        const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Choose outcome'; closeSelect.appendChild(blank);
+        for (const [value, label] of [['viewer_confirmed', 'Viewer confirmed'], ['local_only', 'Local only'], ['unresolved', 'Unresolved']]) {
+          const option = document.createElement('option'); option.value = value; option.textContent = label; closeSelect.appendChild(option);
+        }
+        closeSelect.value = state.closeOutcomes[incident.id] || '';
+        closeSelect.addEventListener('change', () => { state.closeOutcomes[incident.id] = closeSelect.value; });
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'secondary';
+        closeButton.id = 'close-button-' + incident.id;
+        closeButton.textContent = 'Close incident';
+        closeButton.disabled = !closeSelect.value;
+        closeSelect.addEventListener('change', () => { closeButton.disabled = !closeSelect.value; });
+        closeButton.addEventListener('click', () => closeIncident(incident.id, closeSelect.value));
+        actions.appendChild(closeLabel);
+        actions.appendChild(closeSelect);
+        actions.appendChild(closeButton);
+        }
       }
       card.appendChild(actions);
-      list.appendChild(card);
+      const previous = priorCards.find(item => item.dataset && item.dataset.incidentId === incident.id);
+      if (previous && typeof previous.insertBefore === 'function') {
+        patchIncidentNode(previous, card);
+        previous.dataset.signature = signature;
+        cards.push(previous);
+      } else {
+        cards.push(card);
+      }
+    }
+    if (typeof list.insertBefore === 'function') {
+      cards.forEach((card, index) => { if (list.children[index] !== card) list.insertBefore(card, list.children[index] || null); });
+      for (const old of Array.from(list.children)) if (!cards.includes(old)) old.remove();
+    } else { // Minimal Node fixture DOM; browsers use keyed reconciliation above.
+      list.replaceChildren();
+      for (const card of cards) list.appendChild(card);
+    }
+    if (focusedID && typeof document.getElementById === 'function') {
+      const restored = document.getElementById(focusedID);
+      if (restored && document.activeElement !== restored && typeof restored.focus === 'function') restored.focus();
     }
   }
 
@@ -365,8 +469,17 @@
     }
   }
 
-  async function stopMonitoring() {
+  async function closeIncident(id, outcome) {
     try {
+      await postPrivate('/api/v1/incidents/' + encodeURIComponent(id) + '/close', { outcome });
+      showNotice('Incident closed with ' + outcome + '.', 'ok');
+    } catch (error) {
+      showNotice(error.message || 'Closure was not accepted. Reloading truthful state.', 'error');
+    }
+    await loadState();
+  }
+
+  async function stopMonitoring() {    try {
       await request('/api/v1/monitoring/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf },
@@ -422,13 +535,64 @@
     }
   }
 
+  function applySection(section, chosen) {
+    if (chosen) {
+      state.sectionChosen = true;
+      try { sessionStorage.setItem('cuemender-control-section', section); } catch (_) {}
+    }
+    state.section = section;
+    for (const panel of Array.from(document.querySelectorAll ? document.querySelectorAll('#app > section.panel') : [])) {
+      if (panel.id === 'rehearsal-panel') {
+        panel.hidden = state.mode !== 'rehearsal' || section !== 'rehearsal';
+        continue;
+      }
+      panel.hidden = section === 'setup' ? panel.dataset.section !== 'setup' : panel.dataset.section !== 'monitor';
+    }
+    for (const button of queryAll('#section-tabs button')) {
+      if (button.classList) button.classList.toggle('active', button.dataset.section === section);
+    }
+  }
+
+  function renderMode(mode) {
+    state.mode = mode === 'rehearsal' ? 'rehearsal' : 'live';
+    const badge = $('mode-badge');
+    if (badge) {
+      badge.textContent = state.mode === 'rehearsal' ? 'REHEARSAL' : 'LIVE';
+      if (badge.classList) badge.classList.toggle('rehearsal', state.mode === 'rehearsal');
+    }
+    const tab = $('rehearsal-tab');
+    if (tab) {
+      tab.hidden = state.mode !== 'rehearsal';
+    }
+    const watermark = $('mode-watermark');
+    if (watermark) {
+      watermark.hidden = state.mode !== 'rehearsal';
+    }
+    if (state.mode !== 'rehearsal' && state.section === 'rehearsal') {
+      state.section = 'monitor';
+    }
+    applySection(state.section);
+  }
+
   function render(privateState) {
+    if (Number.isFinite(privateState.state_revision)) {
+      if (state.lastStateRevision !== undefined && privateState.state_revision < state.lastStateRevision) return;
+      state.lastStateRevision = privateState.state_revision;
+    }
     showApp();
     if (typeof privateState.csrf_token === 'string' && privateState.csrf_token) {
       state.csrf = privateState.csrf_token;
     }
     state.currentRevision = privateState.settings ? privateState.settings.revision : 0;
+    state.hasVisualExpectation = Boolean(privateState.settings && privateState.settings.visual);
+    renderMode(privateState.mode || 'live');
     renderMonitoring(privateState);
+    if (!state.sectionChosen) {
+      const settings = privateState.settings;
+      const unconfigured = !settings || (!settings.microphone && !settings.visual && !settings.stream_track);
+      state.section = unconfigured ? 'setup' : 'monitor';
+      applySection(state.section);
+    }
     setText('mode', privateState.mode || 'live');
     setText('revision', String(privateState.settings ? privateState.settings.revision : 0));
     setText('state-revision', String(privateState.state_revision || 0));
@@ -440,6 +604,12 @@
     setText('obs', privateState.obs ? privateState.obs.status : 'not connected');
     renderTwitch(privateState.twitch);
     renderOBS(privateState.obs, privateState.startup, privateState.obs_discovery, privateState.obs_observation, privateState.setup);
+    if (state.mode === 'rehearsal') {
+      setText('twitch', 'connected (simulated)');
+      setText('obs', 'connected (simulated)');
+      setText('twitch-status', 'Simulated connected — no real Twitch session.');
+      setText('obs-status', 'Simulated connected — no real OBS socket.');
+    }
     if (privateState.settings) {
       if (privateState.settings.revision !== state.revision) {
         state.revision = privateState.settings.revision;
@@ -457,7 +627,7 @@
       try {
         const privateState = JSON.parse(event.data);
         render(privateState);
-        setText('notice', 'Live state updated.');
+        // Keep action errors/success visible across unrelated state updates.
       } catch (_) {
         showNotice('A state update could not be read.', 'error');
       }
@@ -663,6 +833,58 @@
     }
   }
 
+  async function applyRehearsalScenario() {
+    try {
+      await postPrivate('/api/v1/rehearsal/scenario', { scenario: $('rehearsal-scenario').value });
+      state.rehearsalPublicID = '';
+      state.appliedScenario = $('rehearsal-scenario').value;
+      $('rehearsal-status').textContent = 'Scenario applied. Start monitoring, then simulate a report.';
+      await loadState();
+    } catch (error) {
+      $('rehearsal-status').textContent = error.message || 'Scenario was not applied.';
+    }
+  }
+
+  async function simulateRehearsalReport() {
+    try {
+      const scenario = state.appliedScenario;
+      const category = scenario === 'wrong_scene' || (!scenario && state.hasVisualExpectation) ? 'video' : 'audio';
+      const incident = await postPrivate('/api/v1/rehearsal/report', { category });
+      state.rehearsalPublicID = incident && incident.public_id ? incident.public_id : '';
+      $('rehearsal-status').textContent = 'Simulated ' + category + ' viewer report accepted for ' + (state.rehearsalPublicID || 'the current incident') + '.';
+      await loadState();
+    } catch (error) {
+      $('rehearsal-status').textContent = error.message || 'Simulated report was rejected.';
+    }
+  }
+
+  function rehearsalFeedbackTarget() {
+    const eligible = (state.incidents || []).filter((incident) =>
+      incident.session_id === state.monitoringSessionId &&
+      (incident.stage === 'awaiting_feedback' || incident.stage === 'unresolved'));
+    const preferred = eligible.find((incident) => incident.public_id === state.rehearsalPublicID);
+    if (state.rehearsalPublicID) return preferred || null;
+    return eligible.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0] || null;
+  }
+
+  async function simulateRehearsalFeedback(vote) {
+    const incident = rehearsalFeedbackTarget();
+    if (!incident) {
+      $('rehearsal-status').textContent = 'No current-session incident is eligible for feedback.';
+      return;
+    }
+    try {
+      const updated = await postPrivate('/api/v1/rehearsal/feedback', { public_id: incident.public_id, vote });
+      state.rehearsalPublicID = incident.public_id;
+      $('rehearsal-status').textContent = 'Simulated vote recorded for ' + incident.public_id + ': ' +
+        updated.feedback.positive + ' positive / ' + updated.feedback.negative + ' negative.';
+      await loadState();
+    } catch (error) {
+      $('rehearsal-status').textContent = error.message || 'Simulated feedback was rejected.';
+      await loadState();
+    }
+  }
+
   $('refresh').addEventListener('click', loadState);
   $('settings-form').addEventListener('submit', save);
   $('monitor-start').addEventListener('click', startMonitoring);
@@ -708,6 +930,30 @@
     $('visual-source-uuid').value = option.dataset.uuid || '';
     $('visual-context').value = option.dataset.context || '';
   });
+
+  for (const button of queryAll('#section-tabs button')) {
+    button.addEventListener('click', () => applySection(button.dataset.section, true));
+  }
+  if ($('overlay-url')) {
+    $('overlay-url').value = (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/overlay/';
+    if ($('overlay-copy')) {
+      $('overlay-copy').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText($('overlay-url').value);
+          $('overlay-copy-status').textContent = 'Copied';
+        } catch {
+          $('overlay-url').select();
+          $('overlay-copy-status').textContent = 'Select and copy';
+        }
+      });
+    }
+  }
+  if ($('rehearsal-apply')) {
+    $('rehearsal-apply').addEventListener('click', applyRehearsalScenario);
+    $('rehearsal-report').addEventListener('click', simulateRehearsalReport);
+    $('rehearsal-feedback-fixed').addEventListener('click', () => simulateRehearsalFeedback('fixed'));
+    $('rehearsal-feedback-broken').addEventListener('click', () => simulateRehearsalFeedback('stillbroken'));
+  }
 
   (async () => {
     await bootstrapFromFragment();

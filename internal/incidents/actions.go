@@ -146,7 +146,7 @@ func (c *Coordinator) Approve(ctx context.Context, id string, revision int64) (d
 	if !ready.ResolutionReady || ready.TwitchGeneration != p.TwitchGeneration {
 		return domain.Action{}, domain.ErrActionConflict
 	}
-	if err := actions.Validate(p, c.ActiveSession(), c.settings(), ready.OBSGeneration, true, c.now()); err != nil {
+	if err := actions.ValidateMode(p, c.ActiveSession(), c.settings(), ready.OBSGeneration, true, c.now(), c.mode); err != nil {
 		return domain.Action{}, err
 	}
 	inc, exists := c.Find(p.IncidentID)
@@ -195,7 +195,7 @@ func (c *Coordinator) admitDispatch(ctx context.Context, id string, f domain.Tra
 	if !ready.ResolutionReady || !ready.TwitchConnected || ready.TwitchGeneration != a.Binding.TwitchGeneration {
 		return domain.ErrActionConflict
 	}
-	if err := actions.Validate(a.Binding, c.ActiveSession(), c.settings(), ready.OBSGeneration, ready.OBSConnected, c.now()); err != nil {
+	if err := actions.ValidateMode(a.Binding, c.ActiveSession(), c.settings(), ready.OBSGeneration, ready.OBSConnected, c.now(), c.mode); err != nil {
 		return err
 	}
 	inc, ok := c.Find(a.IncidentID)
@@ -219,7 +219,7 @@ func (c *Coordinator) admitDispatch(ctx context.Context, id string, f domain.Tra
 		return err
 	}
 	ready = c.status()
-	return actions.Validate(a.Binding, c.ActiveSession(), c.settings(), ready.OBSGeneration, ready.ResolutionReady && ready.OBSConnected && ready.TwitchConnected && ready.TwitchGeneration == a.Binding.TwitchGeneration, c.now())
+	return actions.ValidateMode(a.Binding, c.ActiveSession(), c.settings(), ready.OBSGeneration, ready.ResolutionReady && ready.OBSConnected && ready.TwitchConnected && ready.TwitchGeneration == a.Binding.TwitchGeneration, c.now(), c.mode)
 }
 
 func (c *Coordinator) runAction(a domain.Action) {

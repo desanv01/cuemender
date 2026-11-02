@@ -97,6 +97,7 @@ type protocolChat struct {
 	welcome   chan string
 	help      chan string
 	chat      chan string
+	feedback  chan string
 	replies   chan string
 	handlerWG sync.WaitGroup
 }
@@ -173,6 +174,17 @@ func localTwitchServer(t *testing.T, chat *protocolChat) *httptest.Server {
 					return
 				case <-time.After(5 * time.Second):
 					return
+				}
+				if chat.feedback != nil {
+					select {
+					case text := <-chat.feedback:
+						_ = conn.WriteJSON(map[string]any{"metadata": map[string]any{"message_id": "feedback-1", "message_type": "notification", "message_timestamp": "2026-11-01T00:00:02Z"}, "payload": map[string]any{
+							"subscription": map[string]any{"type": "channel.chat.message", "version": "1"},
+							"event":        map[string]any{"broadcaster_user_id": "user-1", "chatter_user_id": "user-3", "message_id": "feedback-message", "message_type": "text", "message": map[string]any{"text": text}},
+						}})
+					case <-readDone:
+						return
+					}
 				}
 				if chat.keepalive {
 					ticker := time.NewTicker(5 * time.Second)

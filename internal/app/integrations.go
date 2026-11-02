@@ -33,6 +33,9 @@ func (a *App) onIntegrationUpdate() {
 // TwitchConnect persists the non-secret public client ID before starting the
 // asynchronous device flow.
 func (a *App) TwitchConnect(ctx context.Context, clientID string) error {
+	if a.rehearsal != nil {
+		return domain.ErrModeConflict
+	}
 	a.integrationMu.Lock()
 	defer a.integrationMu.Unlock()
 	if !twitch.ValidClientID(clientID) {
@@ -60,6 +63,9 @@ func (a *App) TwitchConnect(ctx context.Context, clientID string) error {
 }
 
 func (a *App) TwitchDisconnect(ctx context.Context) error {
+	if a.rehearsal != nil {
+		return domain.ErrModeConflict
+	}
 	a.integrationMu.Lock()
 	defer a.integrationMu.Unlock()
 	if err := a.twitchMgr.Disconnect(ctx); err != nil {
@@ -75,6 +81,9 @@ func (a *App) TwitchDisconnect(ctx context.Context) error {
 }
 
 func (a *App) OBSConnect(ctx context.Context, address string, password *string) error {
+	if a.rehearsal != nil {
+		return domain.ErrModeConflict
+	}
 	a.integrationMu.Lock()
 	defer a.integrationMu.Unlock()
 	if err := ValidateOBSAddress(address); err != nil {
@@ -109,6 +118,9 @@ func busyStatus(status string) bool {
 }
 
 func (a *App) OBSDisconnect(ctx context.Context) error {
+	if a.rehearsal != nil {
+		return domain.ErrModeConflict
+	}
 	a.integrationMu.Lock()
 	defer a.integrationMu.Unlock()
 	if err := a.obsMgr.Disconnect(ctx); err != nil {
@@ -121,6 +133,14 @@ func (a *App) OBSDisconnect(ctx context.Context) error {
 }
 
 func (a *App) OBSDiscovery(ctx context.Context) (domain.OBSDiscovery, error) {
+	if a.rehearsal != nil {
+		settings := a.currentSettings()
+		discovery, _, err := a.rehearsal.Read(ctx, settings)
+		if err != nil || discovery == nil {
+			return domain.OBSDiscovery{}, domain.ErrUnavailable
+		}
+		return *discovery, nil
+	}
 	discovery, err := a.obsMgr.RefreshDiscovery(ctx)
 	if err != nil || discovery == nil {
 		return domain.OBSDiscovery{}, domain.ErrUnavailable

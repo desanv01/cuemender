@@ -106,7 +106,7 @@ func p04OBSServer(t *testing.T) (*httptest.Server, *p04OBSFixture) {
 
 func TestP04ActualAppPrivateApprovalProtocolFlow(t *testing.T) {
 	obsServer, fixture := p04OBSServer(t)
-	chat := &protocolChat{keepalive: true, welcome: make(chan string, 1), help: make(chan string, 1), chat: make(chan string, 1), replies: make(chan string, 10)}
+	chat := &protocolChat{keepalive: true, welcome: make(chan string, 1), help: make(chan string, 1), chat: make(chan string, 1), feedback: make(chan string, 1), replies: make(chan string, 10)}
 	tw := localTwitchServer(t, chat)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -213,7 +213,13 @@ func TestP04ActualAppPrivateApprovalProtocolFlow(t *testing.T) {
 		}
 		until := time.Now().Add(120 * time.Second)
 		stopped := false
+		feedbackSent := false
 		for time.Now().Before(until) {
+			current, _ := a.coordinator.Find(p.IncidentID)
+			if current.LocalVerification == domain.LocalVerified && !feedbackSent {
+				chat.feedback <- "!fixed " + current.PublicID
+				feedbackSent = true
+			}
 			if _, err := os.Stat(filepath.Join(dir, "stop")); err == nil {
 				stopped = true
 				break
@@ -233,6 +239,9 @@ func TestP04ActualAppPrivateApprovalProtocolFlow(t *testing.T) {
 		inc, _ := a.coordinator.Find(p.IncidentID)
 		if len(inc.Findings) != 2 || inc.LocalVerification != domain.LocalVerified {
 			t.Fatal("browser flow lost remaining diagnosis")
+		}
+		if inc.Stage != domain.StageClosed || inc.ClosureOutcome != "viewer_confirmed" || inc.Feedback.Positive != 1 {
+			t.Fatalf("browser protocol feedback/closure incomplete: %+v", inc)
 		}
 		cancel()
 		select {
@@ -290,6 +299,29 @@ func TestP04ActualAppPrivateApprovalProtocolFlow(t *testing.T) {
 	if len(inc.Findings) != 2 || inc.LocalVerification != domain.LocalVerified || inc.Feedback.Positive != 0 {
 		t.Fatalf("remaining mute/local/viewer separation=%+v", inc)
 	}
+	chat.feedback <- "!fixed " + inc.PublicID
+	deadline = time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		got, _ := a.coordinator.Find(inc.ID)
+		if got.Feedback.Positive == 1 {
+			inc = got
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if inc.Feedback.Positive != 1 || inc.Feedback.Negative != 0 {
+		t.Fatalf("separate-viewer actual EventSub feedback not persisted: %+v stage=%s", inc.Feedback, inc.Stage)
+	}
+	closedRaw := post("/api/v1/incidents/"+inc.ID+"/close", map[string]any{"outcome": "viewer_confirmed"}, csrf, 200)
+	var closed struct{ Data domain.Incident }
+	if err := json.Unmarshal(closedRaw, &closed); err != nil {
+		t.Fatal(err)
+	}
+	if closed.Data.Stage != domain.StageClosed || closed.Data.ClosureOutcome != "viewer_confirmed" {
+		t.Fatalf("closure=%+v", closed.Data)
+	}
+	post("/api/v1/incidents/"+inc.ID+"/close", map[string]any{"outcome": "viewer_confirmed"}, csrf, 200)
+	post("/api/v1/incidents/"+inc.ID+"/close", map[string]any{"outcome": "unresolved"}, csrf, 409)
 	for _, path := range []string{"/public/v1/state", "/public/v1/events"} {
 		req, _ := http.NewRequest("GET", a.BaseURL()+path, nil)
 		publicCtx, stop := context.WithTimeout(ctx, time.Second)

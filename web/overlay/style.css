@@ -25,7 +25,7 @@ body {
 }
 
 .overlay {
-  max-width: 340px;
+  width: min(520px, calc(100vw - 36px));
   margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -33,6 +33,7 @@ body {
   background: var(--bg);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
 }
+.incident { margin: 8px 0 0; font-size: 0.92rem; font-weight: 650; }
 
 .eyebrow {
   margin: 0 0 2px;
@@ -55,5 +56,8 @@ body {
 
 @media (max-width: 480px) {
   body { padding: 10px; }
-  .overlay { max-width: 280px; }
+  .overlay { width: calc(100vw - 20px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
 }

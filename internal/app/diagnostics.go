@@ -19,6 +19,9 @@ func (a *App) currentSettings() domain.Settings {
 }
 
 func (a *App) monitoringReadiness() incidents.Readiness {
+	if a.rehearsal != nil {
+		return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, OBSGeneration: a.rehearsal.Generation(), ResolutionReady: true, OBSContext: "Rehearsal"}
+	}
 	if a.monitoringStatusOverride != nil {
 		return a.monitoringStatusOverride()
 	}
@@ -135,6 +138,13 @@ func (a *App) DismissIncident(ctx context.Context, incidentID string) (domain.In
 		return domain.Incident{}, domain.ErrUnavailable
 	}
 	return a.coordinator.Dismiss(ctx, incidentID)
+}
+
+func (a *App) CloseIncident(ctx context.Context, incidentID, outcome string) (domain.Incident, error) {
+	if a.coordinator == nil {
+		return domain.Incident{}, domain.ErrUnavailable
+	}
+	return a.coordinator.CloseIncident(ctx, incidentID, outcome)
 }
 
 func (a *App) ApproveProposal(ctx context.Context, id string, revision int64) (domain.Action, error) {

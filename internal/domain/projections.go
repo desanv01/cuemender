@@ -68,6 +68,7 @@ type PublicIncident struct {
 	MessageCode       string `json:"message_code"`
 	LocalVerification string `json:"local_verification"`
 	FeedbackSummary   string `json:"feedback_summary"`
+	ClosureOutcome    string `json:"closure_outcome,omitempty"`
 }
 
 // PublicState is the complete public projection. It must never contain
