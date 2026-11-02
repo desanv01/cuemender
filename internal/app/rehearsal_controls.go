@@ -42,11 +42,13 @@ func (a *App) RehearsalScenario(ctx context.Context, scenario string) (domain.Se
 		}
 	}
 	current := a.currentSettings()
+	previous := a.rehearsal.snapshot()
+	a.rehearsal.setScenario(scenario)
 	updated, err := a.SaveSettings(ctx, current.Revision, expectations)
 	if err != nil {
+		a.rehearsal.restore(previous)
 		return domain.Settings{}, err
 	}
-	a.rehearsal.setScenario(scenario)
 	return updated, nil
 }
 
@@ -96,6 +98,9 @@ func (a *App) RehearsalFeedback(ctx context.Context, publicID, vote string) (dom
 	for _, inc := range list {
 		if inc.PublicID != publicID {
 			continue
+		}
+		if inc.SessionID != session.ID || (inc.Stage != domain.StageAwaitingFeedback && inc.Stage != domain.StageUnresolved) {
+			return domain.Incident{}, domain.ErrClosureIneligible
 		}
 		if domain.StageTerminal(inc.Stage) {
 			return domain.Incident{}, domain.ErrTerminalIncident

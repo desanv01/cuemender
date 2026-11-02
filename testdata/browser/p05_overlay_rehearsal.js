@@ -10,9 +10,10 @@ function fakeNode(id) {
 const nodes = new Map();
 const node = (id) => { if (!nodes.has(id)) nodes.set(id, fakeNode(id)); return nodes.get(id); };
 let stateListener = null;
+let errorListener = null;
 const sandbox = {
   document: { getElementById: node, createElement: () => fakeNode('') },
-  EventSource: class { addEventListener(type, fn) { if (type === 'state') stateListener = fn; } },
+  EventSource: class { addEventListener(type, fn) { if (type === 'state') stateListener = fn; if (type === 'error') errorListener = fn; } },
   console,
 };
 vm.runInNewContext(script, sandbox, { filename: 'overlay-p05.js' });
@@ -31,5 +32,8 @@ if (node('panel').hidden) failures.push('active rehearsal panel hidden');
 stateListener({ data: JSON.stringify({ mode: 'live', service_status: 'idle', incidents: [] }) });
 if (!node('panel').hidden) failures.push('idle live overlay not hidden');
 if (!node('demo').hidden) failures.push('rehearsal watermark persisted into live mode');
+errorListener();
+if (node('panel').hidden) failures.push('connection error left idle overlay hidden');
+if (!text(node('status')).includes('Not connected')) failures.push('connection error did not show disconnected status');
 console.log(JSON.stringify({ failures }, null, 2));
 if (failures.length) process.exitCode = 1;

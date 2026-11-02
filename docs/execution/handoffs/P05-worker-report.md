@@ -99,3 +99,42 @@ Correction started/finished UTC: 2026-11-02T04:55Z / 2026-11-02T05:05Z. Base wor
 Remaining limits: no full private-HTTP rehearsal 202/error test, no complete production-protocol separate-viewer feedback/closure journey, no deterministic blocked scenario/approval/reconciliation interleaving, no mobile/zoom/keyboard/contrast acceptance. Live Twitch/real OBS gates remain unmet under D34/#6/#10. No Git, real services, dependencies, recording or owned processes.
 
 P05-R01 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P05-R01.md and docs/execution/handoffs/P05-review.md. Rerun the eight preserved regressions and required mode/migration, closure/feedback, simulated adapter/scenario, actual-app protocol and rendered UI boundaries. DeepSeek has stopped editing. Record acceptance or consolidated remaining corrections; live Twitch and real OBS approval remain deferred under D34/#6/#10, and P06 stays held.
+
+## P05-R02 correction evidence (appended)
+
+Correction started/finished UTC: 2026-11-02T05:51Z / 2026-11-02T06:07Z. Three supplied failures reproduced and fixed; all promoted. Original eight and prior regressions preserved. No Codex production fixes.
+
+### A — Exact intake/results and feedback
+
+- Rehearsal feedback now requires the current active session and eligible `awaiting_feedback`/`unresolved` stage before coordinator mutation; rejected votes return non-success and never "recorded". `stillbroken` normalized to `still_broken`; one simulated viewer's negative replaces positive.
+- `TestReviewP05R01FeedbackRejectsUnacceptedVotes` (both subcases) passes/promoted. `TestP05RehearsalPrivateHTTPFlow` covers actual private HTTP scenario/report 202/feedback positive→negative/close 200/post-close 409/wrong-scene video.
+- Production local OAuth/Helix/EventSub/OBS fixture now sends a separate viewer `!fixed CM-...` and closes viewer-confirmed. This exposed and fixed a real parser defect: `validIncidentCode` rejected the hyphen in CueMender public codes. `TestP04ActualAppPrivateApprovalProtocolFlow` passes with SQLite feedback/closure and idempotent/conflicting close.
+- UI report uses selected scenario (wrong_scene→video), stores accepted incident, and feedback targets current-session eligible incident rather than history[0].
+
+### B — Coherent scenario/provider and fixture provenance
+
+- Rehearsal state owns generation/revision, advances generation on scenario, and Read/Repair/ReadTrack validate actual fixture source/context/generation/revision; readback returns fixture-owned observed state. Discovery includes a direct visual item.
+- Scenario applies provider before settings publication and restores the previous provider on persistence failure; active diagnostics/pending actions reject transition. `TestReviewP05R01ScenarioPublishesMatchingProvider` now sees matching published settings/observation and generation advance; `TestReviewP05R01ReconciliationRejectsForeignSource` passes/promoted.
+- OpenMode now distinguishes missing metadata tables/rows from query failures.
+- Gap: admission guard plus stop/save is not a single coordinator-owned atomic transaction; no deterministic barrier test versus blocked diagnosis/approval/reconciliation.
+
+### C — UI and remaining evidence
+
+- Incident rendering uses stable signatures to reuse unchanged cards; closure selects/labels/blank outcome/persisted value remain; focus IDs restore. Setup initial/unconfigured and section memory retained. Overlay EventSource error unhides disconnected panel.
+- Existing six Node fixtures pass, including adapted p03 controls and overlay error assertion. No full all-scenario rendered matrix, 390 no-overflow/200% zoom/keyboard/measured contrast; 390 capture still clips.
+- No deterministic concurrent scenario/approval/reconciliation test. Private HTTP rehearsal journey is covered; production protocol separate-viewer flow is now covered.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `go test ./... -count=1 -timeout=360s` | pass all packages |
+| `go vet`; `gofmt -l cmd internal web` | clean |
+| CGo-free build | `0.5.0-p05`; 20,281,856 bytes; SHA256 `4613FE6990AD8639E733708C27864FD5FBA1CF5DBACCC1480929E31D79B5453E` |
+| Six Node actual-script fixtures | pass |
+| WSL `go test -race ./... -count=1 -timeout=480s` | pass all packages |
+| Rendered Chrome | prior Setup/overlay captures; new captures attempted but 390 still clips. No 200% zoom/keyboard/contrast. |
+
+No new dependencies, real services, Git actions, recording or owned processes. Live Twitch/real OBS gates remain unmet under D34/#6/#10; P06 held.
+
+P05-R02 corrections are ready for review. Read the appended worker evidence, docs/execution/corrections/P05-R02.md and docs/execution/handoffs/P05-R01-review.md. Verify typed acceptance, scenario/provenance ownership, actual HTTP/protocol journey and rendered UI boundaries while preserving all prior regressions. DeepSeek has stopped editing. Record acceptance or remaining corrections; D34/#6/#10 live holds and P06 hold remain.

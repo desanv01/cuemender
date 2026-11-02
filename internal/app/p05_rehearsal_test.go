@@ -1,11 +1,15 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -193,6 +197,85 @@ func TestP05RehearsalAllScenarios(t *testing.T) {
 				t.Fatal("unknown_write did not settle unknown")
 			}
 		})
+	}
+}
+
+func TestP05RehearsalPrivateHTTPFlow(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a, err := New(ctx, Options{Mode: domain.ModeRehearsal, DataDir: t.TempDir(), ListenAddress: freeP05Address(t), NoBrowser: true, Stdout: io.Discard, Stderr: io.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- a.Run(ctx) }()
+	waitHealthy(t, a.BaseURL())
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar, Timeout: 10 * time.Second}
+	post := func(path string, body any, csrf string, want int) []byte {
+		t.Helper()
+		raw, _ := json.Marshal(body)
+		req, _ := http.NewRequest("POST", a.BaseURL()+path, bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", a.BaseURL())
+		if csrf != "" {
+			req.Header.Set("X-CSRF-Token", csrf)
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		out, _ := io.ReadAll(res.Body)
+		if res.StatusCode != want {
+			t.Fatalf("%s=%d want %d: %s", path, res.StatusCode, want, out)
+		}
+		return out
+	}
+	var boot struct {
+		Data struct {
+			CSRF string `json:"csrf_token"`
+		}
+	}
+	_ = json.Unmarshal(post("/api/v1/session/bootstrap", map[string]any{"token": a.ui.BootstrapToken()}, "", 200), &boot)
+	csrf := boot.Data.CSRF
+	var scenario struct{ Data domain.Settings }
+	_ = json.Unmarshal(post("/api/v1/rehearsal/scenario", map[string]any{"scenario": "mic_muted"}, csrf, 200), &scenario)
+	post("/api/v1/monitoring/start", map[string]any{"expected_revision": scenario.Data.Revision}, csrf, 200)
+	post("/api/v1/rehearsal/report", map[string]any{"category": "audio"}, csrf, 202)
+	var incident domain.Incident
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		_, list := a.coordinator.Snapshot()
+		if len(list) > 0 && list[0].Stage == domain.StageAwaitingFeedback {
+			incident = list[0]
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if incident.ID == "" {
+		t.Fatal("rehearsal HTTP report did not settle awaiting_feedback")
+	}
+	post("/api/v1/rehearsal/feedback", map[string]any{"public_id": incident.PublicID, "vote": "fixed"}, csrf, 202)
+	var voted struct{ Data domain.Incident }
+	_ = json.Unmarshal(post("/api/v1/rehearsal/feedback", map[string]any{"public_id": incident.PublicID, "vote": "stillbroken"}, csrf, 202), &voted)
+	if voted.Data.Feedback.Positive != 0 || voted.Data.Feedback.Negative != 1 {
+		t.Fatalf("HTTP feedback replacement=%+v", voted.Data.Feedback)
+	}
+	post("/api/v1/incidents/"+incident.ID+"/close", map[string]any{"outcome": "unresolved"}, csrf, 200)
+	post("/api/v1/rehearsal/feedback", map[string]any{"public_id": incident.PublicID, "vote": "fixed"}, csrf, 409)
+	var wrongScene struct{ Data domain.Settings }
+	_ = json.Unmarshal(post("/api/v1/rehearsal/scenario", map[string]any{"scenario": "wrong_scene"}, csrf, 200), &wrongScene)
+	post("/api/v1/monitoring/start", map[string]any{"expected_revision": wrongScene.Data.Revision}, csrf, 200)
+	post("/api/v1/rehearsal/report", map[string]any{"category": "video"}, csrf, 202)
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("rehearsal HTTP app did not stop")
 	}
 }
 

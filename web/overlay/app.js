@@ -71,7 +71,9 @@
     }
   });
   events.addEventListener('error', () => {
+    panelNode.hidden = false;
     statusNode.textContent = 'Not connected';
-    detailNode.textContent = 'Waiting for CueMender.';
+    detailNode.textContent = 'CueMender connection is unavailable.';
+    incidentsNode.replaceChildren();
   });
 })();

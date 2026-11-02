@@ -12,15 +12,44 @@ import (
 // rehearsalState is an in-process provider used only by --mode rehearsal. It
 // never constructs a socket, dialer, keyring or live sender.
 type rehearsalState struct {
-	mu       sync.Mutex
-	scenario string
-	tracks   map[string]bool
-	mute     *bool
-	written  bool
+	mu         sync.Mutex
+	scenario   string
+	tracks     map[string]bool
+	mute       *bool
+	written    bool
+	generation uint64
+	revision   int64
 }
 
 func newRehearsalState(settings domain.Settings) *rehearsalState {
-	return &rehearsalState{scenario: "track_missing", tracks: trackMap(false), mute: boolPtr(false)}
+	return &rehearsalState{scenario: "track_missing", tracks: trackMap(false), mute: boolPtr(false), generation: 1, revision: settings.Revision}
+}
+
+type rehearsalSnapshot struct {
+	scenario   string
+	tracks     map[string]bool
+	mute       *bool
+	written    bool
+	generation uint64
+	revision   int64
+}
+
+func (r *rehearsalState) snapshot() rehearsalSnapshot {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return rehearsalSnapshot{scenario: r.scenario, tracks: cloneTrackMap(r.tracks), mute: r.mute, written: r.written, generation: r.generation, revision: r.revision}
+}
+
+func (r *rehearsalState) restore(s rehearsalSnapshot) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.scenario, r.tracks, r.mute, r.written, r.generation, r.revision = s.scenario, s.tracks, s.mute, s.written, s.generation, s.revision
+}
+
+func (r *rehearsalState) Generation() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.generation
 }
 
 func boolPtr(v bool) *bool { return &v }
@@ -36,6 +65,7 @@ func (r *rehearsalState) setScenario(name string) {
 	defer r.mu.Unlock()
 	r.scenario = name
 	r.written = false
+	r.generation++
 	switch name {
 	case "mic_muted":
 		r.mute = boolPtr(true)
@@ -52,12 +82,15 @@ func (r *rehearsalState) setScenario(name string) {
 func (r *rehearsalState) Read(_ context.Context, settings domain.Settings) (*domain.OBSDiscovery, *domain.OBSObservation, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.revision = settings.Revision
 	now := time.Now().UTC()
 	discovery := &domain.OBSDiscovery{
-		Generation: 1, ConfigRevision: settings.Revision, SceneCollection: "Rehearsal", CollectionKnown: true,
+		Generation: r.generation, ConfigRevision: settings.Revision, SceneCollection: "Rehearsal", CollectionKnown: true,
 		CapturedAt: now,
 		Inputs:     []domain.OBSInput{{Name: "Rehearsal Mic", UUID: "rehearsal-mic"}},
-		Scenes:     []domain.OBSScene{{Name: "Rehearsal Main", UUID: "rehearsal-scene"}},
+		Scenes: []domain.OBSScene{{Name: "Rehearsal Main", UUID: "rehearsal-scene", Items: []domain.OBSSceneItem{
+			{ID: 1, SourceName: "Rehearsal Camera", SourceUUID: "rehearsal-camera", Enabled: true},
+		}}},
 	}
 	scene := "Rehearsal Main"
 	sceneUUID := "rehearsal-scene"
@@ -65,7 +98,7 @@ func (r *rehearsalState) Read(_ context.Context, settings domain.Settings) (*dom
 		scene, sceneUUID = "Rehearsal Other", "rehearsal-other"
 	}
 	obs := &domain.OBSObservation{
-		Generation: 1, ConfigRevision: settings.Revision, SceneCollection: "Rehearsal", ObservedAt: now,
+		Generation: r.generation, ConfigRevision: settings.Revision, SceneCollection: "Rehearsal", ObservedAt: now,
 		Microphone: &domain.InputRef{Name: "Rehearsal Mic", UUID: "rehearsal-mic"},
 		Mute:       r.mute, Tracks: cloneTrackMap(r.tracks), ProgramScene: scene, ProgramSceneUUID: sceneUUID,
 		VisualItemEnabled: boolPtr(true), Streaming: boolPtr(true),
@@ -84,7 +117,11 @@ func cloneTrackMap(in map[string]bool) map[string]bool {
 func (r *rehearsalState) ReadTrack(_ context.Context, req domain.TrackStateRequest) (domain.TrackState, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(r.tracks), Generation: req.Generation, ConfigRevision: req.ConfigRevision, ObservedAt: time.Now().UTC()}, nil
+	if req.Input.Name != "Rehearsal Mic" || req.Input.UUID != "rehearsal-mic" || req.Input.Context != "Rehearsal" ||
+		req.Generation != r.generation || (r.revision != 0 && req.ConfigRevision != r.revision) {
+		return domain.TrackState{}, domain.ErrActionConflict
+	}
+	return domain.TrackState{Input: req.Input, Tracks: cloneTrackMap(r.tracks), Generation: r.generation, ConfigRevision: r.revision, ObservedAt: time.Now().UTC()}, nil
 }
 
 func (r *rehearsalState) Repair(ctx context.Context, req domain.TrackRepairRequest, admit func(domain.TrackRepairPreflight) error) domain.TrackRepairResult {
@@ -94,12 +131,17 @@ func (r *rehearsalState) Repair(ctx context.Context, req domain.TrackRepairReque
 	r.mu.Lock()
 	scenario := r.scenario
 	actual := cloneTrackMap(r.tracks)
+	generation := r.generation
+	revision := r.revision
 	r.mu.Unlock()
 	invalid := func(code string) domain.TrackRepairResult {
 		return domain.TrackRepairResult{ActionID: req.ActionID, Generation: req.Generation, ConfigRevision: req.ConfigRevision, Status: domain.TrackRepairInvalidated, DetailCode: code}
 	}
 	if req.Input.Name != "Rehearsal Mic" || req.Input.UUID != "rehearsal-mic" || req.Input.Context != "Rehearsal" {
 		return invalid("input_identity_mismatch")
+	}
+	if req.Generation != generation || (revision != 0 && req.ConfigRevision != revision) {
+		return invalid("generation_or_revision_mismatch")
 	}
 	if req.SelectedTrack < 1 || req.SelectedTrack > 6 {
 		return invalid("selected_track_invalid")

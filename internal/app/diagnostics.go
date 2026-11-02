@@ -20,7 +20,7 @@ func (a *App) currentSettings() domain.Settings {
 
 func (a *App) monitoringReadiness() incidents.Readiness {
 	if a.rehearsal != nil {
-		return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, OBSGeneration: 1, ResolutionReady: true, OBSContext: "Rehearsal"}
+		return incidents.Readiness{TwitchConnected: true, TwitchGeneration: 1, OBSConnected: true, OBSGeneration: a.rehearsal.Generation(), ResolutionReady: true, OBSContext: "Rehearsal"}
 	}
 	if a.monitoringStatusOverride != nil {
 		return a.monitoringStatusOverride()

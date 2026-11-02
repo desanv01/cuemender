@@ -20,6 +20,7 @@ func TestParseCommandExact(t *testing.T) {
 		{"!issuevideo", CommandIssueVideo, "", true},
 		{"!streamhelp", CommandStreamHelp, "", true},
 		{"!fixed ab12", CommandFixed, "AB12", true},
+		{"!fixed CM-ABC123", CommandFixed, "CM-ABC123", true},
 		{"!stillbroken XY9Z", CommandStillBroken, "XY9Z", true},
 		{"!issue audio", "", "", false},
 		{"!issueaudio extra", "", "", false},

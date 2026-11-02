@@ -169,10 +169,30 @@ func OpenMode(ctx context.Context, path, mode string) (*Store, error) {
 	}
 
 	var schemaVersion int
-	_ = db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&schemaVersion)
+	var schemaTable int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_migrations'`).Scan(&schemaTable); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("inspect schema metadata: %w", err)
+	}
+	if schemaTable > 0 {
+		if err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&schemaVersion); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("inspect schema version: %w", err)
+		}
+	}
 	var priorMode string
 	if schemaVersion > 0 {
-		_ = db.QueryRowContext(ctx, `SELECT value FROM db_meta WHERE key = 'mode'`).Scan(&priorMode)
+		var metaTable int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='db_meta'`).Scan(&metaTable); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("inspect mode metadata: %w", err)
+		}
+		if metaTable > 0 {
+			if err := db.QueryRowContext(ctx, `SELECT value FROM db_meta WHERE key = 'mode'`).Scan(&priorMode); err != nil && err != sql.ErrNoRows {
+				db.Close()
+				return nil, fmt.Errorf("read database mode: %w", err)
+			}
+		}
 		if priorMode != "" && priorMode != mode {
 			db.Close()
 			return nil, fmt.Errorf("%w: database is %s, requested %s", domain.ErrModeConflict, priorMode, mode)

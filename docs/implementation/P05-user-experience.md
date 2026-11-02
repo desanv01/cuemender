@@ -42,9 +42,23 @@ Known P05-R01 limits: no full private HTTP rehearsal 202/error flow test, no com
 
 
 
+## P05-R02 corrections
+
+- Feedback now requires the current active session and an eligible `awaiting_feedback`/`unresolved` incident before calling the coordinator; rejected targets return non-success and never report a recorded vote. `stillbroken` is normalized to the coordinator's `still_broken`.
+- Rehearsal provider generation is owned by the fixture and advances on each scenario transition; observations, readiness, proposals and readback use that generation. Reads/repair validate fixture source/context/generation/revision and return fixture-owned observed state. Direct visual-item identity is present.
+- Scenario application sets/restores the provider around settings persistence, rejects active diagnostics/pending actions, and publishes settings with the matching provider observation/revision.
+- Twitch command parsing now accepts the hyphenated public incident codes used by CueMender (`CM-XXXXXX`); the production OAuth/Helix/EventSub/OBS fixture now covers separate-viewer feedback, closure idempotency/conflict and public projection.
+- Private HTTP rehearsal flow covers scenario 200, report 202, feedback 202/replacement, close 200, post-close feedback 409 and wrong-scene video report.
+- UI report category follows the selected scenario (wrong_scene→video), report responses select the accepted incident, feedback targets the active-session eligible incident, and keyed render signatures preserve unchanged incident controls; closure selections and focus IDs remain. Overlay EventSource error now unhides a disconnected panel.
+- OpenMode distinguishes absent metadata tables/rows from query failures.
+
+Remaining P05-R02 limits: no deterministic barrier test for scenario versus blocked diagnosis/approval/reconciliation; scenario admission is guarded but not implemented as a single coordinator-owned transaction; no full 390/200%-zoom/keyboard/contrast acceptance (the 390 capture still clips); no measured contrast. Live Twitch/OBS approval remain unmet.
+
+
+
 ## Limits
 
 - Live Twitch, real private-UI OBS approval trial, V14 real journey and final V18/V19 remain unmet under D34/issues #6/#10.
-- Rehearsal HTTP routes are covered by app-level isolation tests and live-mode 409 route tests; full rehearsal 202 route/UI flow has not been rendered end to end.
+- Private HTTP rehearsal 202/error/closure flow is covered. No deterministic scenario-versus-blocked-diagnosis/approval/reconciliation test; admission is guarded but not one coordinator-owned transaction.
 - No full keyboard/screen-reader/200%-zoom audit or measured contrast. The actual 390px Chrome capture still clips at the right edge; desktop Setup/Monitor and overlay captures exist, but mobile no-overflow is not verified.
 - No new dependency/SDK/credential changes. No real OBS contact, login, authorization, chat or recording.

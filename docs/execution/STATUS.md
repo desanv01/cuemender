@@ -1,9 +1,9 @@
 # Execution status
 
 Revision: 2.8
-Last update: 2026-11-02T05:47Z
+Last update: 2026-11-02T06:07Z
 Current packet: P05
-Current state: changes_required
+Current state: ready_for_review
 Current owner: Codex
 Released packet revision: P05-R02 v1.0 against P05 v1.1, CONTRACTS v1.5/C11 and visual brief v1.0
 Code writer active: none
@@ -51,7 +51,7 @@ Correction: docs/execution/corrections/P05-R02.md; worker checkpoint 8275fca
 Correction tracking: https://github.com/desanv01/cuemender/issues/8
 P02 compatibility: docs/implementation/P02-compatibility.md
 Unmet live gates: P02-A/V06 and P03-D live Twitch deferred under D30/issue #6; P04-A/V11 real private-UI approved OBS correction unmet under issue #10. P02-B/V07 read-only live OBS remains passed from closure and does not satisfy V11.
-Next action: One DeepSeek worker executes P05-R02 A–C after user dispatch: typed acceptance/UI targeting, coherent owned scenario/provider transition, stable UI and missing required local acceptance evidence. P06 remains held.
+Next action: Codex reviews P05-R02 actual changes and evidence, including typed/HTTP and production-protocol feedback/closure, generation-coherent simulated provider, UI targeting/focus, Node/Go/race results and the remaining atomic-scenario/visual limits. P06 remains held.
 P04 tracking: https://github.com/desanv01/cuemender/issues/10
 P04 source checkpoint: 6e37c8d1dbbb82bf6f27cc49a64f4b671f8e8db6 (adapter 44295ec; release docs 74c45bd)
 P04 integration PR: https://github.com/desanv01/cuemender/pull/11 — merged as conditional development baseline under D34; live acceptance pending
@@ -63,6 +63,8 @@ P05 started at (UTC): 2026-11-02T04:19Z
 P05 finished at (UTC): 2026-11-02T04:42Z
 P05-R01 started at (UTC): 2026-11-02T04:55Z
 P05-R01 finished at (UTC): 2026-11-02T05:05Z
+P05-R02 started at (UTC): 2026-11-02T05:51Z
+P05-R02 finished at (UTC): 2026-11-02T06:07Z
 P05 expected report: docs/execution/handoffs/P05-worker-report.md
 P05 design brief: docs/execution/P05-VISUAL-BRIEF.md; 12ui retry authorized but service budget exhausted, no generated design claim
 Additional deferred evidence: real P05-A/V14 end-to-end journey and final V18/V19; local protocol/rehearsal work proceeds
@@ -76,7 +78,7 @@ P02 setup: docs/implementation/P02-setup.md
 | P02 | conditionally accepted development baseline; local/live OBS passed; Twitch deferred | P02-codex-closure-review.md + D30 | V06 remains required before final readiness |
 | P03 | accepted local baseline; live Twitch deferred under D30 | P03-codex-closure-review.md | No worker dispatch; P04 subsequently released under D32 |
 | P04 | conditionally accepted local development baseline; real approval pending | P04-review.md + D34 | Integrated via PR #11; issue #10 stays open |
-| P05 | changes_required — P05-R02 released; false acceptance, incoherent rehearsal publication and UI failures reproduced | P05-R01-review.md | One worker dispatch; P06 held |
+| P05 | ready_for_review — P05-R02 corrections; atomic-scenario/visual acceptance gaps recorded | P05-R01-review.md | Codex acceptance or consolidated corrections; P06 held |
 | P06 | planned / held | Not started | Codex acceptance of P05 and release |
 | Submission | planned | Not started | Release review and user-controlled external steps |
 

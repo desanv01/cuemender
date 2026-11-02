@@ -553,7 +553,7 @@ func (a *App) privateLocked() domain.PrivateState {
 	if a.rehearsal != nil {
 		now := a.now().UTC()
 		twitchState = domain.TwitchConnection{Status: domain.ConnectionConnected, ConnectionGeneration: 1, Login: "rehearsal"}
-		obsState = domain.OBSConnection{Status: domain.ConnectionConnected, Generation: 1, ConfigRevision: a.settings.Revision, SceneCollection: "Rehearsal", ObservedAt: &now, Broadcasting: boolPtr(true)}
+		obsState = domain.OBSConnection{Status: domain.ConnectionConnected, Generation: a.rehearsal.Generation(), ConfigRevision: a.settings.Revision, SceneCollection: "Rehearsal", ObservedAt: &now, Broadcasting: boolPtr(true)}
 		discovery, observation, _ = a.rehearsal.Read(context.Background(), a.settings)
 		resolutionReady = true
 	} else {

@@ -3,7 +3,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const queryAll = (selector) => typeof document.querySelectorAll === 'function' ? Array.from(document.querySelectorAll(selector)) : [];
-  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor', sectionChosen: false, closeOutcomes: {} };
+  const state = { csrf: '', revision: 0, currentRevision: 0, monitoringSessionId: '', incidents: [], connected: false, discovery: null, discoverySignature: '', mode: 'live', section: 'monitor', sectionChosen: false, closeOutcomes: {}, rehearsalPublicID: '' };
   let events = null;
 
   class ApiError extends Error {
@@ -268,15 +268,29 @@
     if (!list) {
       return;
     }
-    list.replaceChildren();
     const focusedID = document.activeElement && document.activeElement.id ? document.activeElement.id : '';
+    const priorCards = Array.from(list.children || []);
+    const cards = [];
     if (!incidents.length) {
       list.replaceChildren();
       list.textContent = 'No incidents in this session.';
       return;
     }
     for (const incident of incidents) {
+      const signature = JSON.stringify({
+        stage: incident.stage, feedback: incident.feedback, local_verification: incident.local_verification,
+        closure_outcome: incident.closure_outcome, report_count: incident.report_count,
+        findings: (incident.findings || []).map((finding) => finding.code),
+        checks: (incident.checks || []).map((check) => check.unavailable_reason || check.status),
+        streaming: incident.streaming,
+      });
+      const prior = priorCards.find((card) => card.dataset && card.dataset.incidentId === incident.id && card.dataset.signature === signature);
+      if (prior) {
+        cards.push(prior);
+        continue;
+      }
       const card = document.createElement('div');
+      card.dataset = { incidentId: incident.id, signature };
       card.className = 'device-box';
       const title = document.createElement('p');
       title.className = 'connection-status';
@@ -384,8 +398,10 @@
         actions.appendChild(closeButton);
       }
       card.appendChild(actions);
-      list.appendChild(card);
+      cards.push(card);
     }
+    list.replaceChildren();
+    for (const card of cards) list.appendChild(card);
     if (focusedID && typeof document.getElementById === 'function') {
       const restored = document.getElementById(focusedID);
       if (restored && typeof restored.focus === 'function') restored.focus();
@@ -774,26 +790,41 @@
 
   async function simulateRehearsalReport() {
     try {
-      await postPrivate('/api/v1/rehearsal/report', { category: 'audio' });
-      $('rehearsal-status').textContent = 'Simulated viewer report accepted.';
+      const scenario = $('rehearsal-scenario') ? $('rehearsal-scenario').value : 'track_missing';
+      const category = scenario === 'wrong_scene' ? 'video' : 'audio';
+      const incident = await postPrivate('/api/v1/rehearsal/report', { category });
+      state.rehearsalPublicID = incident && incident.public_id ? incident.public_id : '';
+      $('rehearsal-status').textContent = 'Simulated ' + category + ' viewer report accepted for ' + (state.rehearsalPublicID || 'the current incident') + '.';
       await loadState();
     } catch (error) {
       $('rehearsal-status').textContent = error.message || 'Simulated report was rejected.';
     }
   }
 
+  function rehearsalFeedbackTarget() {
+    const eligible = (state.incidents || []).filter((incident) =>
+      incident.session_id === state.monitoringSessionId &&
+      (incident.stage === 'awaiting_feedback' || incident.stage === 'unresolved'));
+    const preferred = eligible.find((incident) => incident.public_id === state.rehearsalPublicID);
+    if (preferred) return preferred;
+    return eligible.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0] || null;
+  }
+
   async function simulateRehearsalFeedback(vote) {
-    const incident = (state.incidents || [])[0];
+    const incident = rehearsalFeedbackTarget();
     if (!incident) {
-      $('rehearsal-status').textContent = 'Run a simulated report first.';
+      $('rehearsal-status').textContent = 'No current-session incident is eligible for feedback.';
       return;
     }
     try {
-      await postPrivate('/api/v1/rehearsal/feedback', { public_id: incident.public_id, vote });
-      $('rehearsal-status').textContent = 'Simulated vote recorded with the single rehearsal viewer.';
+      const updated = await postPrivate('/api/v1/rehearsal/feedback', { public_id: incident.public_id, vote });
+      state.rehearsalPublicID = incident.public_id;
+      $('rehearsal-status').textContent = 'Simulated vote recorded for ' + incident.public_id + ': ' +
+        updated.feedback.positive + ' positive / ' + updated.feedback.negative + ' negative.';
       await loadState();
     } catch (error) {
       $('rehearsal-status').textContent = error.message || 'Simulated feedback was rejected.';
+      await loadState();
     }
   }
 
